@@ -107,19 +107,21 @@ elif len(selected_attrs) == 2:
     
     # Marcar inviáveis (N < 100)
     inter_grouped['Viável'] = inter_grouped['N'] >= 100
+    inter_grouped['Global Mean'] = global_favorable_rate
     
-    bar_inter = alt.Chart(inter_grouped).mark_bar().encode(
+    base_bar = alt.Chart(inter_grouped).mark_bar().encode(
         x=alt.X(f"{selected_attrs[1]}:N", title=selected_attrs[1]),
         y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
         color=f"{selected_attrs[0]}:N",
-        column=f"{selected_attrs[0]}:N",
         opacity=alt.condition(alt.datum.Viável, alt.value(1.0), alt.value(0.3)),
         tooltip=[selected_attrs[0], selected_attrs[1], 'N', alt.Tooltip("Taxa Favorável:Q", format=".1%")]
     ).properties(width=150, height=350)
     
-    rule_inter = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(color='red', strokeDash=[5, 5]).encode(y='mean:Q')
+    rule_inter = alt.Chart(inter_grouped).mark_rule(color='red', strokeDash=[5, 5]).encode(y='Global Mean:Q')
     
-    st.altair_chart((bar_inter + rule_inter), use_container_width=False)
+    layered_chart = (base_bar + rule_inter).facet(column=f"{selected_attrs[0]}:N")
+    
+    st.altair_chart(layered_chart, use_container_width=False)
     st.caption("Barras translúcidas indicam N < 100 (subgrupo inviável estatisticamente). Linha vermelha = Média Global.")
 
 else:
