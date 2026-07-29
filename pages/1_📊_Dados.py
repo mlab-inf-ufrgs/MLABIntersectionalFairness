@@ -136,7 +136,7 @@ else:
         return f'color: {color}'
         
     st.dataframe(
-        audit_df.style.applymap(color_verdict, subset=['Audit Veredict'])
+        audit_df.style.map(color_verdict, subset=['Audit Veredict'])
               .format({'Favorable Rate': '{:.2%}', 'Real Gap (Intersectional)': '{:.4f}', 
                        'Expected Gap (Max Marginal)': '{:.4f}', 'Hidden Bias (Surplus)': '{:.4f}',
                        'Priority Score': '{:.2f}', 'Pre-training DI': '{:.4f}'}),
