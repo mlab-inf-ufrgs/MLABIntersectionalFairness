@@ -7,3 +7,5 @@ statsmodels
 ucimlrepo
 scikit-learn
 setuptools
+
+folktables
