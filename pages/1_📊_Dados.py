@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -38,6 +39,8 @@ with st.spinner("Carregando e processando dados..."):
 target_col = dataset_info['target']
 favorable_val = dataset_info['favorable_val']
 protected_attrs = dataset_info['protected_attributes']
+proxy_attrs = dataset_info.get('proxy_attributes', [])
+all_attrs = protected_attrs + proxy_attrs
 
 # Card de metadados do dataset
 with st.container(border=True):
@@ -51,6 +54,9 @@ with st.container(border=True):
         st.markdown(
             f"**Classe favorável:** `{favorable_val}` — {dataset_info.get('favorable_label', '')}"
         )
+        st.markdown(f"**Atributos protegidos (Demográficos):** {', '.join(protected_attrs)}")
+        if proxy_attrs:
+            st.markdown(f"**Proxies (Socioeconômicos/Comportamentais):** {', '.join(proxy_attrs)}")
         link = dataset_info.get('link', '')
         if link:
             st.markdown(f"🔗 [Fonte original]({link})")
@@ -91,10 +97,11 @@ st.divider()
 # ---------------------------------------------------------
 # Bloco 2: Viés Unidimensional
 # ---------------------------------------------------------
+# ---------------------------------------------------------
 st.header("2. Viés Unidimensional")
 st.markdown("Taxa de resultado favorável por subgrupo marginal.")
 
-uni_attr = st.radio("Selecione 1 atributo sensível:", protected_attrs, horizontal=True)
+uni_attr = st.radio("Selecione 1 atributo:", all_attrs, horizontal=True)
 
 global_favorable_rate = (df[target_col] == favorable_val).mean()
 
@@ -122,7 +129,7 @@ st.divider()
 st.header("3. Viés Interseccional")
 st.markdown("Selecione múltiplos atributos para análise de interseccionalidade e Justice Gerrymandering.")
 
-selected_attrs = st.multiselect("Selecione 2 ou mais atributos:", protected_attrs, default=protected_attrs[:2])
+selected_attrs = st.multiselect("Selecione 2 ou mais atributos:", all_attrs, default=all_attrs[:2])
 
 if len(selected_attrs) < 2:
     st.warning("Selecione pelo menos 2 atributos para análise interseccional.")
