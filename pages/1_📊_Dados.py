@@ -10,13 +10,33 @@ st.set_page_config(page_title="Dados (EDA)", page_icon="📊", layout="wide")
 st.title("Análise Exploratória e Viés Social Pré-Treino")
 
 # ---------------------------------------------------------
-# Seletor de Dataset
+# Seletor cascata: País/Região → Dataset
 # ---------------------------------------------------------
-dataset_name = st.selectbox("Selecione o Dataset:", list(DATASETS.keys()))
-dataset_info = DATASETS[dataset_name]
+COUNTRY_ORDER = ['🇧🇷 Brasil', '🇺🇸 Estados Unidos', '🇵🇹 Portugal', '🌐 Internacional']
 
-if 'description' in dataset_info:
-    st.info(dataset_info['description'])
+countries = sorted(
+    set(info['country'] for info in DATASETS.values()),
+    key=lambda x: COUNTRY_ORDER.index(x) if x in COUNTRY_ORDER else 99
+)
+
+selected_country = st.selectbox("Selecione o país/região:", countries)
+filtered_datasets = {k: v for k, v in DATASETS.items() if v['country'] == selected_country}
+
+dataset_name = st.selectbox("Selecione o Dataset:", list(filtered_datasets.keys()))
+dataset_info = filtered_datasets[dataset_name]
+
+# Card de metadados do dataset
+with st.container(border=True):
+    col_desc, col_stats = st.columns([3, 1])
+    with col_desc:
+        st.markdown(f"**Domínio:** {dataset_info.get('domain', '—')}")
+        st.markdown(dataset_info.get('description', ''))
+        link = dataset_info.get('link', '')
+        if link:
+            st.markdown(f"🔗 [Fonte original]({link})")
+    with col_stats:
+        st.metric("N (aprox.)", dataset_info.get('n_approx', '') or '—')
+        st.metric("Ano", dataset_info.get('year', '') or '—')
 
 @st.cache_data
 def load_data(name):
@@ -29,7 +49,7 @@ target_col = dataset_info['target']
 favorable_val = dataset_info['favorable_val']
 protected_attrs = dataset_info['protected_attributes']
 
-st.markdown(f"**Alvo ({target_col}):** A classe favorável é `{favorable_val}`. **N Total:** {len(df)}")
+st.markdown(f"**Alvo ({target_col}):** A classe favorável é `{favorable_val}`. **N Total:** {len(df):,}")
 
 st.divider()
 
