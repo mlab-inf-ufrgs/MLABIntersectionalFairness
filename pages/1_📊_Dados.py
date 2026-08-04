@@ -22,21 +22,11 @@ countries = sorted(
 selected_country = st.selectbox("Selecione o país/região:", countries)
 filtered_datasets = {k: v for k, v in DATASETS.items() if v['country'] == selected_country}
 
-dataset_name = st.selectbox("Selecione o Dataset:", list(filtered_datasets.keys()))
+# Monta nomes de exibição com ícone de domínio
+display_map = {f"{v['icon']} {k}": k for k, v in filtered_datasets.items()}
+selected_display = st.selectbox("Selecione o Dataset:", list(display_map.keys()))
+dataset_name = display_map[selected_display]
 dataset_info = filtered_datasets[dataset_name]
-
-# Card de metadados do dataset
-with st.container(border=True):
-    col_desc, col_stats = st.columns([3, 1])
-    with col_desc:
-        st.markdown(f"**Domínio:** {dataset_info.get('domain', '—')}")
-        st.markdown(dataset_info.get('description', ''))
-        link = dataset_info.get('link', '')
-        if link:
-            st.markdown(f"🔗 [Fonte original]({link})")
-    with col_stats:
-        st.metric("N (aprox.)", dataset_info.get('n_approx', '') or '—')
-        st.metric("Ano", dataset_info.get('year', '') or '—')
 
 @st.cache_data
 def load_data(name):
@@ -49,9 +39,27 @@ target_col = dataset_info['target']
 favorable_val = dataset_info['favorable_val']
 protected_attrs = dataset_info['protected_attributes']
 
-st.markdown(f"**Alvo ({target_col}):** A classe favorável é `{favorable_val}`. **N Total:** {len(df):,}")
+# Card de metadados do dataset
+with st.container(border=True):
+    col_desc, col_stats = st.columns([3, 1])
+    with col_desc:
+        st.markdown(f"**Domínio:** {dataset_info.get('domain', '—')}")
+        st.markdown(dataset_info.get('description', ''))
+        st.markdown(
+            f"**Alvo:** `{target_col}` — {dataset_info.get('target_label', '')}"
+        )
+        st.markdown(
+            f"**Classe favorável:** `{favorable_val}` — {dataset_info.get('favorable_label', '')}"
+        )
+        link = dataset_info.get('link', '')
+        if link:
+            st.markdown(f"🔗 [Fonte original]({link})")
+    with col_stats:
+        st.metric("N Total", f"{len(df):,}")
+        st.metric("Ano", dataset_info.get('year', '') or '—')
 
 st.divider()
+
 
 # ---------------------------------------------------------
 # Bloco 1: Distribuição Geral
