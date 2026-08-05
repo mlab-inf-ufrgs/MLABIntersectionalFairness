@@ -29,7 +29,7 @@ DATASETS = {
         'icon': '💰',
         'domain': 'Censo Demográfico / Renda',
         'link': 'https://archive.ics.uci.edu/dataset/2/adult',
-        'year': '1996',
+        'year': '1994',
         'original_n': 48842,
         'target_label': 'Renda anual',
         'favorable_label': 'Renda > $50K (classe privilegiada)',
@@ -67,6 +67,22 @@ DATASETS = {
     #     'target_label': 'Seguro de saúde público',
     #     'favorable_label': 'Possui cobertura',
     #     'description': "Prevê a probabilidade de um indivíduo possuir cobertura de seguro-saúde público, fortemente associado a determinantes sociais da saúde."
+    # },
+    # 'NIJ Recidivism 🇺🇸': {
+    #     'loader': lambda: load_local_parquet('nij_processed.parquet'),
+    #     'target': 'Recidivism_Arrest',
+    #     'favorable_val': 0,
+    #     'protected_attributes': ['Sex', 'Race', 'Age'],
+    #     'proxy_attributes': [],
+    #     'country': '🇺🇸 Estados Unidos',
+    #     'icon': '🚔',
+    #     'domain': 'Justiça Criminal',
+    #     'link': 'https://nij.ojp.gov/funding/recidivism-forecasting-challenge',
+    #     'year': '2021',
+    #     'original_n': 25835,
+    #     'target_label': 'Reincidência criminal',
+    #     'favorable_label': 'Não reincidência',
+    #     'description': "Prevê reincidência criminal ao longo de 1, 2 e 3 anos, com base em dados de indivíduos soltos na Geórgia (2013-2015)."
     # },
     # ------------------------------------------------------------------------
     'COMPAS 🇺🇸': {
