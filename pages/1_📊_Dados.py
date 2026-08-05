@@ -61,8 +61,12 @@ with st.container(border=True):
         if link:
             st.markdown(f"🔗 [Fonte original]({link})")
     with col_stats:
-        st.metric("N Original (Bruto)", dataset_info.get('original_n') or dataset_info.get('n_approx', '—'))
-        st.metric("N Pós-processamento", f"{len(df):,}")
+        orig_n = dataset_info.get('original_n')
+        orig_n_str = f"{orig_n:,}".replace(',', '.') if orig_n else dataset_info.get('n_approx', '—')
+        processed_n_str = f"{len(df):,}".replace(',', '.')
+        
+        st.metric("N Original (Bruto)", orig_n_str)
+        st.metric("N Pós-processamento", processed_n_str)
         st.metric("Ano", dataset_info.get('year', '') or '—')
 
 st.divider()

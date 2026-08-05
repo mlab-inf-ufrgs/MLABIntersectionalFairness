@@ -30,7 +30,7 @@ DATASETS = {
         'domain': 'Censo Demográfico / Renda',
         'link': 'https://archive.ics.uci.edu/dataset/2/adult',
         'year': '1996',
-        'original_n': '48.842',
+        'original_n': 48842,
         'target_label': 'Renda anual',
         'favorable_label': 'Renda > $50K (classe privilegiada)',
         'description': "Avalia se a renda anual excede $50K. Atributos sensíveis incluem sexo, raça e escolaridade. Grupos frequentemente privilegiados: Homens Brancos."
@@ -81,7 +81,7 @@ DATASETS = {
         'domain': 'Justiça Criminal',
         'link': 'https://github.com/propublica/compas-analysis',
         'year': '2016',
-        'original_n': '7.214',
+        'original_n': 7214,
         'target_label': 'Reincidência criminal em 2 anos',
         'favorable_label': 'Não reincidência',
         'description': "Estima o risco de reincidência criminal em 2 anos. Atributos sensíveis incluem raça e sexo. O viés estrutural frequentemente superestima o risco para réus afro-americanos."
@@ -98,7 +98,7 @@ DATASETS = {
         'domain': 'Educação Superior',
         'link': 'https://archive.ics.uci.edu/dataset/697/predict+students+dropout+and+academic+success',
         'year': '2022',
-        'original_n': '4.424',
+        'original_n': 4424,
         'target_label': 'Desfecho acadêmico',
         'favorable_label': 'Formatura ou matrícula ativa',
         'description': "Prevê a evasão ou formatura de estudantes universitários. Atributos sensíveis abrangem gênero, idade e qualificação dos pais. Curiosidade: mulheres apresentam taxas naturais de retenção significativamente maiores."
@@ -115,7 +115,7 @@ DATASETS = {
         'domain': 'Saúde (Benchmark Sintético)',
         'link': 'https://www.openml.org/search?type=data&sort=runs&id=44203&status=active',
         'year': '2022',
-        'original_n': '32.768',
+        'original_n': 32768,
         'target_label': 'Diagnóstico clínico',
         'favorable_label': 'Diagnóstico favorável',
         'description': "Desenvolvido especificamente para auditar diagnósticos clínicos com disparidades interseccionais (ex: viés oculto exacerbado na interseção entre raça e sexo)."
