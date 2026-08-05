@@ -2,16 +2,27 @@ from .adult import load_and_preprocess_adult
 from .compas import load_and_preprocess_compas
 from .dropout import load_and_preprocess_dropout
 from .intersectional_bias import load_and_preprocess_intersectional_bias
+from .loaders_folktables import load_and_preprocess_folktables_income, load_and_preprocess_folktables_coverage
 from .loaders_datasus import load_and_preprocess_sih, load_and_preprocess_sim, load_and_preprocess_sinasc
 from .loaders_cadunico import load_and_preprocess_cadunico
-from .loaders_folktables import load_and_preprocess_folktables_income, load_and_preprocess_folktables_coverage
+
+import os
+import pandas as pd
+import streamlit as st
+
+@st.cache_data
+def load_local_parquet(file_name):
+    """Lê um dataset pré-processado da pasta local data/processed/"""
+    path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data', 'processed', file_name))
+    return pd.read_parquet(path)
 
 # Dictionary mapping dataset names to their loader functions and relevant metadata
 DATASETS = {
-    'Adult (Legacy) 🇺🇸': {
-        'loader': load_and_preprocess_adult,
+    'Adult 🇺🇸': {
+        'loader': lambda: load_local_parquet('adult_processed.parquet'),
         'target': 'income',
         'favorable_val': 1,
+        'target_mapping': {1: '> $50K', 0: '<= $50K'},
         'protected_attributes': ['sex', 'race', 'age_group'],
         'proxy_attributes': ['education_group', 'relationship'],
         'country': '🇺🇸 Estados Unidos',
@@ -24,42 +35,45 @@ DATASETS = {
         'favorable_label': 'Renda > $50K (classe privilegiada)',
         'description': "Avalia se a renda anual excede $50K. Atributos sensíveis incluem sexo, raça e escolaridade. Grupos frequentemente privilegiados: Homens Brancos."
     },
-    'ACSIncome (Folktables) 🇺🇸': {
-        'loader': load_and_preprocess_folktables_income,
-        'target': 'PINCP',
-        'favorable_val': 1,
-        'protected_attributes': ['SEX', 'RAC1P', 'AGEP_Group'],
-        'proxy_attributes': ['SCHL'],
-        'country': '🇺🇸 Estados Unidos',
-        'icon': '💵',
-        'domain': 'Censo Demográfico / Renda (ACS)',
-        'link': 'https://github.com/socialfoundations/folktables',
-        'year': '2018',
-        'n_approx': '~370K (CA)',
-        'target_label': 'Renda anual',
-        'favorable_label': 'Renda > $50K',
-        'description': "Substituto moderno do Adult, baseado no American Community Survey (ACS). Avalia se a renda anual excede $50K, com dados contemporâneos."
-    },
-    'ACSPublicCoverage (Folktables) 🇺🇸': {
-        'loader': load_and_preprocess_folktables_coverage,
-        'target': 'PUBCOV',
-        'favorable_val': 1,
-        'protected_attributes': ['SEX', 'RAC1P', 'AGEP_Group'],
-        'proxy_attributes': [],
-        'country': '🇺🇸 Estados Unidos',
-        'icon': '🏥',
-        'domain': 'Saúde Pública / Cobertura',
-        'link': 'https://github.com/socialfoundations/folktables',
-        'year': '2018',
-        'n_approx': '~370K (CA)',
-        'target_label': 'Seguro de saúde público',
-        'favorable_label': 'Possui cobertura',
-        'description': "Prevê a probabilidade de um indivíduo possuir cobertura de seguro-saúde público, fortemente associado a determinantes sociais da saúde."
-    },
+    # --- OCULTADOS PARA A PROPOSTA DE TESE (Serão ativados na Tese final) ---
+    # 'ACSIncome (Folktables) 🇺🇸': {
+    #     'loader': lambda: load_local_parquet('acsincome_processed.parquet'),
+    #     'target': 'PINCP',
+    #     'favorable_val': 1,
+    #     'protected_attributes': ['SEX', 'RAC1P', 'AGEP_Group'],
+    #     'proxy_attributes': ['SCHL'],
+    #     'country': '🇺🇸 Estados Unidos',
+    #     'icon': '💵',
+    #     'domain': 'Censo Demográfico / Renda (ACS)',
+    #     'link': 'https://github.com/socialfoundations/folktables',
+    #     'year': '2018',
+    #     'n_approx': '~370K (CA)',
+    #     'target_label': 'Renda anual',
+    #     'favorable_label': 'Renda > $50K',
+    #     'description': "Substituto moderno do Adult, baseado no American Community Survey (ACS). Avalia se a renda anual excede $50K, com dados contemporâneos."
+    # },
+    # 'ACSPublicCoverage (Folktables) 🇺🇸': {
+    #     'loader': lambda: load_local_parquet('acspubliccoverage_processed.parquet'),
+    #     'target': 'PUBCOV',
+    #     'favorable_val': 1,
+    #     'protected_attributes': ['SEX', 'RAC1P', 'AGEP_Group'],
+    #     'proxy_attributes': [],
+    #     'country': '🇺🇸 Estados Unidos',
+    #     'icon': '🏥',
+    #     'domain': 'Saúde Pública / Cobertura',
+    #     'link': 'https://github.com/socialfoundations/folktables',
+    #     'year': '2018',
+    #     'n_approx': '~370K (CA)',
+    #     'target_label': 'Seguro de saúde público',
+    #     'favorable_label': 'Possui cobertura',
+    #     'description': "Prevê a probabilidade de um indivíduo possuir cobertura de seguro-saúde público, fortemente associado a determinantes sociais da saúde."
+    # },
+    # ------------------------------------------------------------------------
     'COMPAS 🇺🇸': {
-        'loader': load_and_preprocess_compas,
+        'loader': lambda: load_local_parquet('compas_processed.parquet'),
         'target': 'two_year_recid',
         'favorable_val': 0,  # Favorable is NOT recidivating
+        'target_mapping': {0: 'Não Reincidente', 1: 'Reincidente'},
         'protected_attributes': ['sex', 'race', 'age_group'],
         'proxy_attributes': [],
         'country': '🇺🇸 Estados Unidos',
@@ -73,9 +87,10 @@ DATASETS = {
         'description': "Estima o risco de reincidência criminal em 2 anos. Atributos sensíveis incluem raça e sexo. O viés estrutural frequentemente superestima o risco para réus afro-americanos."
     },
     'Dropout 🇵🇹': {
-        'loader': load_and_preprocess_dropout,
+        'loader': lambda: load_local_parquet('dropout_processed.parquet'),
         'target': 'Target',
         'favorable_val': 1,  # Graduate
+        'target_mapping': {1: 'Formatura/Ativo', 0: 'Evasão'},
         'protected_attributes': ['Gender', 'Age_Group'],
         'proxy_attributes': ['Mother_Qualification_Group'],
         'country': '🇵🇹 Portugal',
@@ -89,9 +104,10 @@ DATASETS = {
         'description': "Prevê a evasão ou formatura de estudantes universitários. Atributos sensíveis abrangem gênero, idade e qualificação dos pais. Curiosidade: mulheres apresentam taxas naturais de retenção significativamente maiores."
     },
     'Intersectional Bias 🌐': {
-        'loader': load_and_preprocess_intersectional_bias,
+        'loader': lambda: load_local_parquet('intersectional_bias_processed.parquet'),
         'target': 'diagnosis',
         'favorable_val': 1,
+        'target_mapping': {1: 'Favorável', 0: 'Desfavorável'},
         'protected_attributes': ['race', 'sex'],
         'proxy_attributes': [],
         'country': '🌐 Internacional',
@@ -156,6 +172,7 @@ DATASETS = {
         'loader': load_and_preprocess_cadunico,
         'target': 'pobreza_extrema',
         'favorable_val': 0,  # Not in extreme poverty
+        'target_mapping': {0: 'Acima da Extrema Pobreza', 1: 'Extrema Pobreza'},
         'protected_attributes': ['raca_cor', 'sexo'],
         'proxy_attributes': ['escolaridade'],
         'country': '🇧🇷 Brasil',

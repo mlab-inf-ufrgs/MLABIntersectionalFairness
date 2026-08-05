@@ -71,7 +71,14 @@ st.divider()
 # Bloco 1: Distribuição Geral
 # ---------------------------------------------------------
 st.header("1. Distribuição Geral do Alvo")
-target_counts = df[target_col].value_counts().reset_index()
+
+# Cria uma cópia apenas para a visualização
+df_viz = df.copy()
+target_mapping = dataset_info.get('target_mapping')
+if target_mapping:
+    df_viz[target_col] = df_viz[target_col].map(target_mapping)
+
+target_counts = df_viz[target_col].value_counts().reset_index()
 target_counts.columns = [target_col, 'count']
 
 # Filtro
