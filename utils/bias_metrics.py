@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import itertools
 from scipy.stats import chi2_contingency
 from statsmodels.stats.proportion import proportion_confint
 
@@ -148,7 +149,62 @@ def calculate_base_metrics(df, dataset_info):
         'DI Pre-train': di_pre_train
     }
 
+def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
+    """
+    Varre todos os pares de atributos selecionados e compara a disparidade máxima marginal
+    com a disparidade máxima interseccional.
+    """
+    results = []
+    
+    marginal_gaps = {}
+    for attr in attributes:
+        rates = df.groupby(attr)[target_col].apply(lambda x: (x == favorable_val).mean())
+        if len(rates) > 1:
+            marginal_gaps[attr] = rates.max() - rates.min()
+        else:
+            marginal_gaps[attr] = 0.0
 
+    pairs = list(itertools.combinations(attributes, 2))
+    
+    for pair in pairs:
+        attr_a, attr_b = pair
+        gap_a = marginal_gaps[attr_a]
+        gap_b = marginal_gaps[attr_b]
+        
+        expected_gap = max(gap_a, gap_b)
+        
+        inter_stats = df.groupby(list(pair), observed=True)[target_col].agg(
+            rate=lambda x: (x == favorable_val).mean(),
+            n='count'
+        )
+        
+        viable_stats = inter_stats[inter_stats['n'] >= 100]
+        
+        if len(viable_stats) > 1:
+            real_gap = viable_stats['rate'].max() - viable_stats['rate'].min()
+        elif len(inter_stats) > 1:
+            real_gap = inter_stats['rate'].max() - inter_stats['rate'].min()
+        else:
+            real_gap = 0.0
+            
+        hidden_bias = real_gap - expected_gap
+        
+        if hidden_bias > 0.05:
+            verdict = "⚠️ GERRYMANDERING"
+        else:
+            verdict = "OK"
+            
+        results.append({
+            'Intersection Pair': f"{attr_a} × {attr_b}",
+            'Indiv. Gap A': gap_a,
+            'Indiv. Gap B': gap_b,
+            'Expected Gap (Max Marginal)': expected_gap,
+            'Real Gap (Intersectional)': real_gap,
+            'Hidden Bias (Surplus)': hidden_bias,
+            'Audit Veredict': verdict
+        })
+        
+    return pd.DataFrame(results)
 def calculate_model_fairness_metrics(y_true, y_pred, sensitive_attr):
     """
     To be used in the 'Modelos' tab later.

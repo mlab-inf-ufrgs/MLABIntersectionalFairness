@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import altair as alt
 from data_module import DATASETS
-from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v
+from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v, pairwise_gerrymandering_audit
 
 st.set_page_config(page_title="Dados (EDA)", page_icon="📊", layout="wide")
 
@@ -120,31 +120,48 @@ st.divider()
 # Bloco 2: Viés Unidimensional
 # ---------------------------------------------------------
 # ---------------------------------------------------------
-st.header("2. Viés Unidimensional")
-st.markdown("Taxa de resultado favorável por subgrupo marginal.")
-
-uni_attr = st.radio("Selecione 1 atributo:", all_attrs, horizontal=True)
+st.header("2. Viés Unidimensional (Taxas Marginais)")
+st.markdown("Comparativo da taxa de resultado favorável por todos os subgrupos protegidos e *proxies* (linhas de base marginais).")
 
 global_favorable_rate = (df[target_col] == favorable_val).mean()
 
-uni_grouped = df.groupby(uni_attr)[target_col].apply(
-    lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
-).unstack().reset_index()
+marginal_frames = []
+for attr in all_attrs:
+    attr_grouped = df.groupby(attr)[target_col].apply(
+        lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
+    ).unstack().reset_index()
+    attr_grouped.rename(columns={attr: 'Subgrupo'}, inplace=True)
+    attr_grouped['Atributo'] = attr
+    marginal_frames.append(attr_grouped)
 
-# Linha de média global
-base_chart = alt.Chart(uni_grouped).encode(x=alt.X(f"{uni_attr}:N", title=uni_attr))
-bar = base_chart.mark_bar(opacity=0.8).encode(
+marginal_df = pd.concat(marginal_frames, ignore_index=True)
+marginal_df['Subgrupo'] = marginal_df['Subgrupo'].astype(str)
+
+base_chart = alt.Chart(marginal_df).encode(
+    x=alt.X("Subgrupo:N", title=None, axis=alt.Axis(labelAngle=-45)),
     y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
-    color=f"{uni_attr}:N",
-    tooltip=[uni_attr, alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
+    color=alt.Color("Atributo:N", legend=None),
+    tooltip=['Atributo', 'Subgrupo', alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
 )
-text = base_chart.mark_text(dy=-5).encode(
+
+bar = base_chart.mark_bar(opacity=0.9)
+
+text = base_chart.mark_text(dy=-5, fontSize=10).encode(
     y=alt.Y("Taxa Favorável:Q"),
     text=alt.Text('N:Q')
 )
-rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(color='red', strokeDash=[5, 5]).encode(y='mean:Q')
 
-st.altair_chart((bar + text + rule).properties(height=350), use_container_width=True)
+rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(
+    color='red', strokeDash=[5, 5]
+).encode(y='mean:Q')
+
+layered = (bar + text + rule)
+
+faceted_chart = layered.facet(
+    column=alt.Column("Atributo:N", title=None, header=alt.Header(labelOrient='bottom', titleOrient='bottom', labelFontWeight='bold'))
+).resolve_scale(x='independent')
+
+st.altair_chart(faceted_chart, use_container_width=False)
 
 st.divider()
 
@@ -158,68 +175,128 @@ selected_attrs = st.multiselect("Selecione 2 ou mais atributos:", all_attrs, def
 
 if len(selected_attrs) < 2:
     st.warning("Selecione pelo menos 2 atributos para análise interseccional.")
-elif len(selected_attrs) == 2:
-    st.subheader("Visualização Interseccional (2 Atributos)")
-    
-    inter_grouped = df.groupby(selected_attrs)[target_col].apply(
-        lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
-    ).unstack().reset_index()
-    
-    # Marcar inviáveis (N < 100)
-    inter_grouped['Viável'] = inter_grouped['N'] >= 100
-    inter_grouped['Global Mean'] = global_favorable_rate
-    
-    base_bar_chart = alt.Chart(inter_grouped).encode(
-        x=alt.X(f"{selected_attrs[1]}:N", title=selected_attrs[1]),
-        y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
-        color=f"{selected_attrs[0]}:N",
-        opacity=alt.condition(alt.datum.Viável, alt.value(1.0), alt.value(0.3)),
-        tooltip=[selected_attrs[0], selected_attrs[1], alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
-    ).properties(width=150, height=350)
-    
-    base_bar = base_bar_chart.mark_bar()
-    text = base_bar_chart.mark_text(dy=-5).encode(text='N:Q')
-    
-    rule_inter = alt.Chart(inter_grouped).mark_rule(color='red', strokeDash=[5, 5]).encode(y='Global Mean:Q')
-    
-    layered_chart = (base_bar + text + rule_inter).facet(column=f"{selected_attrs[0]}:N")
-    
-    st.altair_chart(layered_chart, use_container_width=False)
-    st.caption("Barras translúcidas indicam N < 100 (subgrupo inviável estatisticamente). Linha vermelha = Média Global.")
-
 else:
-    st.subheader("Auditoria de Justice Gerrymandering (3+ Atributos)")
+    tab1, tab2 = st.tabs(["Auditoria de Subgrupos", "Auditoria em Pares (Global)"])
     
-    with st.spinner("Calculando métricas de Gerrymandering..."):
-        audit_df = intersectional_audit_metrics(df, selected_attrs, target_col, favorable_val)
-    
-    # Estilização condicional
-    def color_verdict(val):
-        color = 'green' if val == 'Ok' else 'orange' if 'Inviable' in val else 'red'
-        return f'color: {color}'
+    with tab1:
+        if len(selected_attrs) == 2:
+            st.subheader("Visualização Interseccional (2 Atributos)")
+            
+            inter_grouped = df.groupby(selected_attrs)[target_col].apply(
+                lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
+            ).unstack().reset_index()
+            
+            # Marcar inviáveis (N < 100)
+            inter_grouped['Viável'] = inter_grouped['N'] >= 100
+            inter_grouped['Global Mean'] = global_favorable_rate
+            
+            base_bar_chart = alt.Chart(inter_grouped).encode(
+                x=alt.X(f"{selected_attrs[1]}:N", title=selected_attrs[1]),
+                y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
+                color=f"{selected_attrs[0]}:N",
+                opacity=alt.condition(alt.datum.Viável, alt.value(1.0), alt.value(0.3)),
+                tooltip=[selected_attrs[0], selected_attrs[1], alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
+            ).properties(width=150, height=350)
+            
+            base_bar = base_bar_chart.mark_bar()
+            text = base_bar_chart.mark_text(dy=-5).encode(text='N:Q')
+            
+            rule_inter = alt.Chart(inter_grouped).mark_rule(color='red', strokeDash=[5, 5]).encode(y='Global Mean:Q')
+            
+            layered_chart = (base_bar + text + rule_inter).facet(column=f"{selected_attrs[0]}:N")
+            
+            st.altair_chart(layered_chart, use_container_width=False)
+            st.caption("Barras translúcidas indicam N < 100 (subgrupo inviável estatisticamente). Linha vermelha = Média Global.")
         
-    st.dataframe(
-        audit_df.style.map(color_verdict, subset=['Audit Veredict'])
-              .format({'Favorable Rate': '{:.2%}', 'Real Gap (Intersectional)': '{:.4f}', 
-                       'Expected Gap (Max Marginal)': '{:.4f}', 'Hidden Bias (Surplus)': '{:.4f}',
-                       'Priority Score': '{:.2f}', 'Pre-training DI': '{:.4f}'}),
-        use_container_width=True
-    )
-    
-    st.caption("Subgrupos com N < 100 são marcados como 'Inviable'. DI pré-treinamento indica Pre-training Disparate Impact contra a média global.")
-    
-    # Exportação Long CSV
-    long_csv = audit_df.melt(id_vars=['Subgroup', 'N'], 
-                             value_vars=['Favorable Rate', 'Real Gap (Intersectional)', 'Expected Gap (Max Marginal)', 'Hidden Bias (Surplus)', 'Priority Score', 'Pre-training DI'],
-                             var_name='Metrica', value_name='Valor')
-    long_csv.insert(0, 'Dataset', dataset_name)
-    
-    st.download_button(
-        label="📥 Exportar Dados (CSV Longo Consolidado)",
-        data=long_csv.to_csv(index=False).encode('utf-8'),
-        file_name=f"{dataset_name}_intersectional_audit_long.csv",
-        mime="text/csv"
-    )
+        else:
+            st.subheader("Auditoria de Justice Gerrymandering (3+ Atributos)")
+            
+            with st.spinner("Calculando métricas de Gerrymandering..."):
+                audit_df = intersectional_audit_metrics(df, selected_attrs, target_col, favorable_val)
+            
+            # Estilização condicional
+            def color_verdict(val):
+                color = 'green' if val == 'Ok' else 'orange' if 'Inviable' in val else 'red'
+                return f'color: {color}'
+                
+            st.dataframe(
+                audit_df.style.map(color_verdict, subset=['Audit Veredict'])
+                      .format({'Favorable Rate': '{:.2%}', 'Real Gap (Intersectional)': '{:.4f}', 
+                               'Expected Gap (Max Marginal)': '{:.4f}', 'Hidden Bias (Surplus)': '{:.4f}',
+                               'Priority Score': '{:.2f}', 'Pre-training DI': '{:.4f}'}),
+                use_container_width=True
+            )
+            
+            st.caption("Subgrupos com N < 100 são marcados como 'Inviable'. DI pré-treinamento indica Pre-training Disparate Impact contra a média global.")
+            
+            # Exportação Long CSV
+            long_csv = audit_df.melt(id_vars=['Subgroup', 'N'], 
+                                     value_vars=['Favorable Rate', 'Real Gap (Intersectional)', 'Expected Gap (Max Marginal)', 'Hidden Bias (Surplus)', 'Priority Score', 'Pre-training DI'],
+                                     var_name='Metrica', value_name='Valor')
+            long_csv.insert(0, 'Dataset', dataset_name)
+            
+            st.download_button(
+                label="📥 Exportar Dados (CSV Longo Consolidado)",
+                data=long_csv.to_csv(index=False).encode('utf-8'),
+                file_name=f"{dataset_name}_intersectional_audit_long.csv",
+                mime="text/csv"
+            )
+
+    with tab2:
+        st.subheader("Auditoria de Gerrymandering em Pares (Global)")
+        st.markdown("Esta visão varre **todos os pares possíveis** entre os atributos selecionados para encontrar a disparidade máxima na margem versus na interseção.")
+        
+        with st.spinner("Varrendo pares..."):
+            pair_df = pairwise_gerrymandering_audit(df, selected_attrs, target_col, favorable_val)
+            
+        def color_pair_verdict(val):
+            return 'background-color: #ffcccc; color: #cc0000; font-weight: bold;' if 'GERRYMANDERING' in val else ''
+            
+        st.dataframe(
+            pair_df.style.map(color_pair_verdict, subset=['Audit Veredict'])
+                  .format({
+                      'Indiv. Gap A': '{:.2%}',
+                      'Indiv. Gap B': '{:.2%}',
+                      'Expected Gap (Max Marginal)': '{:.2%}',
+                      'Real Gap (Intersectional)': '{:.2%}',
+                      'Hidden Bias (Surplus)': '{:+.2%}'
+                  }),
+            use_container_width=True
+        )
+        
+        st.markdown(f"**{dataset_name} — Gap Audit: Single-Axis vs. Intersectional Disparity**")
+        
+        melted_pairs = pair_df.melt(
+            id_vars=['Intersection Pair'],
+            value_vars=['Expected Gap (Max Marginal)', 'Real Gap (Intersectional)'],
+            var_name='Gap Type',
+            value_name='Gap Amplitude (%)'
+        )
+        
+        base = alt.Chart(melted_pairs).encode(
+            x=alt.X('Intersection Pair:N', title='', axis=alt.Axis(labelAngle=-45)),
+            y=alt.Y('Gap Amplitude (%):Q', title='Gap Amplitude (%)', scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color('Gap Type:N', 
+                scale=alt.Scale(range=['#4c6b8b', '#002f6c']),
+                legend=alt.Legend(title="", orient="top-left")
+            )
+        )
+        
+        bars = base.mark_bar(xOffset=alt.XOffset("Gap Type:N"))
+        
+        text = base.mark_text(
+            align='center',
+            baseline='bottom',
+            dy=-5,
+            fontSize=10
+        ).encode(
+            xOffset=alt.XOffset("Gap Type:N"),
+            text=alt.Text('Gap Amplitude (%):Q', format='.1%')
+        ).transform_filter(
+            alt.datum['Gap Type'] == 'Real Gap (Intersectional)'
+        )
+        
+        st.altair_chart((bars + text).properties(height=400), use_container_width=True)
 
 st.divider()
 
