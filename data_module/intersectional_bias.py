@@ -5,24 +5,21 @@ import streamlit as st
 @st.cache_data
 def load_and_preprocess_intersectional_bias():
     """
-    Loads the Intersectional Bias dataset (OpenML ID 44203).
-    Target: 'diagnosis' (favorable=0)
+    Loads the Intersectional Bias TRAINING dataset (OpenML ID 44202, v.2).
+    10.000 instâncias sintéticas de saúde mental (esquizofrenia/depressão).
+    Target: 'diagnosis' (favorable=0, sem diagnóstico de doença)
     
     Privileged Groups:
         - race: White
-        - sex: Female
-        
-    Dataset is simulated and needs no cleaning.
+        - sex: Male
     """
-    # Fetch dataset
-    data = fetch_openml(data_id=44203, as_frame=True, parser='auto')
+    data = fetch_openml(data_id=44202, as_frame=True, parser='auto')
     df = data.frame
     
-    # Target is diagnosis (favorable = 0)
-    # Just ensure it's integer for consistency
     df.columns = df.columns.str.lower()
     
     if 'diagnosis' in df.columns:
         df['diagnosis'] = df['diagnosis'].astype(int)
         
     return df
+
