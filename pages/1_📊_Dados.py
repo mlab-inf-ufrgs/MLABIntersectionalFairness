@@ -121,47 +121,73 @@ st.divider()
 # ---------------------------------------------------------
 # ---------------------------------------------------------
 st.header("2. Viés Unidimensional (Taxas Marginais)")
-st.markdown("Comparativo da taxa de resultado favorável por todos os subgrupos protegidos e *proxies* (linhas de base marginais).")
+st.markdown("Comparativo da taxa de resultado favorável por subgrupos protegidos e *proxies* (linhas de base marginais).")
+
+view_mode = st.radio("Nível de Zoom:", ["Visão Global (Todos os Atributos)", "Visão Individual (1 Atributo)"], horizontal=True)
 
 global_favorable_rate = (df[target_col] == favorable_val).mean()
 
-marginal_frames = []
-for attr in all_attrs:
-    attr_grouped = df.groupby(attr)[target_col].apply(
+if view_mode == "Visão Global (Todos os Atributos)":
+    marginal_frames = []
+    for attr in all_attrs:
+        attr_grouped = df.groupby(attr)[target_col].apply(
+            lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
+        ).unstack().reset_index()
+        attr_grouped.rename(columns={attr: 'Subgrupo'}, inplace=True)
+        attr_grouped['Atributo'] = attr
+        marginal_frames.append(attr_grouped)
+
+    marginal_df = pd.concat(marginal_frames, ignore_index=True)
+    marginal_df['Subgrupo'] = marginal_df['Subgrupo'].astype(str)
+
+    base_chart = alt.Chart(marginal_df).encode(
+        x=alt.X("Subgrupo:N", title=None, axis=alt.Axis(labelAngle=-45)),
+        y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
+        color=alt.Color("Atributo:N", legend=None),
+        tooltip=['Atributo', 'Subgrupo', alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
+    )
+
+    bar = base_chart.mark_bar(opacity=0.9)
+
+    text = base_chart.mark_text(dy=-5, fontSize=10).encode(
+        y=alt.Y("Taxa Favorável:Q"),
+        text=alt.Text('N:Q')
+    )
+
+    rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(
+        color='red', strokeDash=[5, 5]
+    ).encode(y='mean:Q')
+
+    layered = (bar + text + rule)
+
+    faceted_chart = layered.facet(
+        column=alt.Column("Atributo:N", title=None, header=alt.Header(labelOrient='bottom', titleOrient='bottom', labelFontWeight='bold'))
+    ).resolve_scale(x='independent')
+
+    st.altair_chart(faceted_chart, use_container_width=False)
+
+else:
+    uni_attr = st.selectbox("Selecione o atributo para inspecionar:", all_attrs)
+    
+    uni_grouped = df.groupby(uni_attr)[target_col].apply(
         lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
     ).unstack().reset_index()
-    attr_grouped.rename(columns={attr: 'Subgrupo'}, inplace=True)
-    attr_grouped['Atributo'] = attr
-    marginal_frames.append(attr_grouped)
 
-marginal_df = pd.concat(marginal_frames, ignore_index=True)
-marginal_df['Subgrupo'] = marginal_df['Subgrupo'].astype(str)
+    base_chart = alt.Chart(uni_grouped).encode(x=alt.X(f"{uni_attr}:N", title=uni_attr, axis=alt.Axis(labelAngle=0)))
+    bar = base_chart.mark_bar(opacity=0.9).encode(
+        y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
+        color=alt.Color(f"{uni_attr}:N", legend=None),
+        tooltip=[uni_attr, alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
+    )
+    text = base_chart.mark_text(dy=-5, fontSize=12).encode(
+        y=alt.Y("Taxa Favorável:Q"),
+        text=alt.Text('N:Q')
+    )
+    rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(
+        color='red', strokeDash=[5, 5]
+    ).encode(y='mean:Q')
 
-base_chart = alt.Chart(marginal_df).encode(
-    x=alt.X("Subgrupo:N", title=None, axis=alt.Axis(labelAngle=-45)),
-    y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
-    color=alt.Color("Atributo:N", legend=None),
-    tooltip=['Atributo', 'Subgrupo', alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
-)
-
-bar = base_chart.mark_bar(opacity=0.9)
-
-text = base_chart.mark_text(dy=-5, fontSize=10).encode(
-    y=alt.Y("Taxa Favorável:Q"),
-    text=alt.Text('N:Q')
-)
-
-rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(
-    color='red', strokeDash=[5, 5]
-).encode(y='mean:Q')
-
-layered = (bar + text + rule)
-
-faceted_chart = layered.facet(
-    column=alt.Column("Atributo:N", title=None, header=alt.Header(labelOrient='bottom', titleOrient='bottom', labelFontWeight='bold'))
-).resolve_scale(x='independent')
-
-st.altair_chart(faceted_chart, use_container_width=False)
+    st.altair_chart((bar + text + rule).properties(height=350), use_container_width=True)
 
 st.divider()
 
