@@ -108,7 +108,7 @@ DATASETS = {
         'favorable_val': 1,  # Graduate
         'target_mapping': {1: 'Formatura/Ativo', 0: 'Evasão'},
         'protected_attributes': ['Gender', 'Age_Group'],
-        'proxy_attributes': ['Mother_Qualification_Group'],
+        'proxy_attributes': ['Mother_Qualification_Group', 'Debtor', 'Scholarship holder'],
         'country': '🇵🇹 Portugal',
         'icon': '🎓',
         'domain': 'Educação Superior',
