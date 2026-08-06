@@ -96,6 +96,59 @@ def intersectional_audit_metrics(df, sensitive_attrs, target_col, favorable_val=
         
     return pd.DataFrame(results)
 
+def calculate_base_metrics(df, dataset_info):
+    """
+    Calculates the base metrics from Table 1 of the paper:
+    - Class Dist (%)
+    - CI Ratio
+    - DI Pre-train
+    """
+    target_col = dataset_info['target']
+    favorable_val = dataset_info['favorable_val']
+    
+    # Class Dist and CI Ratio
+    counts = df[target_col].value_counts()
+    if len(counts) == 2:
+        # Assuming binary target
+        maj_count = counts.max()
+        min_count = counts.min()
+        total = maj_count + min_count
+        maj_pct = (maj_count / total) * 100
+        min_pct = (min_count / total) * 100
+        class_dist = f"{maj_pct:.1f} / {min_pct:.1f}"
+        ci_ratio = maj_count / min_count if min_count > 0 else 0
+    else:
+        class_dist = "N/A"
+        ci_ratio = 0
+        
+    # DI Pre-train
+    di_pre_train = "N/A"
+    primary_protected = dataset_info.get('primary_protected')
+    privileged_group = dataset_info.get('privileged_group')
+    unprivileged_group = dataset_info.get('unprivileged_group')
+    di_target_val = dataset_info.get('di_target_val', favorable_val)
+    
+    if primary_protected and privileged_group and unprivileged_group and primary_protected in df.columns:
+        priv_df = df[df[primary_protected] == privileged_group]
+        unpriv_df = df[df[primary_protected] == unprivileged_group]
+        
+        if len(priv_df) > 0 and len(unpriv_df) > 0:
+            priv_rate = (priv_df[target_col] == di_target_val).mean()
+            unpriv_rate = (unpriv_df[target_col] == di_target_val).mean()
+            
+            if priv_rate > 0:
+                di_pre_train = unpriv_rate / priv_rate
+                di_pre_train = f"{di_pre_train:.2f}"
+            else:
+                di_pre_train = "N/A"
+                
+    return {
+        'Class Dist (%)': class_dist,
+        'CI Ratio': f"{ci_ratio:.2f}" if isinstance(ci_ratio, float) else "N/A",
+        'DI Pre-train': di_pre_train
+    }
+
+
 def calculate_model_fairness_metrics(y_true, y_pred, sensitive_attr):
     """
     To be used in the 'Modelos' tab later.
