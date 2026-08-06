@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import altair as alt
 from data_module import DATASETS
-from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics
+from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v
 
 st.set_page_config(page_title="Dados (EDA)", page_icon="📊", layout="wide")
 
@@ -69,13 +69,13 @@ with st.container(border=True):
         st.metric("N Pós-processamento", processed_n_str)
         st.metric("Ano", dataset_info.get('year', '') or '—')
         
-        base_metrics = calculate_base_metrics(df, dataset_info)
-        st.divider()
-        st.markdown("**Métricas (Tabela 1)**")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Class Dist (%)", base_metrics['Class Dist (%)'])
-        c2.metric("CI Ratio", base_metrics['CI Ratio'])
-        c3.metric("DI Pre-train", base_metrics['DI Pre-train'])
+    st.divider()
+    st.markdown("**Métricas Globais de Viés Pré-treino (Tabela 1)**")
+    base_metrics = calculate_base_metrics(df, dataset_info)
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Class Dist (%)", base_metrics['Class Dist (%)'])
+    c2.metric("CI Ratio", base_metrics['CI Ratio'])
+    c3.metric("DI Pre-train", base_metrics['DI Pre-train'])
 
 st.divider()
 
@@ -103,12 +103,14 @@ selected_classes = st.multiselect(
 
 filtered_counts = target_counts[target_counts[target_col].isin(selected_classes)]
 
-chart_general = alt.Chart(filtered_counts).mark_bar().encode(
+base_general = alt.Chart(filtered_counts).encode(
     x=alt.X(f"{target_col}:N", title="Classe"),
     y=alt.Y("count:Q", title="Frequência"),
     color=f"{target_col}:N",
-    tooltip=[target_col, 'count']
+    tooltip=[target_col, alt.Tooltip("count:Q", title="N")]
 ).properties(height=300)
+
+chart_general = base_general.mark_bar() + base_general.mark_text(dy=-5).encode(text='count:Q')
 
 st.altair_chart(chart_general, use_container_width=True)
 
@@ -126,20 +128,23 @@ uni_attr = st.radio("Selecione 1 atributo:", all_attrs, horizontal=True)
 global_favorable_rate = (df[target_col] == favorable_val).mean()
 
 uni_grouped = df.groupby(uni_attr)[target_col].apply(
-    lambda x: (x == favorable_val).mean()
-).reset_index()
-uni_grouped.columns = [uni_attr, 'Taxa Favorável']
+    lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
+).unstack().reset_index()
 
 # Linha de média global
 base_chart = alt.Chart(uni_grouped).encode(x=alt.X(f"{uni_attr}:N", title=uni_attr))
 bar = base_chart.mark_bar(opacity=0.8).encode(
     y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
     color=f"{uni_attr}:N",
-    tooltip=[uni_attr, alt.Tooltip("Taxa Favorável:Q", format=".1%")]
+    tooltip=[uni_attr, alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
+)
+text = base_chart.mark_text(dy=-5).encode(
+    y=alt.Y("Taxa Favorável:Q"),
+    text=alt.Text('N:Q')
 )
 rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(color='red', strokeDash=[5, 5]).encode(y='mean:Q')
 
-st.altair_chart((bar + rule).properties(height=350), use_container_width=True)
+st.altair_chart((bar + text + rule).properties(height=350), use_container_width=True)
 
 st.divider()
 
@@ -164,17 +169,20 @@ elif len(selected_attrs) == 2:
     inter_grouped['Viável'] = inter_grouped['N'] >= 100
     inter_grouped['Global Mean'] = global_favorable_rate
     
-    base_bar = alt.Chart(inter_grouped).mark_bar().encode(
+    base_bar_chart = alt.Chart(inter_grouped).encode(
         x=alt.X(f"{selected_attrs[1]}:N", title=selected_attrs[1]),
         y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
         color=f"{selected_attrs[0]}:N",
         opacity=alt.condition(alt.datum.Viável, alt.value(1.0), alt.value(0.3)),
-        tooltip=[selected_attrs[0], selected_attrs[1], 'N', alt.Tooltip("Taxa Favorável:Q", format=".1%")]
+        tooltip=[selected_attrs[0], selected_attrs[1], alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
     ).properties(width=150, height=350)
+    
+    base_bar = base_bar_chart.mark_bar()
+    text = base_bar_chart.mark_text(dy=-5).encode(text='N:Q')
     
     rule_inter = alt.Chart(inter_grouped).mark_rule(color='red', strokeDash=[5, 5]).encode(y='Global Mean:Q')
     
-    layered_chart = (base_bar + rule_inter).facet(column=f"{selected_attrs[0]}:N")
+    layered_chart = (base_bar + text + rule_inter).facet(column=f"{selected_attrs[0]}:N")
     
     st.altair_chart(layered_chart, use_container_width=False)
     st.caption("Barras translúcidas indicam N < 100 (subgrupo inviável estatisticamente). Linha vermelha = Média Global.")
@@ -212,3 +220,55 @@ else:
         file_name=f"{dataset_name}_intersectional_audit_long.csv",
         mime="text/csv"
     )
+
+st.divider()
+
+# ---------------------------------------------------------
+# Bloco 4: Correlação Categórica (Risco de Proxies)
+# ---------------------------------------------------------
+st.header("4. Matriz de Correlação (Risco de Proxies)")
+st.markdown("O **V de Cramér** mede a associação estatística entre variáveis categóricas (0 = sem associação, 1 = associação perfeita). Valores altos entre um *proxy* socioeconômico e um atributo protegido indicam alto risco de que modelos descubram a classe sensível indiretamente (*Redlining*).")
+
+vars_to_correlate = [target_col] + all_attrs
+
+if len(vars_to_correlate) > 1:
+    with st.spinner("Calculando V de Cramér..."):
+        matrix = []
+        for var1 in vars_to_correlate:
+            row = []
+            for var2 in vars_to_correlate:
+                if var1 == var2:
+                    row.append(1.0)
+                else:
+                    row.append(calculate_cramer_v(df, var1, var2))
+            matrix.append(row)
+            
+        corr_df = pd.DataFrame(matrix, index=vars_to_correlate, columns=vars_to_correlate)
+        
+        # Format for Altair
+        corr_melt = corr_df.reset_index().melt(id_vars='index')
+        corr_melt.columns = ['Var1', 'Var2', 'Cramer_V']
+        
+        base_hm = alt.Chart(corr_melt).encode(
+            x=alt.X('Var1:N', title=''),
+            y=alt.Y('Var2:N', title='')
+        )
+        
+        hm = base_hm.mark_rect().encode(
+            color=alt.Color('Cramer_V:Q', scale=alt.Scale(scheme='blues', domain=[0, 1]), title="V de Cramér"),
+            tooltip=['Var1', 'Var2', alt.Tooltip('Cramer_V:Q', format=".2f")]
+        )
+        
+        text_hm = base_hm.mark_text(baseline='middle').encode(
+            text=alt.Text('Cramer_V:Q', format=".2f"),
+            color=alt.condition(
+                alt.datum.Cramer_V > 0.5,
+                alt.value('white'),
+                alt.value('black')
+            )
+        )
+        
+        heatmap = (hm + text_hm).properties(height=max(400, len(vars_to_correlate)*40))
+        st.altair_chart(heatmap, use_container_width=True)
+else:
+    st.info("Atributos insuficientes para gerar a matriz de correlação.")
