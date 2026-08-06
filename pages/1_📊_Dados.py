@@ -30,11 +30,17 @@ dataset_name = display_map[selected_display]
 dataset_info = filtered_datasets[dataset_name]
 
 @st.cache_data
-def load_data(name):
+def load_data(name, uf=None):
+    if uf:
+        return DATASETS[name]['loader'](uf)
     return DATASETS[name]['loader']()
 
+uf_selected = None
+if dataset_info.get('supports_uf', False):
+    uf_selected = st.selectbox("Selecione o Estado (UF):", ['SP', 'RS', 'RJ', 'MG', 'BA', 'PE', 'DF'])
+
 with st.spinner("Carregando e processando dados..."):
-    df = load_data(dataset_name)
+    df = load_data(dataset_name, uf=uf_selected)
 
 target_col = dataset_info['target']
 favorable_val = dataset_info['favorable_val']

@@ -130,7 +130,7 @@ DATASETS = {
         'description': "Prevê a evasão ou formatura de estudantes universitários. Atributos sensíveis abrangem gênero, idade e qualificação dos pais. Curiosidade: mulheres apresentam taxas naturais de retenção significativamente maiores."
     },
     'Intersectional Bias 🌐': {
-        'loader': lambda: load_local_parquet('intersectional_bias_processed.parquet'),
+        'loader': load_and_preprocess_intersectional_bias,
         'target': 'diagnosis',
         'favorable_val': 1,
         'target_mapping': {1: 'Favorável', 0: 'Desfavorável'},
@@ -150,7 +150,8 @@ DATASETS = {
         'description': "Desenvolvido especificamente para auditar diagnósticos clínicos com disparidades interseccionais (ex: viés oculto exacerbado na interseção entre raça e sexo)."
     },
     'SIH (DATASUS) 🇧🇷': {
-        'loader': load_and_preprocess_sih,
+        'loader': lambda uf='SP': load_and_preprocess_sih(uf),
+        'supports_uf': True,
         'target': 'desfecho',
         'favorable_val': 'Alta',
         'protected_attributes': ['sexo', 'raca_cor'],
@@ -166,7 +167,8 @@ DATASETS = {
         'description': "Sistema de Informações Hospitalares. Avalia o desfecho da internação (Alta vs. Óbito). Revela disparidades na qualidade da assistência segundo raça/cor e sexo."
     },
     'SIM (DATASUS) 🇧🇷': {
-        'loader': load_and_preprocess_sim,
+        'loader': lambda uf='SP': load_and_preprocess_sim(uf),
+        'supports_uf': True,
         'target': 'tipo_obito',
         'favorable_val': 'Não Evitável',
         'protected_attributes': ['sexo', 'raca_cor'],
@@ -182,7 +184,8 @@ DATASETS = {
         'description': "Sistema de Informações sobre Mortalidade. Analisa se o óbito era evitável por intervenções do SUS. Exibe iniquidades de acesso e mortalidade precoce focada em raça/cor."
     },
     'SINASC (DATASUS) 🇧🇷': {
-        'loader': load_and_preprocess_sinasc,
+        'loader': lambda uf='SP': load_and_preprocess_sinasc(uf),
+        'supports_uf': True,
         'target': 'desfecho_nascimento',
         'favorable_val': 'Normal',
         'protected_attributes': ['raca_cor_mae', 'idade_mae'],

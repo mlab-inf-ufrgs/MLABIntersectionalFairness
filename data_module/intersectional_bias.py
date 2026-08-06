@@ -1,6 +1,8 @@
 from sklearn.datasets import fetch_openml
 import pandas as pd
+import streamlit as st
 
+@st.cache_data
 def load_and_preprocess_intersectional_bias():
     """
     Loads the Intersectional Bias dataset (OpenML ID 44203).
