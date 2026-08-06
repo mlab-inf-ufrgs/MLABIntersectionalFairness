@@ -72,9 +72,10 @@ with st.container(border=True):
         base_metrics = calculate_base_metrics(df, dataset_info)
         st.divider()
         st.markdown("**Métricas (Tabela 1)**")
-        st.metric("Class Dist (%)", base_metrics['Class Dist (%)'])
-        st.metric("CI Ratio", base_metrics['CI Ratio'])
-        st.metric("DI Pre-train", base_metrics['DI Pre-train'])
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Class Dist (%)", base_metrics['Class Dist (%)'])
+        c2.metric("CI Ratio", base_metrics['CI Ratio'])
+        c3.metric("DI Pre-train", base_metrics['DI Pre-train'])
 
 st.divider()
 
