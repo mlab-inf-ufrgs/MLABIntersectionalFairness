@@ -159,11 +159,7 @@ def calculate_base_metrics(df, dataset_info):
                 di_pre_train = "N/A"
                 
     return {
-        'Class Distribution (%)': class_dist,
-        'Class Imbalance (CI)': ci_metric,
-        'DI Pre-train': di_pre_train,
-        'KL Divergence': f"{kl:.3f}" if 'kl' in locals() else "N/A",
-        'KS Statistic': f"{ks:.3f}" if 'ks' in locals() else "N/A"
+        'Class Distribution (%)': class_dist
     }
 
 def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
@@ -270,3 +266,68 @@ def calculate_model_fairness_metrics(y_true, y_pred, sensitive_attr):
     Calculates Sensitivity Gap and AAOD.
     """
     pass
+
+def calculate_dynamic_metrics(df, attr, target_col, favorable_val):
+    """
+    Calcula as métricas de viés (CI, DI, KL, KS) dinamicamente para um dado atributo.
+    Identifica o grupo com maior taxa de sucesso como 'privilegiado' 
+    e o de menor taxa como 'desprivilegiado'.
+    Para o CI, usa a diferença de tamanho entre esses dois mesmos grupos extremos.
+    """
+    groups = df[attr].dropna().unique()
+    if len(groups) < 2:
+        return {'CI': 'N/A', 'DI': 'N/A', 'KL': 'N/A', 'KS': 'N/A', 'priv': None, 'unpriv': None}
+        
+    # Calcular taxas de sucesso
+    rates = {}
+    sizes = {}
+    for g in groups:
+        g_df = df[df[attr] == g]
+        sizes[g] = len(g_df)
+        if len(g_df) > 0:
+            rates[g] = (g_df[target_col] == favorable_val).mean()
+        else:
+            rates[g] = 0.0
+            
+    # Encontrar priviliegiado e desprivilegiado
+    priv_group = max(rates, key=rates.get)
+    unpriv_group = min(rates, key=rates.get)
+    
+    # Se todas as taxas forem iguais, fallback para tamanho
+    if rates[priv_group] == rates[unpriv_group]:
+        priv_group = max(sizes, key=sizes.get)
+        unpriv_group = min(sizes, key=sizes.get)
+        
+    n_p = sizes[priv_group]
+    n_d = sizes[unpriv_group]
+    
+    ci_metric = "N/A"
+    if (n_p + n_d) > 0:
+        ci_val = (n_p - n_d) / (n_p + n_d)
+        ci_metric = f"{ci_val:.2f}"
+        
+    priv_rate = rates[priv_group]
+    unpriv_rate = rates[unpriv_group]
+    
+    epsilon = 1e-9
+    pp_1 = max(priv_rate, epsilon)
+    pp_0 = max(1 - priv_rate, epsilon)
+    pd_1 = max(unpriv_rate, epsilon)
+    pd_0 = max(1 - unpriv_rate, epsilon)
+    
+    kl = pp_1 * np.log(pp_1 / pd_1) + pp_0 * np.log(pp_0 / pd_0)
+    ks = max(abs(pp_1 - pd_1), abs(pp_0 - pd_0))
+    
+    di_pre_train = "N/A"
+    if priv_rate > 0:
+        di_val = unpriv_rate / priv_rate
+        di_pre_train = f"{di_val:.2f}"
+        
+    return {
+        'CI': ci_metric,
+        'DI': di_pre_train,
+        'KL': f"{kl:.3f}",
+        'KS': f"{ks:.3f}",
+        'priv': priv_group,
+        'unpriv': unpriv_group
+    }

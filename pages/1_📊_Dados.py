@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import altair as alt
 from data_module import DATASETS
-from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v, pairwise_gerrymandering_audit, calculate_cddl
+from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v, pairwise_gerrymandering_audit, calculate_cddl, calculate_dynamic_metrics
 
 st.set_page_config(page_title="Dados (EDA)", page_icon="📊", layout="wide")
 
@@ -76,22 +76,16 @@ with st.container(border=True):
         st.metric("Ano", dataset_info.get('year', '') or '—')
         
     st.divider()
-    st.markdown("**Métricas Globais de Viés Pré-treino (Tabela 1)**")
+    st.markdown("**Distribuição Global da Variável Alvo**")
     base_metrics = calculate_base_metrics(df, dataset_info)
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("Class Distribution (%)", base_metrics['Class Distribution (%)'])
-    c2.metric("Class Imbalance (CI)", base_metrics['Class Imbalance (CI)'])
-    c3.metric("DI Pre-train", base_metrics['DI Pre-train'])
-    c4.metric("KL Divergence", base_metrics.get('KL Divergence', 'N/A'))
-    c5.metric("KS Statistic", base_metrics.get('KS Statistic', 'N/A'))
+    
+    col_metric, col_spacer = st.columns([1, 4])
+    with col_metric:
+        st.metric("Class Distribution (%)", base_metrics['Class Distribution (%)'])
 
-    with st.expander("ℹ️ Entenda as Métricas"):
+    with st.expander("ℹ️ Entenda a Métrica"):
         st.markdown("""
-        * **Class Distribution (%)**: Proporção global entre a classe majoritária e minoritária da variável-alvo.
-        * **Class Imbalance (CI)**: Mede o desbalanceamento considerando o atributo protegido. Varia de -1 (todas as amostras na classe desprivilegiada) a 1 (todas na classe privilegiada). Ideal: 0.
-        * **DI Pre-train (Disparate Impact)**: Razão entre a chance do grupo desprivilegiado obter o desfecho favorável e a do grupo privilegiado. Valores < 0.8 indicam disparidade relevante (Regra dos 80%).
-        * **KL Divergence**: Mede a divergência (distância) entre as distribuições de probabilidade de resultados dos grupos privilegiado e desprivilegiado.
-        * **KS Statistic (Kolmogorov-Smirnov)**: Mede a distância máxima entre as distribuições acumuladas dos dois grupos. Valores altos indicam grande separação/desigualdade.
+        * **Class Distribution (%)**: Proporção global entre a classe majoritária e minoritária da variável-alvo. Mede o quão desbalanceados estão os desfechos em toda a base de dados.
         """)
 st.divider()
 
@@ -204,6 +198,26 @@ else:
     ).encode(y='mean:Q')
 
     st.altair_chart((bar + text + rule).properties(height=350), use_container_width=True)
+    
+    dyn_metrics = calculate_dynamic_metrics(df, uni_attr, target_col, favorable_val)
+    
+    if dyn_metrics['priv'] is not None:
+        st.markdown(f"**Métricas de Equidade para `{uni_attr}`**")
+        st.caption(f"Grupos identificados automaticamente para cálculo: **Privilegiado** = `{dyn_metrics['priv']}` (maior tx. sucesso) | **Desprivilegiado** = `{dyn_metrics['unpriv']}` (menor tx. sucesso).")
+        
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Class Imbalance (CI)", dyn_metrics['CI'])
+        c2.metric("DI Pre-train", dyn_metrics['DI'])
+        c3.metric("KL Divergence", dyn_metrics['KL'])
+        c4.metric("KS Statistic", dyn_metrics['KS'])
+        
+        with st.expander("ℹ️ Entenda as Métricas"):
+            st.markdown("""
+            * **Class Imbalance (CI)**: Mede o desbalanceamento demográfico entre os dois grupos extremos listados acima. Varia de -1 (todas as amostras no grupo desprivilegiado) a 1 (todas no privilegiado). Ideal: 0.
+            * **DI Pre-train (Disparate Impact)**: Razão entre a chance do grupo desprivilegiado obter o desfecho favorável e a do grupo privilegiado. Valores < 0.8 indicam disparidade (Regra dos 80%).
+            * **KL Divergence**: Mede a divergência (distância) entre as distribuições de probabilidade de resultados do grupo privilegiado e desprivilegiado.
+            * **KS Statistic (Kolmogorov-Smirnov)**: Mede a distância máxima entre as distribuições acumuladas dos dois grupos. Valores altos indicam desigualdade na distribuição.
+            """)
 
 st.divider()
 
