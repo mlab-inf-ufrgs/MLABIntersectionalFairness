@@ -29,34 +29,38 @@ def load_and_preprocess_adult():
     
     # 2. Filtering & Binning
     # sex: Male/Female
+    if 'sex' in df.columns:
+        df['sex'] = df['sex'].map({'Male': 'Masculino', 'Female': 'Feminino'})
+    
     # race: keep only White/Black
     df = df[df['race'].isin(['White', 'Black'])].copy()
+    df['race'] = df['race'].map({'White': 'Branco', 'Black': 'Negro'})
     
     # age_group: discretize age, filter 19-65
     df = df[(df['age'] >= 19) & (df['age'] <= 65)].copy()
     bins = [18, 35, 50, 65]
-    labels = ['Young', 'Middle-aged', 'Senior']
+    labels = ['Jovem', 'Meia-idade', 'Sênior']
     df['age_group'] = pd.cut(df['age'], bins=bins, labels=labels)
     df = df.drop(columns=['age'])
     
     # education_group: regroup
     edu_map = {
-        'Bachelors': 'Bachelors',
-        'Some-college': 'Associate/College',
-        'Assoc-acdm': 'Associate/College',
-        'Assoc-voc': 'Associate/College',
-        'Prof-school': 'Graduate Degree',
-        'Masters': 'Graduate Degree',
-        'Doctorate': 'Graduate Degree',
-        '11th': 'Schooling',
-        '9th': 'Schooling',
-        '7th-8th': 'Schooling',
-        '12th': 'Schooling',
-        '1st-4th': 'Schooling',
-        '10th': 'Schooling',
-        '5th-6th': 'Schooling',
-        'Preschool': 'Schooling',
-        'HS-grad': 'Schooling'
+        'Bachelors': 'Bacharelado',
+        'Some-college': 'Superior Incompleto',
+        'Assoc-acdm': 'Superior Incompleto',
+        'Assoc-voc': 'Superior Incompleto',
+        'Prof-school': 'Pós-graduação',
+        'Masters': 'Pós-graduação',
+        'Doctorate': 'Pós-graduação',
+        '11th': 'Ensino Básico/Médio',
+        '9th': 'Ensino Básico/Médio',
+        '7th-8th': 'Ensino Básico/Médio',
+        '12th': 'Ensino Básico/Médio',
+        '1st-4th': 'Ensino Básico/Médio',
+        '10th': 'Ensino Básico/Médio',
+        '5th-6th': 'Ensino Básico/Médio',
+        'Preschool': 'Ensino Básico/Médio',
+        'HS-grad': 'Ensino Básico/Médio'
     }
     df['education_group'] = df['education'].map(edu_map)
     df = df.drop(columns=['education', 'education-num'])

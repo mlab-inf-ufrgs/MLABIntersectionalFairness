@@ -31,7 +31,7 @@ def load_and_preprocess_dropout():
     
     # 2. Filtering & Binning
     # Gender is 1/0, map to Male/Female (Usually 1 is Male, 0 is Female in this dataset)
-    df['Gender'] = df['Gender'].map({1: 'Male', 0: 'Female'})
+    df['Gender'] = df['Gender'].map({1: 'Masculino', 0: 'Feminino'})
     
     # Age_Group: <=20, 21-25, >25 (filter > 50 as outliers)
     df = df[df['Age at enrollment'] <= 50].copy()
@@ -44,33 +44,33 @@ def load_and_preprocess_dropout():
         # Simplistic mapping based on general structure of UCI dataset
         # 1: Secondary, 2-6: Higher, else: Basic/Other
         if x == 1:
-            return 'Secondary Education'
+            return 'Ensino Secundário'
         elif 2 <= x <= 6:
-            return 'Higher Education'
+            return 'Ensino Superior'
         else:
-            return 'Basic/Other'
+            return 'Ensino Básico/Outros'
             
     df['Mother_Qualification_Group'] = df['Mother\'s qualification'].apply(map_qual)
     df['Father_Qualification_Group'] = df['Father\'s qualification'].apply(map_qual)
     
     # Nacionality (1 is usually Portuguese)
-    df['Nacionality_Group'] = df['Nacionality'].apply(lambda x: 'Portuguese' if x == 1 else 'International')
+    df['Nacionality_Group'] = df['Nacionality'].apply(lambda x: 'Português' if x == 1 else 'Internacional')
     
     # Attendance (1 is Daytime, 0 is Evening)
     if 'Daytime/evening attendance\t' in df.columns:
         att_col = 'Daytime/evening attendance\t'
     else:
         att_col = 'Daytime/evening attendance'
-    df['Attendance'] = df[att_col].map({1: 'Daytime', 0: 'Evening'})
+    df['Attendance'] = df[att_col].map({1: 'Diurno', 0: 'Noturno'})
     
     # Debtor
-    df['Debtor'] = df['Debtor'].map({1: 'Yes', 0: 'No'})
+    df['Debtor'] = df['Debtor'].map({1: 'Sim', 0: 'Não'})
     
     # Scholarship holder
-    df['Scholarship holder'] = df['Scholarship holder'].map({1: 'Yes', 0: 'No'})
+    df['Scholarship holder'] = df['Scholarship holder'].map({1: 'Sim', 0: 'Não'})
     
     # Displaced
-    df['Displaced'] = df['Displaced'].map({1: 'Yes', 0: 'No'})
+    df['Displaced'] = df['Displaced'].map({1: 'Sim', 0: 'Não'})
     
     # Drop unused continuous or raw columns to avoid redundancy
     cols_to_drop = ['Age at enrollment', 'Mother\'s qualification', 'Father\'s qualification', 'Nacionality', att_col]

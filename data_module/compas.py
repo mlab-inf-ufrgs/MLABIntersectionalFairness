@@ -27,13 +27,17 @@ def load_and_preprocess_compas():
     
     # 2. Filtering & Binning
     # sex: Male/Female
+    if 'sex' in df.columns:
+        df['sex'] = df['sex'].map({'Male': 'Masculino', 'Female': 'Feminino'})
+    
     # race: Caucasian, African-American, Hispanic
     df = df[df['race'].isin(['Caucasian', 'African-American', 'Hispanic'])].copy()
+    df['race'] = df['race'].map({'Caucasian': 'Branco', 'African-American': 'Negro', 'Hispanic': 'Hispânico'})
     
     # age_group: discretize 19-65
     df = df[(df['age'] >= 19) & (df['age'] <= 65)].copy()
     bins = [18, 35, 50, 65]
-    labels = ['Young', 'Middle-aged', 'Senior']
+    labels = ['Jovem', 'Meia-idade', 'Sênior']
     df['age_group'] = pd.cut(df['age'], bins=bins, labels=labels)
     df = df.drop(columns=['age'])
     
@@ -41,7 +45,7 @@ def load_and_preprocess_compas():
     
     # c_charge_degree: Felony/Misdemeanor
     df = df[df['c_charge_degree'].isin(['F', 'M'])].copy()
-    df['c_charge_degree'] = df['c_charge_degree'].map({'F': 'Felony', 'M': 'Misdemeanor'})
+    df['c_charge_degree'] = df['c_charge_degree'].map({'F': 'Crime grave', 'M': 'Contravenção'})
     
     # 3. Keep only relevant features and target to prevent data leakage
     features_to_keep = ['two_year_recid', 'sex', 'race', 'age_group', 'priors_count', 'c_charge_degree']
