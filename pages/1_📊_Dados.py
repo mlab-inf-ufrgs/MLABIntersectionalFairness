@@ -54,12 +54,6 @@ with st.container(border=True):
     with col_desc:
         st.markdown(f"**Domínio:** {dataset_info.get('domain', '—')}")
         st.markdown(dataset_info.get('description', ''))
-        st.markdown(
-            f"**Alvo:** `{target_col}` — {dataset_info.get('target_label', '')}"
-        )
-        st.markdown(
-            f"**Classe favorável:** `{favorable_val}` — {dataset_info.get('favorable_label', '')}"
-        )
         st.markdown(f"**Atributos protegidos (Demográficos):** {', '.join(protected_attrs)}")
         if proxy_attrs:
             st.markdown(f"**Proxies (Socioeconômicos/Comportamentais):** {', '.join(proxy_attrs)}")
@@ -88,6 +82,8 @@ st.divider()
 # Bloco 1: Distribuição Geral
 # ---------------------------------------------------------
 st.header("1. Distribuição Geral do Alvo")
+st.markdown(f"**Alvo:** `{target_col}` — {dataset_info.get('target_label', '')}")
+st.markdown(f"**Classe favorável:** `{favorable_val}` — {dataset_info.get('favorable_label', '')}")
 
 # Cria uma cópia apenas para a visualização
 df_viz = df.copy()
@@ -100,7 +96,7 @@ target_counts.columns = [target_col, 'count']
 
 # Filtro
 selected_classes = st.multiselect(
-    f"Filtrar classes de {target_col}:", 
+    "Filtrar classes:", 
     options=target_counts[target_col].unique(), 
     default=target_counts[target_col].unique()
 )
