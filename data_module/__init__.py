@@ -30,7 +30,7 @@ DATASETS = {
         'proxy_attributes': ['education_group', 'relationship'],
         'country': '🇺🇸 Estados Unidos',
         'icon': '💰',
-        'domain': 'Censo Demográfico / Renda',
+        'domain': 'Renda',
         'link': 'https://archive.ics.uci.edu/dataset/2/adult',
         'year': '1994',
         'original_n': 48842,
@@ -129,7 +129,7 @@ DATASETS = {
         'favorable_label': 'Formatura ou matrícula ativa',
         'description': "Prevê a evasão ou formatura de estudantes universitários. Atributos sensíveis abrangem gênero, idade e qualificação dos pais. Curiosidade: mulheres apresentam taxas naturais de retenção significativamente maiores."
     },
-    'Intersectional Bias 🌐': {
+    'Intersectional Bias 🧪': {
         'loader': load_and_preprocess_intersectional_bias,
         'target': 'diagnosis',
         'favorable_val': 0,
@@ -139,7 +139,7 @@ DATASETS = {
         'privileged_group': 'Male',
         'unprivileged_group': 'Female',
         'proxy_attributes': ['housing'],
-        'country': '🌐 Internacional',
+        'country': '🧪 Sem nacionalidade (simulado)',
         'icon': '🔬',
         'domain': 'Saúde Mental (Benchmark Sintético)',
         'link': 'https://www.openml.org/search?type=data&sort=runs&id=44202&status=active',

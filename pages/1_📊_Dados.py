@@ -13,7 +13,7 @@ st.title("Análise Exploratória e Viés Social Pré-Treino")
 # ---------------------------------------------------------
 # Seletor cascata: País/Região → Dataset
 # ---------------------------------------------------------
-COUNTRY_ORDER = ['🇧🇷 Brasil', '🇺🇸 Estados Unidos', '🇵🇹 Portugal', '🌐 Internacional']
+COUNTRY_ORDER = ['🇧🇷 Brasil', '🇺🇸 Estados Unidos', '🇵🇹 Portugal', '🧪 Sem nacionalidade (simulado)']
 
 countries = sorted(
     set(info['country'] for info in DATASETS.values()),
@@ -79,8 +79,8 @@ with st.container(border=True):
     st.markdown("**Métricas Globais de Viés Pré-treino (Tabela 1)**")
     base_metrics = calculate_base_metrics(df, dataset_info)
     c1, c2, c3 = st.columns(3)
-    c1.metric("Class Dist (%)", base_metrics['Class Dist (%)'])
-    c2.metric("CI Ratio", base_metrics['CI Ratio'])
+    c1.metric("Class Distribution (%)", base_metrics['Class Distribution (%)'])
+    c2.metric("Class Imbalance (CI)", base_metrics['Class Imbalance (CI)'])
     c3.metric("DI Pre-train", base_metrics['DI Pre-train'])
 
 st.divider()

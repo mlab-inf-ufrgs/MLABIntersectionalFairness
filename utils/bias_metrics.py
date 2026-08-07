@@ -107,7 +107,7 @@ def calculate_base_metrics(df, dataset_info):
     target_col = dataset_info['target']
     favorable_val = dataset_info['favorable_val']
     
-    # Class Dist and CI Ratio
+    # Class Dist
     counts = df[target_col].value_counts()
     if len(counts) == 2:
         # Assuming binary target
@@ -117,13 +117,12 @@ def calculate_base_metrics(df, dataset_info):
         maj_pct = (maj_count / total) * 100
         min_pct = (min_count / total) * 100
         class_dist = f"{maj_pct:.1f} / {min_pct:.1f}"
-        ci_ratio = maj_count / min_count if min_count > 0 else 0
     else:
         class_dist = "N/A"
-        ci_ratio = 0
         
-    # DI Pre-train
+    # DI Pre-train and CI
     di_pre_train = "N/A"
+    ci_metric = "N/A"
     primary_protected = dataset_info.get('primary_protected')
     privileged_group = dataset_info.get('privileged_group')
     unprivileged_group = dataset_info.get('unprivileged_group')
@@ -133,6 +132,13 @@ def calculate_base_metrics(df, dataset_info):
         priv_df = df[df[primary_protected] == privileged_group]
         unpriv_df = df[df[primary_protected] == unprivileged_group]
         
+        n_p = len(priv_df)
+        n_d = len(unpriv_df)
+        
+        if (n_p + n_d) > 0:
+            ci_val = (n_p - n_d) / (n_p + n_d)
+            ci_metric = f"{ci_val:.2f}"
+            
         if len(priv_df) > 0 and len(unpriv_df) > 0:
             priv_rate = (priv_df[target_col] == di_target_val).mean()
             unpriv_rate = (unpriv_df[target_col] == di_target_val).mean()
@@ -144,8 +150,8 @@ def calculate_base_metrics(df, dataset_info):
                 di_pre_train = "N/A"
                 
     return {
-        'Class Dist (%)': class_dist,
-        'CI Ratio': f"{ci_ratio:.2f}" if isinstance(ci_ratio, float) else "N/A",
+        'Class Distribution (%)': class_dist,
+        'Class Imbalance (CI)': ci_metric,
         'DI Pre-train': di_pre_train
     }
 
