@@ -75,18 +75,12 @@ with st.container(border=True):
         st.metric("N Pós-processamento", processed_n_str)
         st.metric("Ano", dataset_info.get('year', '') or '—')
         
-    st.divider()
-    st.markdown("**Distribuição Global da Variável Alvo**")
-    base_metrics = calculate_base_metrics(df, dataset_info)
-    
-    col_metric, col_spacer = st.columns([1, 4])
-    with col_metric:
-        st.metric("Class Distribution (%)", base_metrics['Class Distribution (%)'])
-
-    with st.expander("ℹ️ Entenda a Métrica"):
-        st.markdown("""
-        * **Class Distribution (%)**: Proporção global entre a classe majoritária e minoritária da variável-alvo. Mede o quão desbalanceados estão os desfechos em toda a base de dados.
-        """)
+        base_metrics = calculate_base_metrics(df, dataset_info)
+        st.metric(
+            "Dist. de Classes (Alvo)", 
+            base_metrics['Class Distribution (%)'], 
+            help="Proporção global entre a classe majoritária e minoritária da variável-alvo. Mede o quão desbalanceados estão os desfechos em toda a base de dados."
+        )
 st.divider()
 
 
