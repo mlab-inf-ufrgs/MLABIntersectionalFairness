@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import altair as alt
 from data_module import DATASETS
-from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v, pairwise_gerrymandering_audit
+from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v, pairwise_gerrymandering_audit, calculate_cddl
 
 st.set_page_config(page_title="Dados (EDA)", page_icon="📊", layout="wide")
 
@@ -78,10 +78,12 @@ with st.container(border=True):
     st.divider()
     st.markdown("**Métricas Globais de Viés Pré-treino (Tabela 1)**")
     base_metrics = calculate_base_metrics(df, dataset_info)
-    c1, c2, c3 = st.columns(3)
+    c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("Class Distribution (%)", base_metrics['Class Distribution (%)'])
     c2.metric("Class Imbalance (CI)", base_metrics['Class Imbalance (CI)'])
     c3.metric("DI Pre-train", base_metrics['DI Pre-train'])
+    c4.metric("KL Divergence", base_metrics.get('KL Divergence', 'N/A'))
+    c5.metric("KS Statistic", base_metrics.get('KS Statistic', 'N/A'))
 
 st.divider()
 
@@ -273,6 +275,27 @@ else:
                 file_name=f"{dataset_name}_intersectional_audit_long.csv",
                 mime="text/csv"
             )
+            
+        st.divider()
+        st.subheader("Disparidade Demográfica Condicional (CDDL)")
+        if not proxy_attrs:
+            st.info("Nenhum proxy definido")
+        else:
+            primary_protected = dataset_info.get('primary_protected')
+            priv_group = dataset_info.get('privileged_group')
+            unpriv_group = dataset_info.get('unprivileged_group')
+            
+            if primary_protected and priv_group and unpriv_group and primary_protected in df.columns:
+                with st.spinner("Calculando CDDL..."):
+                    cddl_df = calculate_cddl(df, target_col, favorable_val, primary_protected, priv_group, unpriv_group, proxy_attrs)
+                
+                st.dataframe(
+                    cddl_df.style.format({'CDDL': '{:.4f}'}),
+                    use_container_width=True
+                )
+                st.caption("Valores positivos indicam que a classe desprivilegiada sofre mais resultados desfavoráveis (e menos favoráveis) condicionado aos estratos do proxy.")
+            else:
+                st.warning("Metadados incompletos para definir grupo privilegiado/desprivilegiado principal.")
 
     with tab2:
         st.subheader("Auditoria de Gerrymandering em Pares (Global)")

@@ -143,6 +143,15 @@ def calculate_base_metrics(df, dataset_info):
             priv_rate = (priv_df[target_col] == di_target_val).mean()
             unpriv_rate = (unpriv_df[target_col] == di_target_val).mean()
             
+            epsilon = 1e-9
+            pp_1 = max(priv_rate, epsilon)
+            pp_0 = max(1 - priv_rate, epsilon)
+            pd_1 = max(unpriv_rate, epsilon)
+            pd_0 = max(1 - unpriv_rate, epsilon)
+            
+            kl = pp_1 * np.log(pp_1 / pd_1) + pp_0 * np.log(pp_0 / pd_0)
+            ks = max(abs(pp_1 - pd_1), abs(pp_0 - pd_0))
+            
             if priv_rate > 0:
                 di_pre_train = unpriv_rate / priv_rate
                 di_pre_train = f"{di_pre_train:.2f}"
@@ -152,7 +161,9 @@ def calculate_base_metrics(df, dataset_info):
     return {
         'Class Distribution (%)': class_dist,
         'Class Imbalance (CI)': ci_metric,
-        'DI Pre-train': di_pre_train
+        'DI Pre-train': di_pre_train,
+        'KL Divergence': f"{kl:.3f}" if 'kl' in locals() else "N/A",
+        'KS Statistic': f"{ks:.3f}" if 'ks' in locals() else "N/A"
     }
 
 def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
@@ -208,6 +219,48 @@ def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
             'Real Gap (Intersectional)': real_gap,
             'Hidden Bias (Surplus)': hidden_bias,
             'Audit Veredict': verdict
+        })
+        
+    return pd.DataFrame(results)
+
+def calculate_cddl(df, target_col, favorable_val, protected_attr, priv_group, unpriv_group, proxy_attrs):
+    """
+    Calculates Conditional Demographic Disparity in Labels (CDDL) for each proxy attribute.
+    """
+    results = []
+    n_total = len(df)
+    
+    for proxy in proxy_attrs:
+        cddl = 0.0
+        
+        # Agrupar pelos estratos do proxy
+        for stratum, group in df.groupby(proxy, observed=True):
+            n_i = len(group)
+            if n_i == 0:
+                continue
+                
+            priv_mask = (group[protected_attr] == priv_group)
+            unpriv_mask = (group[protected_attr] == unpriv_group)
+            
+            fav_mask = (group[target_col] == favorable_val)
+            unfav_mask = (group[target_col] != favorable_val)
+            
+            n_favorable = fav_mask.sum()
+            n_unfavorable = unfav_mask.sum()
+            
+            n_d_favorable = (unpriv_mask & fav_mask).sum()
+            n_d_unfavorable = (unpriv_mask & unfav_mask).sum()
+            
+            term1 = (n_d_unfavorable / n_unfavorable) if n_unfavorable > 0 else 0
+            term2 = (n_d_favorable / n_favorable) if n_favorable > 0 else 0
+            dd_i = term1 - term2
+            
+            cddl += (n_i * dd_i)
+            
+        cddl /= n_total
+        results.append({
+            'Proxy (Estrato)': proxy,
+            'CDDL': cddl
         })
         
     return pd.DataFrame(results)
