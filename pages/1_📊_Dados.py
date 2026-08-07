@@ -85,6 +85,14 @@ with st.container(border=True):
     c4.metric("KL Divergence", base_metrics.get('KL Divergence', 'N/A'))
     c5.metric("KS Statistic", base_metrics.get('KS Statistic', 'N/A'))
 
+    with st.expander("ℹ️ Entenda as Métricas"):
+        st.markdown("""
+        * **Class Distribution (%)**: Proporção global entre a classe majoritária e minoritária da variável-alvo.
+        * **Class Imbalance (CI)**: Mede o desbalanceamento considerando o atributo protegido. Varia de -1 (todas as amostras na classe desprivilegiada) a 1 (todas na classe privilegiada). Ideal: 0.
+        * **DI Pre-train (Disparate Impact)**: Razão entre a chance do grupo desprivilegiado obter o desfecho favorável e a do grupo privilegiado. Valores < 0.8 indicam disparidade relevante (Regra dos 80%).
+        * **KL Divergence**: Mede a divergência (distância) entre as distribuições de probabilidade de resultados dos grupos privilegiado e desprivilegiado.
+        * **KS Statistic (Kolmogorov-Smirnov)**: Mede a distância máxima entre as distribuições acumuladas dos dois grupos. Valores altos indicam grande separação/desigualdade.
+        """)
 st.divider()
 
 
