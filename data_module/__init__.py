@@ -233,4 +233,5 @@ DATASETS = {
         'favorable_label_en': 'Term birth, no complications',
         'description_pt': "Sistema de Informações sobre Nascidos Vivos. Foca em desfechos como prematuridade e baixo peso ao nascer, controlando determinantes sociais da mãe.",
         'description_en': "Live Births Information System. Focuses on outcomes like prematurity and low birth weight, controlling for mother's social determinants."
+    }
 }
