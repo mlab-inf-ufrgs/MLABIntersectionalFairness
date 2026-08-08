@@ -35,7 +35,7 @@ DATASETS = {
         'year': '1994',
         'original_n': 48842,
         'target_label': 'Renda anual',
-        'favorable_label': 'Renda > $50K (classe privilegiada)',
+        'favorable_label': 'Renda > $50K',
         'description': "Avalia se a renda anual excede $50K."
     },
     # --- OCULTADOS PARA A PROPOSTA DE TESE (Serão ativados na Tese final) ---

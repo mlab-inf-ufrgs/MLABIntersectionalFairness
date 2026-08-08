@@ -75,24 +75,24 @@ def intersectional_audit_metrics(df, sensitive_attrs, target_col, favorable_val=
         
         # Audit Verdict
         if n < 100:
-            verdict = "Inviable (N<100)"
+            verdict = "Inviável (N<100)"
         elif hidden_bias < -0.05:
-            verdict = "High Hidden Bias"
+            verdict = "Alto Viés Oculto"
         elif real_gap < -0.1:
-            verdict = "High Direct Bias"
+            verdict = "Alto Viés Direto"
         else:
             verdict = "Ok"
             
         results.append({
-            'Subgroup': subgroup_name,
+            'Subgrupo': subgroup_name,
             'N': n,
-            'Favorable Rate': subgroup_rate,
-            'Real Gap (Intersectional)': real_gap,
-            'Expected Gap (Max Marginal)': expected_gap,
-            'Hidden Bias (Surplus)': hidden_bias,
-            'Priority Score': priority_score,
-            'Pre-training DI': di,
-            'Audit Veredict': verdict
+            'Taxa Favorável': subgroup_rate,
+            'Gap Real (Interseccional)': real_gap,
+            'Gap Esperado (Marginal Máx)': expected_gap,
+            'Viés Oculto (Excedente)': hidden_bias,
+            'Score de Prioridade': priority_score,
+            'DI Pré-treinamento': di,
+            'Veredito da Auditoria': verdict
         })
         
     return pd.DataFrame(results)
@@ -159,7 +159,7 @@ def calculate_base_metrics(df, dataset_info):
                 di_pre_train = "N/A"
                 
     return {
-        'Class Distribution (%)': class_dist
+        'Distribuição de Classes (%)': class_dist
     }
 
 def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
@@ -208,13 +208,13 @@ def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
             verdict = "OK"
             
         results.append({
-            'Intersection Pair': f"{attr_a} × {attr_b}",
-            'Indiv. Gap A': gap_a,
-            'Indiv. Gap B': gap_b,
-            'Expected Gap (Max Marginal)': expected_gap,
-            'Real Gap (Intersectional)': real_gap,
-            'Hidden Bias (Surplus)': hidden_bias,
-            'Audit Veredict': verdict
+            'Par de Intersecção': f"{attr_a} × {attr_b}",
+            'Gap Indiv. A': gap_a,
+            'Gap Indiv. B': gap_b,
+            'Gap Esperado (Marginal Máx)': expected_gap,
+            'Gap Real (Interseccional)': real_gap,
+            'Viés Oculto (Excedente)': hidden_bias,
+            'Veredito da Auditoria': verdict
         })
         
     return pd.DataFrame(results)

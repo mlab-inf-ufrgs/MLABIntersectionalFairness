@@ -68,7 +68,7 @@ with st.container(border=True):
     c3.metric("Ano", dataset_info.get('year', '') or '—')
     c4.metric(
         "Dist. de Classes (Alvo)", 
-        base_metrics['Class Distribution (%)'], 
+        base_metrics['Distribuição de Classes (%)'], 
         help="Proporção global entre a classe majoritária e minoritária da variável-alvo. Mede o quão desbalanceados estão os desfechos em toda a base de dados."
     )
 st.divider()
@@ -155,7 +155,7 @@ if view_mode == "Visão agregada":
 
     text = base_chart.mark_text(dy=-5, fontSize=10).encode(
         y=alt.Y("Taxa Favorável:Q"),
-        text=alt.Text('N:Q')
+        text=alt.Text('Taxa Favorável:Q', format=".1%")
     )
 
     rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(
@@ -189,7 +189,7 @@ else:
     )
     text = base_chart.mark_text(dy=-5, fontSize=12).encode(
         y=alt.Y("Taxa Favorável:Q"),
-        text=alt.Text('N:Q')
+        text=alt.Text('Taxa Favorável:Q', format=".1%")
     )
     rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(
         color='red', strokeDash=[5, 5]
@@ -205,20 +205,20 @@ else:
     
     if dyn_metrics['priv'] is not None:
         st.markdown(f"**Métricas de Equidade para `{uni_attr}`**")
-        st.markdown(f"Grupos identificados automaticamente para cálculo:<br>**Privilegiado** = `{dyn_metrics['priv']}` (maior tx. sucesso) | **Desprivilegiado** = `{dyn_metrics['unpriv']}` (menor tx. sucesso).", unsafe_allow_html=True)
+        st.markdown(f"Grupos identificados automaticamente para cálculo:<br>**Privilegiado** = `{dyn_metrics['priv']}` (maior taxa de sucesso) | **Desprivilegiado** = `{dyn_metrics['unpriv']}` (menor taxa de sucesso).", unsafe_allow_html=True)
         
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Class Imbalance (CI)", dyn_metrics['CI'])
-        c2.metric("DI Pre-train", dyn_metrics['DI'])
-        c3.metric("KL Divergence", dyn_metrics['KL'])
-        c4.metric("KS Statistic", dyn_metrics['KS'])
+        c1.metric("Desbalanceamento de Classe (CI)", dyn_metrics['CI'])
+        c2.metric("DI Pré-treino", dyn_metrics['DI'])
+        c3.metric("Divergência KL", dyn_metrics['KL'])
+        c4.metric("Estatística KS", dyn_metrics['KS'])
         
         with st.expander("ℹ️ Entenda as Métricas"):
             st.markdown("""
-            * **Class Imbalance (CI)**: Mede o desbalanceamento demográfico entre os dois grupos extremos listados acima. Varia de -1 (todas as amostras no grupo desprivilegiado) a 1 (todas no privilegiado). Ideal: 0.
-            * **DI Pre-train (Disparate Impact)**: Razão entre a chance do grupo desprivilegiado obter o desfecho favorável e a do grupo privilegiado. Valores < 0.8 indicam disparidade (Regra dos 80%).
-            * **KL Divergence**: Mede a divergência (distância) entre as distribuições de probabilidade de resultados do grupo privilegiado e desprivilegiado.
-            * **KS Statistic (Kolmogorov-Smirnov)**: Mede a distância máxima entre as distribuições acumuladas dos dois grupos. Valores altos indicam desigualdade na distribuição.
+            * **Desbalanceamento de Classe (CI)**: Mede o desbalanceamento demográfico entre os dois grupos extremos listados acima. Varia de -1 (todas as amostras no grupo desprivilegiado) a 1 (todas no privilegiado). Ideal: 0.
+            * **DI Pré-treino (Disparate Impact)**: Razão entre a chance do grupo desprivilegiado pertencer à classe alvo favorável e a do grupo privilegiado. Valores < 0.8 ou > 1.2 indicam disparidade (Regra dos 80%).
+            * **Divergência KL**: Mede a divergência (distância) entre as distribuições de probabilidade de resultados do grupo privilegiado e desprivilegiado.
+            * **Estatística KS (Kolmogorov-Smirnov)**: Mede a distância máxima entre as distribuições acumuladas dos dois grupos. Valores altos indicam desigualdade na distribuição.
             """)
 
 st.divider()
@@ -274,23 +274,23 @@ else:
             
             # Estilização condicional
             def color_verdict(val):
-                color = 'green' if val == 'Ok' else 'orange' if 'Inviable' in val else 'red'
+                color = 'green' if val == 'Ok' else 'orange' if 'Inviável' in val else 'red'
                 return f'color: {color}'
                 
             st.dataframe(
-                audit_df.style.map(color_verdict, subset=['Audit Veredict'])
-                      .format({'Favorable Rate': '{:.2%}', 'Real Gap (Intersectional)': '{:.4f}', 
-                               'Expected Gap (Max Marginal)': '{:.4f}', 'Hidden Bias (Surplus)': '{:.4f}',
-                               'Priority Score': '{:.2f}', 'Pre-training DI': '{:.4f}'}),
+                audit_df.style.map(color_verdict, subset=['Veredito da Auditoria'])
+                      .format({'Taxa Favorável': '{:.2%}', 'Gap Real (Interseccional)': '{:.4f}', 
+                               'Gap Esperado (Marginal Máx)': '{:.4f}', 'Viés Oculto (Excedente)': '{:.4f}',
+                               'Score de Prioridade': '{:.2f}', 'DI Pré-treinamento': '{:.4f}'}),
                 use_container_width=True
             )
             
-            st.caption("Subgrupos com N < 100 são marcados como 'Inviable'. DI pré-treinamento indica Pre-training Disparate Impact contra a média global.")
+            st.caption("Subgrupos com N < 100 são marcados como 'Inviável'. DI pré-treinamento indica Pre-training Disparate Impact contra a média global.")
             
             # Exportação Long CSV
-            long_csv = audit_df.melt(id_vars=['Subgroup', 'N'], 
-                                     value_vars=['Favorable Rate', 'Real Gap (Intersectional)', 'Expected Gap (Max Marginal)', 'Hidden Bias (Surplus)', 'Priority Score', 'Pre-training DI'],
-                                     var_name='Metrica', value_name='Valor')
+            long_csv = audit_df.melt(id_vars=['Subgrupo', 'N'], 
+                                     value_vars=['Taxa Favorável', 'Gap Real (Interseccional)', 'Gap Esperado (Marginal Máx)', 'Viés Oculto (Excedente)', 'Score de Prioridade', 'DI Pré-treinamento'],
+                                     var_name='Métrica', value_name='Valor')
             long_csv.insert(0, 'Dataset', dataset_name)
             
             st.download_button(
@@ -332,36 +332,36 @@ else:
             return 'background-color: #ffcccc; color: #cc0000; font-weight: bold;' if 'GERRYMANDERING' in val else ''
             
         st.dataframe(
-            pair_df.style.map(color_pair_verdict, subset=['Audit Veredict'])
+            pair_df.style.map(color_pair_verdict, subset=['Veredito da Auditoria'])
                   .format({
-                      'Indiv. Gap A': '{:.2%}',
-                      'Indiv. Gap B': '{:.2%}',
-                      'Expected Gap (Max Marginal)': '{:.2%}',
-                      'Real Gap (Intersectional)': '{:.2%}',
-                      'Hidden Bias (Surplus)': '{:+.2%}'
+                      'Gap Indiv. A': '{:.2%}',
+                      'Gap Indiv. B': '{:.2%}',
+                      'Gap Esperado (Marginal Máx)': '{:.2%}',
+                      'Gap Real (Interseccional)': '{:.2%}',
+                      'Viés Oculto (Excedente)': '{:+.2%}'
                   }),
             use_container_width=True
         )
         
-        st.markdown(f"**{dataset_name} — Gap Audit: Single-Axis vs. Intersectional Disparity**")
+        st.markdown(f"**{dataset_name} — Auditoria de Gap: Disparidade Marginal vs. Interseccional**")
         
         melted_pairs = pair_df.melt(
-            id_vars=['Intersection Pair'],
-            value_vars=['Expected Gap (Max Marginal)', 'Real Gap (Intersectional)'],
-            var_name='Gap Type',
-            value_name='Gap Amplitude (%)'
+            id_vars=['Par de Intersecção'],
+            value_vars=['Gap Esperado (Marginal Máx)', 'Gap Real (Interseccional)'],
+            var_name='Tipo de Gap',
+            value_name='Amplitude do Gap (%)'
         )
         
         base = alt.Chart(melted_pairs).encode(
-            x=alt.X('Intersection Pair:N', title='', axis=alt.Axis(labelAngle=-45)),
-            y=alt.Y('Gap Amplitude (%):Q', title='Gap Amplitude (%)', scale=alt.Scale(domain=[0, 1])),
-            color=alt.Color('Gap Type:N', 
+            x=alt.X('Par de Intersecção:N', title='', axis=alt.Axis(labelAngle=-45)),
+            y=alt.Y('Amplitude do Gap (%):Q', title='Amplitude do Gap (%)', scale=alt.Scale(domain=[0, 1])),
+            color=alt.Color('Tipo de Gap:N', 
                 scale=alt.Scale(range=['#4c6b8b', '#002f6c']),
                 legend=alt.Legend(title="", orient="top-left")
             )
         )
         
-        bars = base.mark_bar(xOffset=alt.XOffset("Gap Type:N"))
+        bars = base.mark_bar(xOffset=alt.XOffset("Tipo de Gap:N"))
         
         text = base.mark_text(
             align='center',
@@ -369,10 +369,10 @@ else:
             dy=-5,
             fontSize=10
         ).encode(
-            xOffset=alt.XOffset("Gap Type:N"),
-            text=alt.Text('Gap Amplitude (%):Q', format='.1%')
+            xOffset=alt.XOffset("Tipo de Gap:N"),
+            text=alt.Text('Amplitude do Gap (%):Q', format='.1%')
         ).transform_filter(
-            alt.datum['Gap Type'] == 'Real Gap (Intersectional)'
+            alt.datum['Tipo de Gap'] == 'Gap Real (Interseccional)'
         )
         
         st.altair_chart((bars + text).properties(height=400), use_container_width=True)
