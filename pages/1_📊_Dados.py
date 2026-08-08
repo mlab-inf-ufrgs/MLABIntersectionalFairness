@@ -425,7 +425,7 @@ else:
             )
         )
         
-        bars = base.mark_bar(xOffset=alt.XOffset(f"{t('tbl_gap_type')}:N"))
+        bars = base.mark_bar().encode(xOffset=alt.XOffset(f"{t('tbl_gap_type')}:N"))
         
         text = base.mark_text(
             align='center',
