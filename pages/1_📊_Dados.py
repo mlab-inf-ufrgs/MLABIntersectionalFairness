@@ -39,7 +39,7 @@ dataset_info = filtered_datasets[dataset_name]
 
 @st.cache_data
 def load_data(name, uf=None):
-    if uf:
+    if DATASETS[name].get('supports_uf', False):
         return DATASETS[name]['loader'](uf)
     return DATASETS[name]['loader']()
 
