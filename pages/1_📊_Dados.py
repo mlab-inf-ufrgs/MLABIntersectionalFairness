@@ -43,9 +43,10 @@ def load_data(name, uf=None):
         return DATASETS[name]['loader'](uf)
     return DATASETS[name]['loader']()
 
-uf_selected = None
+uf_selected = ['Todos']
 if dataset_info.get('supports_uf', False):
-    uf_selected = st.selectbox(t("select_state"), ['SP', 'RS', 'RJ', 'MG', 'BA', 'PE', 'DF'])
+    ufs_options = ['Todos', 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']
+    uf_selected = st.multiselect(t("select_state"), ufs_options, default=['Todos'])
 
 with st.spinner(t("loading")):
     df = load_data(dataset_name, uf=uf_selected)

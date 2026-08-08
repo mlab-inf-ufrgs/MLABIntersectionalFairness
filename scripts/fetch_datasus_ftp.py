@@ -4,6 +4,10 @@ from ftplib import FTP
 import pyreaddbc
 from dbfread import DBF
 
+UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 
+       'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 
+       'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']
+
 def download_file(ftp, ftp_dir, filename, out_dir='data/raw/'):
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, filename)
@@ -25,8 +29,7 @@ def convert_dbc_to_df(dbc_path):
     os.remove(dbf_path)
     return df
 
-def process_sih(df):
-    print("Processando SIH...")
+def process_sih(df, uf):
     df.columns = [c.upper() for c in df.columns]
     res = pd.DataFrame()
     if 'SEXO' in df.columns:
@@ -46,12 +49,10 @@ def process_sih(df):
         res['desfecho'] = 'Alta'
         
     res = res.dropna(subset=['sexo', 'raca_cor', 'desfecho'])
-    os.makedirs('data/processed', exist_ok=True)
-    res.to_parquet('data/processed/sih_processed.parquet')
-    print(f"SIH salvo com {len(res)} registros.")
+    res['uf'] = uf
+    return res
 
-def process_sim(df):
-    print("Processando SIM...")
+def process_sim(df, uf):
     df.columns = [c.upper() for c in df.columns]
     res = pd.DataFrame()
     if 'SEXO' in df.columns:
@@ -68,12 +69,10 @@ def process_sim(df):
     res['tipo_obito'] = 'Não Evitável' 
     
     res = res.dropna(subset=['sexo', 'raca_cor'])
-    os.makedirs('data/processed', exist_ok=True)
-    res.to_parquet('data/processed/sim_processed.parquet')
-    print(f"SIM salvo com {len(res)} registros.")
+    res['uf'] = uf
+    return res
 
-def process_sinasc(df):
-    print("Processando SINASC...")
+def process_sinasc(df, uf):
     df.columns = [c.upper() for c in df.columns]
     res = pd.DataFrame()
     raca_col = 'RACACORMAE' if 'RACACORMAE' in df.columns else None
@@ -98,28 +97,60 @@ def process_sinasc(df):
         res['desfecho_nascimento'] = 'Normal'
         
     res = res.dropna()
-    os.makedirs('data/processed', exist_ok=True)
-    res.to_parquet('data/processed/sinasc_processed.parquet')
-    print(f"SINASC salvo com {len(res)} registros.")
+    res['uf'] = uf
+    return res
 
 if __name__ == '__main__':
     ftp = FTP('ftp.datasus.gov.br')
     ftp.login()
     
-    # SIH
-    sih_dbc = download_file(ftp, 'dissemin/publicos/SIHSUS/200801_/Dados', 'RDSP2301.dbc')
-    df_sih = convert_dbc_to_df(sih_dbc)
-    process_sih(df_sih)
+    os.makedirs('data/processed', exist_ok=True)
     
-    # SIM
-    sim_dbc = download_file(ftp, 'dissemin/publicos/SIM/CID10/DORES', 'DOSP2022.dbc')
-    df_sim = convert_dbc_to_df(sim_dbc)
-    process_sim(df_sim)
+    sih_all = []
+    sim_all = []
+    sinasc_all = []
     
-    # SINASC
-    sinasc_dbc = download_file(ftp, 'dissemin/publicos/SINASC/1996_/Dados/DNRES', 'DNSP2022.dbc')
-    df_sinasc = convert_dbc_to_df(sinasc_dbc)
-    process_sinasc(df_sinasc)
-    
+    for uf in UFS:
+        print(f"\n--- Processando Estado: {uf} ---")
+        
+        # SIH
+        try:
+            sih_filename = f"RD{uf}2301.dbc"
+            sih_dbc = download_file(ftp, 'dissemin/publicos/SIHSUS/200801_/Dados', sih_filename)
+            df_sih = convert_dbc_to_df(sih_dbc)
+            sih_all.append(process_sih(df_sih, uf))
+        except Exception as e:
+            print(f"Erro SIH {uf}: {e}")
+            
+        # SIM
+        try:
+            sim_filename = f"DO{uf}2022.dbc"
+            sim_dbc = download_file(ftp, 'dissemin/publicos/SIM/CID10/DORES', sim_filename)
+            df_sim = convert_dbc_to_df(sim_dbc)
+            sim_all.append(process_sim(df_sim, uf))
+        except Exception as e:
+            print(f"Erro SIM {uf}: {e}")
+            
+        # SINASC
+        try:
+            sinasc_filename = f"DN{uf}2022.dbc"
+            sinasc_dbc = download_file(ftp, 'dissemin/publicos/SINASC/1996_/Dados/DNRES', sinasc_filename)
+            df_sinasc = convert_dbc_to_df(sinasc_dbc)
+            sinasc_all.append(process_sinasc(df_sinasc, uf))
+        except Exception as e:
+            print(f"Erro SINASC {uf}: {e}")
+
     ftp.quit()
-    print("Sucesso! Todos os datasets foram salvos em data/processed/")
+    
+    print("\nSalvando os consolidados nacionais em parquet...")
+    if sih_all:
+        pd.concat(sih_all).to_parquet('data/processed/sih_processed.parquet')
+        print("SIH Nacional Salvo!")
+    if sim_all:
+        pd.concat(sim_all).to_parquet('data/processed/sim_processed.parquet')
+        print("SIM Nacional Salvo!")
+    if sinasc_all:
+        pd.concat(sinasc_all).to_parquet('data/processed/sinasc_processed.parquet')
+        print("SINASC Nacional Salvo!")
+        
+    print("Processo Finalizado com Sucesso!")

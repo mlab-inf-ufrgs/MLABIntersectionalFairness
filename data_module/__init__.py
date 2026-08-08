@@ -4,7 +4,6 @@ from .dropout import load_and_preprocess_dropout
 from .intersectional_bias import load_and_preprocess_intersectional_bias
 from .loaders_folktables import load_and_preprocess_folktables_income, load_and_preprocess_folktables_coverage
 from .loaders_datasus import load_and_preprocess_sih, load_and_preprocess_sim, load_and_preprocess_sinasc
-from .loaders_cadunico import load_and_preprocess_cadunico
 
 import os
 import pandas as pd
@@ -166,11 +165,11 @@ DATASETS = {
         'target_label_en': 'Clinical diagnosis (schizophrenia or depression)',
         'favorable_label_pt': '0 — Saudável (sem diagnóstico de doença mental)',
         'favorable_label_en': '0 — Healthy (no mental illness diagnosis)',
-        'description_pt': "Partição de <b>treino</b> do benchmark sintético FAccT 2022 (10.000 instâncias). Desenvolvido para auditar classificadores de saúde mental com disparidades interseccionais ocultas entre raça e sexo.",
-        'description_en': "<b>Training</b> partition of the FAccT 2022 synthetic benchmark (10,000 instances). Developed to audit mental health classifiers with hidden intersectional disparities between race and sex."
+        'description_pt': "Partição de treino do benchmark sintético FAccT 2022 (10.000 instâncias). Desenvolvido para auditar classificadores de saúde mental com disparidades interseccionais ocultas entre raça e sexo.",
+        'description_en': "Training partition of the FAccT 2022 synthetic benchmark (10,000 instances). Developed to audit mental health classifiers with hidden intersectional disparities between race and sex."
     },
     'SIH (DATASUS) 🇧🇷': {
-        'loader': lambda uf='SP': load_and_preprocess_sih(uf),
+        'loader': lambda uf=['Todos']: load_and_preprocess_sih(uf),
         'supports_uf': True,
         'target': 'desfecho',
         'favorable_val': 'Alta',
@@ -192,7 +191,7 @@ DATASETS = {
         'description_en': "Hospital Information System. Evaluates admission outcome (Discharge vs. Death). Reveals disparities in care quality by race/color and sex."
     },
     'SIM (DATASUS) 🇧🇷': {
-        'loader': lambda uf='SP': load_and_preprocess_sim(uf),
+        'loader': lambda uf=['Todos']: load_and_preprocess_sim(uf),
         'supports_uf': True,
         'target': 'tipo_obito',
         'favorable_val': 'Não Evitável',
@@ -214,7 +213,7 @@ DATASETS = {
         'description_en': "Mortality Information System. Analyzes if death was preventable by SUS interventions. Shows inequities in access and early mortality focused on race/color."
     },
     'SINASC (DATASUS) 🇧🇷': {
-        'loader': lambda uf='SP': load_and_preprocess_sinasc(uf),
+        'loader': lambda uf=['Todos']: load_and_preprocess_sinasc(uf),
         'supports_uf': True,
         'target': 'desfecho_nascimento',
         'favorable_val': 'Normal',
@@ -234,27 +233,4 @@ DATASETS = {
         'favorable_label_en': 'Term birth, no complications',
         'description_pt': "Sistema de Informações sobre Nascidos Vivos. Foca em desfechos como prematuridade e baixo peso ao nascer, controlando determinantes sociais da mãe.",
         'description_en': "Live Births Information System. Focuses on outcomes like prematurity and low birth weight, controlling for mother's social determinants."
-    },
-    'CadÚnico 🇧🇷': {
-        'loader': load_and_preprocess_cadunico,
-        'target': 'pobreza_extrema',
-        'favorable_val': 0,  # Not in extreme poverty
-        'target_mapping': {0: 'Acima da Extrema Pobreza', 1: 'Extrema Pobreza'},
-        'protected_attributes': ['raca_cor', 'sexo'],
-        'proxy_attributes': ['escolaridade'],
-        'country_pt': '🇧🇷 Brasil',
-        'country_en': '🇧🇷 Brazil',
-        'icon': '🤝',
-        'domain_pt': 'Assistência Social',
-        'domain_en': 'Social Assistance',
-        'link': '',
-        'year': '2012–2016',
-        'n_approx': '',
-        'target_label_pt': 'Condição de extrema pobreza',
-        'target_label_en': 'Extreme poverty condition',
-        'favorable_label_pt': 'Não está em extrema pobreza (renda > R$ 77,00/mês)',
-        'favorable_label_en': 'Not in extreme poverty (income > R$ 77.00/month)',
-        'description_pt': "Amostra do Cadastro Único. Avalia se a renda per capita familiar está abaixo da linha de extrema pobreza (R$ 77,00 na época). Fortemente marcado pelo racismo e sexismo estrutural.",
-        'description_en': "Sample from the Unified Registry (CadÚnico). Evaluates if per capita family income is below the extreme poverty line (R$ 77.00 at the time). Heavily marked by structural racism and sexism."
-    }
 }

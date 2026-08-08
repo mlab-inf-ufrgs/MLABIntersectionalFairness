@@ -34,6 +34,8 @@ venv.bak/
 .ipynb_checkpoints
 
 # Data files (we should not commit large datasets)
+*.dbc
+*.dbf
 *.csv
 *.parquet
 *.db

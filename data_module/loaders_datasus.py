@@ -3,7 +3,7 @@ import streamlit as st
 import os
 
 @st.cache_data(show_spinner=False)
-def load_and_preprocess_sih(uf='SP'):
+def load_and_preprocess_sih(ufs=['Todos']):
     """
     Carrega amostra real do SIH (DATASUS).
     Alvo: desfecho (Alta vs Óbito)
@@ -11,7 +11,10 @@ def load_and_preprocess_sih(uf='SP'):
     """
     path = os.path.join(os.path.dirname(__file__), '..', 'data', 'processed', 'sih_processed.parquet')
     if os.path.exists(path):
-        return pd.read_parquet(path)
+        df = pd.read_parquet(path)
+        if 'Todos' not in ufs and len(ufs) > 0:
+            df = df[df['uf'].isin(ufs)]
+        return df
     
     # Fallback apenas se o arquivo ainda não existir
     return pd.DataFrame({
@@ -21,13 +24,16 @@ def load_and_preprocess_sih(uf='SP'):
     })
 
 @st.cache_data(show_spinner=False)
-def load_and_preprocess_sim(uf='SP'):
+def load_and_preprocess_sim(ufs=['Todos']):
     """
     Carrega amostra real do SIM (DATASUS).
     """
     path = os.path.join(os.path.dirname(__file__), '..', 'data', 'processed', 'sim_processed.parquet')
     if os.path.exists(path):
-        return pd.read_parquet(path)
+        df = pd.read_parquet(path)
+        if 'Todos' not in ufs and len(ufs) > 0:
+            df = df[df['uf'].isin(ufs)]
+        return df
     
     return pd.DataFrame({
         'sexo': ['Masculino', 'Feminino', 'Feminino', 'Feminino'] * 250,
@@ -36,13 +42,16 @@ def load_and_preprocess_sim(uf='SP'):
     })
 
 @st.cache_data(show_spinner=False)
-def load_and_preprocess_sinasc(uf='SP'):
+def load_and_preprocess_sinasc(ufs=['Todos']):
     """
     Carrega amostra real do SINASC (DATASUS).
     """
     path = os.path.join(os.path.dirname(__file__), '..', 'data', 'processed', 'sinasc_processed.parquet')
     if os.path.exists(path):
-        return pd.read_parquet(path)
+        df = pd.read_parquet(path)
+        if 'Todos' not in ufs and len(ufs) > 0:
+            df = df[df['uf'].isin(ufs)]
+        return df
         
     return pd.DataFrame({
         'raca_cor_mae': ['Preta', 'Branca', 'Parda', 'Branca'] * 250,
