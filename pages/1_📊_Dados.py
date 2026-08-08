@@ -160,10 +160,14 @@ global_favorable_rate = (df[target_col] == favorable_val).mean()
 if view_mode == t("view_agg"):
     marginal_frames = []
     for attr in all_attrs:
-        attr_grouped = df_mapped.groupby(attr)[target_col].apply(
-            lambda x: pd.Series({t("favorable_rate"): (x == favorable_val).mean(), "N": len(x)})
-        ).unstack().reset_index()
-        attr_grouped.rename(columns={attr: t('subgroup')}, inplace=True)
+        grouped = df_mapped.groupby(attr, observed=True)[target_col]
+        fav_rate = (grouped.apply(lambda x: (x == favorable_val).mean(), include_groups=False)
+                    .reset_index()
+                    .rename(columns={attr: t('subgroup'), target_col: t("favorable_rate")}))
+        n_count = (grouped.count()
+                   .reset_index()
+                   .rename(columns={attr: t('subgroup'), target_col: 'N'}))
+        attr_grouped = fav_rate.merge(n_count, on=t('subgroup'))
         attr_grouped['Atributo'] = attr
         marginal_frames.append(attr_grouped)
 
