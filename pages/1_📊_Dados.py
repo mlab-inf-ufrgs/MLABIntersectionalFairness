@@ -50,31 +50,27 @@ all_attrs = protected_attrs + proxy_attrs
 
 # Card de metadados do dataset
 with st.container(border=True):
-    col_desc, col_stats = st.columns([3, 1])
-    with col_desc:
-        st.markdown(f"**Domínio:** {dataset_info.get('domain', '—')}")
-        st.markdown(dataset_info.get('description', ''))
-        st.markdown(f"**Atributos protegidos (Demográficos):** {', '.join(protected_attrs)}")
-        if proxy_attrs:
-            st.markdown(f"**Proxies (Socioeconômicos/Comportamentais):** {', '.join(proxy_attrs)}")
-        link = dataset_info.get('link', '')
-        if link:
-            st.markdown(f"🔗 [Fonte original]({link})")
-    with col_stats:
-        orig_n = dataset_info.get('original_n')
-        orig_n_str = f"{orig_n:,}".replace(',', '.') if orig_n else dataset_info.get('n_approx', '—')
-        processed_n_str = f"{len(df):,}".replace(',', '.')
-        
-        st.metric("N Original (Bruto)", orig_n_str)
-        st.metric("N Pós-processamento", processed_n_str)
-        st.metric("Ano", dataset_info.get('year', '') or '—')
-        
-        base_metrics = calculate_base_metrics(df, dataset_info)
-        st.metric(
-            "Dist. de Classes (Alvo)", 
-            base_metrics['Class Distribution (%)'], 
-            help="Proporção global entre a classe majoritária e minoritária da variável-alvo. Mede o quão desbalanceados estão os desfechos em toda a base de dados."
-        )
+    st.markdown(f"**Domínio:** {dataset_info.get('domain', '—')}")
+    st.markdown(dataset_info.get('description', ''))
+    link = dataset_info.get('link', '')
+    if link:
+        st.markdown(f"🔗 [Fonte original]({link})")
+    
+    orig_n = dataset_info.get('original_n')
+    orig_n_str = f"{orig_n:,}".replace(',', '.') if orig_n else dataset_info.get('n_approx', '—')
+    processed_n_str = f"{len(df):,}".replace(',', '.')
+    
+    base_metrics = calculate_base_metrics(df, dataset_info)
+    
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("N Original (Bruto)", orig_n_str)
+    c2.metric("N Pós-processamento", processed_n_str)
+    c3.metric("Ano", dataset_info.get('year', '') or '—')
+    c4.metric(
+        "Dist. de Classes (Alvo)", 
+        base_metrics['Class Distribution (%)'], 
+        help="Proporção global entre a classe majoritária e minoritária da variável-alvo. Mede o quão desbalanceados estão os desfechos em toda a base de dados."
+    )
 st.divider()
 
 
@@ -120,14 +116,22 @@ st.divider()
 # Bloco 2: Viés Unidimensional
 # ---------------------------------------------------------
 # ---------------------------------------------------------
-st.header("2. Viés Unidimensional (Taxas Marginais)")
-st.markdown("Comparativo da taxa de resultado favorável por subgrupos protegidos e *proxies* (linhas de base marginais).")
+st.header("2. Viés Unidimensional")
+st.markdown("Distribuição dos resultados favoráveis por subgrupo demográfico")
+st.markdown(f"**Atributos protegidos (Demográficos):** {', '.join(protected_attrs)}")
+if proxy_attrs:
+    st.markdown(f"**Proxies (Socioeconômicos/Comportamentais):** {', '.join(proxy_attrs)}")
 
-view_mode = st.radio("Nível de Zoom:", ["Visão Global (Todos os Atributos)", "Visão Individual (1 Atributo)"], horizontal=True)
+view_mode = st.radio(
+    "Visão", 
+    ["Visão por atributo", "Visão agregada"], 
+    horizontal=True,
+    label_visibility="collapsed"
+)
 
 global_favorable_rate = (df[target_col] == favorable_val).mean()
 
-if view_mode == "Visão Global (Todos os Atributos)":
+if view_mode == "Visão agregada":
     marginal_frames = []
     for attr in all_attrs:
         attr_grouped = df.groupby(attr)[target_col].apply(
@@ -158,7 +162,11 @@ if view_mode == "Visão Global (Todos os Atributos)":
         color='red', strokeDash=[5, 5]
     ).encode(y='mean:Q')
 
-    layered = (bar + text + rule)
+    rule_label = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_text(
+        align='left', baseline='bottom', dy=-5, dx=5, color='red', text=f"Média: {global_favorable_rate:.1%}"
+    ).encode(y='mean:Q', x=alt.value(0))
+
+    layered = (bar + text + rule + rule_label)
 
     faceted_chart = layered.facet(
         column=alt.Column("Atributo:N", title=None, header=alt.Header(labelOrient='bottom', titleOrient='bottom', labelFontWeight='bold'))
@@ -173,11 +181,11 @@ else:
         lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
     ).unstack().reset_index()
 
-    base_chart = alt.Chart(uni_grouped).encode(x=alt.X(f"{uni_attr}:N", title=uni_attr, axis=alt.Axis(labelAngle=0)))
+    base_chart = alt.Chart(uni_grouped).encode(x=alt.X(f"{uni_attr}:N", title="Subgrupo", axis=alt.Axis(labelAngle=0)))
     bar = base_chart.mark_bar(opacity=0.9).encode(
         y=alt.Y("Taxa Favorável:Q", title="Taxa Favorável", scale=alt.Scale(domain=[0, 1])),
         color=alt.Color(f"{uni_attr}:N", legend=None),
-        tooltip=[uni_attr, alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
+        tooltip=[alt.Tooltip(f"{uni_attr}:N", title="Subgrupo"), alt.Tooltip("N:Q", title="N"), alt.Tooltip("Taxa Favorável:Q", format=".1%")]
     )
     text = base_chart.mark_text(dy=-5, fontSize=12).encode(
         y=alt.Y("Taxa Favorável:Q"),
@@ -186,14 +194,18 @@ else:
     rule = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_rule(
         color='red', strokeDash=[5, 5]
     ).encode(y='mean:Q')
+    
+    rule_label = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_text(
+        align='left', baseline='bottom', dy=-5, dx=5, color='red', text=f"Média Global: {global_favorable_rate:.1%}"
+    ).encode(y='mean:Q', x=alt.value(0))
 
-    st.altair_chart((bar + text + rule).properties(height=350), use_container_width=True)
+    st.altair_chart((bar + text + rule + rule_label).properties(height=350), use_container_width=True)
     
     dyn_metrics = calculate_dynamic_metrics(df, uni_attr, target_col, favorable_val)
     
     if dyn_metrics['priv'] is not None:
         st.markdown(f"**Métricas de Equidade para `{uni_attr}`**")
-        st.caption(f"Grupos identificados automaticamente para cálculo: **Privilegiado** = `{dyn_metrics['priv']}` (maior tx. sucesso) | **Desprivilegiado** = `{dyn_metrics['unpriv']}` (menor tx. sucesso).")
+        st.markdown(f"Grupos identificados automaticamente para cálculo:<br>**Privilegiado** = `{dyn_metrics['priv']}` (maior tx. sucesso) | **Desprivilegiado** = `{dyn_metrics['unpriv']}` (menor tx. sucesso).", unsafe_allow_html=True)
         
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Class Imbalance (CI)", dyn_metrics['CI'])
