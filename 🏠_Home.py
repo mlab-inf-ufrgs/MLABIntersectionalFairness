@@ -1,17 +1,17 @@
 import streamlit as st
+from utils.i18n import t
+
+if "lang" not in st.session_state:
+    st.session_state.lang = "PT"
 
 st.set_page_config(
-    page_title="Diagnóstico de Viés Interseccional",
+    page_title=t("home_page_title"),
     page_icon="⚖️",
     layout="wide"
 )
 
-st.title("Análise de impacto cumulativo do viés social")
+st.sidebar.selectbox("Idioma / Language", ["PT", "EN"], key="lang")
 
-st.markdown("""
-**Navegação:**
-- **Dados**: Diagnóstico pré-treinamento e Análise Exploratória (EDA). Avalia o viés inerente aos dados e auditoria de Gerrymandering.
-- **Modelos**: (Em Breve) Avaliação de disparidades e trade-offs de justiça algorítmica pós-treinamento.
+st.title(t("home_title"))
 
-Selecione a aba desejada no menu lateral.
-""")
+st.markdown(t("home_nav"))

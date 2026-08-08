@@ -1,17 +1,16 @@
 import streamlit as st
+from utils.i18n import t
 
-st.set_page_config(page_title="Modelos (Em Breve)", page_icon="🤖")
+if "lang" not in st.session_state:
+    st.session_state.lang = "PT"
 
-st.title("Modelos Pós-Treinamento")
+st.set_page_config(
+    page_title=t("models_page_title"), 
+    page_icon="🤖"
+)
 
-st.info("""
-**Aba em desenvolvimento.**
+st.sidebar.selectbox("Idioma / Language", ["PT", "EN"], key="lang")
 
-Nesta etapa futura, adicionaremos os resultados de modelos (RF, GBM, MLP) treinados sobre os datasets selecionados.
-As métricas de auditoria incluirão:
-- Sensitivity Gap
-- Average Absolute Odds Difference (AAOD)
-- Disparate Impact (Pós-treinamento)
+st.title(t("models_title"))
 
-Por enquanto, utilize a aba **Dados** para análise exploratória e diagnóstico de viés inerente (pré-treinamento).
-""")
+st.info(t("models_info"))
