@@ -129,12 +129,28 @@ view_mode = st.radio(
     label_visibility="collapsed"
 )
 
+# Mapeamento para tradução de rótulos nos gráficos e tabelas
+translation_dict = {
+    'White': 'Branco', 'Black': 'Negro', 'Asian-Pac-Islander': 'Asiático/Pacífico', 'Amer-Indian-Eskimo': 'Indígena/Esquimó', 'Other': 'Outro',
+    'Caucasian': 'Caucasiano', 'African-American': 'Afro-americano', 'Hispanic': 'Hispânico', 'Native American': 'Nativo Americano', 'Asian': 'Asiático',
+    'Female': 'Mulher', 'Male': 'Homem',
+    'Wife': 'Esposa', 'Own-child': 'Filho(a)', 'Husband': 'Marido', 'Not-in-family': 'Não-familiar', 'Other-relative': 'Outro parente', 'Unmarried': 'Solteiro(a)',
+    'Young': 'Jovem', 'Middle-aged': 'Meia-idade', 'Senior': 'Idoso', 'Less than 25': 'Menor que 25', 'Greater than 45': 'Maior que 45', 'Adult': 'Adulto',
+    'Schooling': 'Ed. Básica', 'Associate/College': 'Ensino Sup./Téc.', 'Bachelors': 'Bacharelado', 'Masters/Doctorate/Prof': 'Pós-graduação',
+    'Stable': 'Estável', 'Unstable': 'Instável', 'Yes': 'Sim', 'No': 'Não'
+}
+
+df_mapped = df.copy()
+for col in all_attrs:
+    if col in df_mapped.columns:
+        df_mapped[col] = df_mapped[col].replace(translation_dict)
+
 global_favorable_rate = (df[target_col] == favorable_val).mean()
 
 if view_mode == "Visão agregada":
     marginal_frames = []
     for attr in all_attrs:
-        attr_grouped = df.groupby(attr)[target_col].apply(
+        attr_grouped = df_mapped.groupby(attr)[target_col].apply(
             lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
         ).unstack().reset_index()
         attr_grouped.rename(columns={attr: 'Subgrupo'}, inplace=True)
@@ -162,22 +178,19 @@ if view_mode == "Visão agregada":
         color='red', strokeDash=[5, 5]
     ).encode(y='mean:Q')
 
-    rule_label = alt.Chart(pd.DataFrame({'mean': [global_favorable_rate]})).mark_text(
-        align='left', baseline='bottom', dy=-5, dx=5, color='red', text=f"Média: {global_favorable_rate:.1%}"
-    ).encode(y='mean:Q', x=alt.value(0))
-
-    layered = (bar + text + rule + rule_label)
+    layered = (bar + text + rule)
 
     faceted_chart = layered.facet(
         column=alt.Column("Atributo:N", title=None, header=alt.Header(labelOrient='bottom', titleOrient='bottom', labelFontWeight='bold'))
     ).resolve_scale(x='independent')
 
     st.altair_chart(faceted_chart, use_container_width=False)
+    st.caption(f"A linha pontilhada vermelha representa a Média Global ({global_favorable_rate:.1%}).")
 
 else:
     uni_attr = st.selectbox("Selecione o atributo para inspecionar:", all_attrs)
     
-    uni_grouped = df.groupby(uni_attr)[target_col].apply(
+    uni_grouped = df_mapped.groupby(uni_attr)[target_col].apply(
         lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
     ).unstack().reset_index()
 
@@ -201,7 +214,7 @@ else:
 
     st.altair_chart((bar + text + rule + rule_label).properties(height=350), use_container_width=True)
     
-    dyn_metrics = calculate_dynamic_metrics(df, uni_attr, target_col, favorable_val)
+    dyn_metrics = calculate_dynamic_metrics(df_mapped, uni_attr, target_col, favorable_val)
     
     if dyn_metrics['priv'] is not None:
         st.markdown(f"**Métricas de Equidade para `{uni_attr}`**")
@@ -240,7 +253,7 @@ else:
         if len(selected_attrs) == 2:
             st.subheader("Visualização Interseccional (2 Atributos)")
             
-            inter_grouped = df.groupby(selected_attrs)[target_col].apply(
+            inter_grouped = df_mapped.groupby(selected_attrs)[target_col].apply(
                 lambda x: pd.Series({"Taxa Favorável": (x == favorable_val).mean(), "N": len(x)})
             ).unstack().reset_index()
             
@@ -270,7 +283,7 @@ else:
             st.subheader("Auditoria de Justice Gerrymandering (3+ Atributos)")
             
             with st.spinner("Calculando métricas de Gerrymandering..."):
-                audit_df = intersectional_audit_metrics(df, selected_attrs, target_col, favorable_val)
+                audit_df = intersectional_audit_metrics(df_mapped, selected_attrs, target_col, favorable_val)
             
             # Estilização condicional
             def color_verdict(val):
@@ -312,6 +325,7 @@ else:
             if primary_protected and priv_group and unpriv_group and primary_protected in df.columns:
                 with st.spinner("Calculando CDDL..."):
                     cddl_df = calculate_cddl(df, target_col, favorable_val, primary_protected, priv_group, unpriv_group, proxy_attrs)
+                    cddl_df['Proxy (Estrato)'] = cddl_df['Proxy (Estrato)'].replace(translation_dict)
                 
                 st.dataframe(
                     cddl_df.style.format({'CDDL': '{:.4f}'}),
@@ -326,7 +340,7 @@ else:
         st.markdown("Esta visão varre **todos os pares possíveis** entre os atributos selecionados para encontrar a disparidade máxima na margem versus na interseção.")
         
         with st.spinner("Varrendo pares..."):
-            pair_df = pairwise_gerrymandering_audit(df, selected_attrs, target_col, favorable_val)
+            pair_df = pairwise_gerrymandering_audit(df_mapped, selected_attrs, target_col, favorable_val)
             
         def color_pair_verdict(val):
             return 'background-color: #ffcccc; color: #cc0000; font-weight: bold;' if 'GERRYMANDERING' in val else ''
