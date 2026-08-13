@@ -3,7 +3,7 @@ from .compas import load_and_preprocess_compas
 from .dropout import load_and_preprocess_dropout
 from .intersectional_bias import load_and_preprocess_intersectional_bias
 from .loaders_folktables import load_and_preprocess_folktables_income, load_and_preprocess_folktables_coverage
-from .loaders_datasus import load_and_preprocess_sih, load_and_preprocess_sim, load_and_preprocess_sinasc
+from .loaders_datasus import load_and_preprocess_sih, load_and_preprocess_sim, load_and_preprocess_sinasc, load_and_preprocess_sinan
 
 import os
 import pandas as pd
@@ -233,5 +233,27 @@ DATASETS = {
         'favorable_label_en': 'Term birth, no complications',
         'description_pt': "Sistema de Informações sobre Nascidos Vivos. Foca em desfechos como prematuridade e baixo peso ao nascer, controlando determinantes sociais da mãe.",
         'description_en': "Live Births Information System. Focuses on outcomes like prematurity and low birth weight, controlling for mother's social determinants."
+    },
+    'SINAN (DATASUS) 🇧🇷': {
+        'loader': lambda uf=['Todos']: load_and_preprocess_sinan(uf),
+        'supports_uf': True,
+        'target': 'evolucao_caso',
+        'favorable_val': 'Cura',
+        'protected_attributes': ['sexo', 'raca_cor'],
+        'proxy_attributes': ['escolaridade'],
+        'country_pt': '🇧🇷 Brasil',
+        'country_en': '🇧🇷 Brazil',
+        'icon': '🦟',
+        'domain_pt': 'Saúde Pública — Agravos de Notificação',
+        'domain_en': 'Public Health — Notifiable Diseases',
+        'link': '',
+        'year': '',
+        'n_approx': '',
+        'target_label_pt': 'Evolução do caso',
+        'target_label_en': 'Case evolution',
+        'favorable_label_pt': 'Cura',
+        'favorable_label_en': 'Cure',
+        'description_pt': "Sistema de Informação de Agravos de Notificação (SINAN). Avalia a evolução de casos de doenças de notificação compulsória.",
+        'description_en': "Notifiable Diseases Information System (SINAN). Evaluates the evolution of compulsory notifiable disease cases."
     }
 }

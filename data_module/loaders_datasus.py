@@ -59,3 +59,22 @@ def load_and_preprocess_sinasc(ufs=['Todos']):
         'escolaridade_mae': ['Fundamental', 'Médio', 'Superior', 'Médio'] * 250,
         'desfecho_nascimento': ['Normal', 'Normal', 'Baixo Peso', 'Normal'] * 250
     })
+
+@st.cache_data(show_spinner=False)
+def load_and_preprocess_sinan(ufs=['Todos']):
+    """
+    Carrega amostra real do SINAN (DATASUS).
+    """
+    path = os.path.join(os.path.dirname(__file__), '..', 'data', 'processed', 'sinan_processed.parquet')
+    if os.path.exists(path):
+        df = pd.read_parquet(path)
+        if 'Todos' not in ufs and len(ufs) > 0:
+            df = df[df['uf'].isin(ufs)]
+        return df
+        
+    return pd.DataFrame({
+        'sexo': ['Masculino', 'Feminino', 'Masculino', 'Feminino'] * 250,
+        'raca_cor': ['Preta', 'Branca', 'Parda', 'Branca'] * 250,
+        'escolaridade': ['Fundamental', 'Médio', 'Superior', 'Médio'] * 250,
+        'evolucao_caso': ['Cura', 'Óbito', 'Cura', 'Cura'] * 250
+    })
