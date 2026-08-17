@@ -175,10 +175,12 @@ if view_mode == t("view_agg"):
     marginal_df[t('subgroup')] = marginal_df[t('subgroup')].astype(str)
 
     base_chart = alt.Chart(marginal_df).encode(
-        x=alt.X(f"{t('subgroup')}:N", title=None, axis=alt.Axis(labelAngle=-45)),
+        x=alt.X(f"{t('subgroup')}:N", title=None, axis=alt.Axis(labelAngle=-90, labelOverlap=False, labelLimit=0)),
         y=alt.Y(f"{t('favorable_rate')}:Q", title=t("favorable_rate"), scale=alt.Scale(domain=[0, 1])),
         color=alt.Color("Atributo:N", legend=None),
         tooltip=['Atributo', t('subgroup'), alt.Tooltip("N:Q", title="N"), alt.Tooltip(f"{t('favorable_rate')}:Q", format=".1%")]
+    ).properties(
+        width=alt.Step(60)
     )
 
     bar = base_chart.mark_bar(opacity=0.9)
