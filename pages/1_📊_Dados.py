@@ -362,7 +362,9 @@ else:
                 with st.spinner(t("calc_cddl")):
                     cddl_df = calculate_cddl(df, target_col, favorable_val, primary_protected, priv_group, unpriv_group, cddl_proxies)
                     if st.session_state.lang == "PT":
-                        cddl_df['Proxy (Estrato)'] = cddl_df['Proxy (Estrato)'].replace(translation_dict)
+                        cddl_df['Variável Proxy (Condição)'] = cddl_df['Variável Proxy (Condição)'].replace(translation_dict)
+                        cddl_df['Atributo Protegido (Vítima)'] = cddl_df['Atributo Protegido (Vítima)'].replace(translation_dict)
+                        cddl_df['Grupo Desprivilegiado'] = cddl_df['Grupo Desprivilegiado'].replace(translation_dict)
                 
                 st.dataframe(
                     cddl_df.style.format({'CDDL': '{:.4f}'}),

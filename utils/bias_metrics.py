@@ -256,7 +256,9 @@ def calculate_cddl(df, target_col, favorable_val, protected_attr, priv_group, un
             
         cddl /= n_total
         results.append({
-            'Proxy (Estrato)': proxy,
+            'Atributo Protegido (Vítima)': protected_attr,
+            'Grupo Desprivilegiado': unpriv_group,
+            'Variável Proxy (Condição)': proxy,
             'CDDL': cddl
         })
         
