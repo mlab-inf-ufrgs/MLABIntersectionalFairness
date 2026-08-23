@@ -349,16 +349,18 @@ else:
             
         st.divider()
         st.subheader(t("cddl_header"))
-        if not proxy_attrs:
+        primary_protected = dataset_info.get('primary_protected')
+        priv_group = dataset_info.get('privileged_group')
+        unpriv_group = dataset_info.get('unprivileged_group')
+        
+        cddl_proxies = [a for a in selected_attrs if a != primary_protected]
+        
+        if not cddl_proxies:
             st.info(t("no_proxy"))
         else:
-            primary_protected = dataset_info.get('primary_protected')
-            priv_group = dataset_info.get('privileged_group')
-            unpriv_group = dataset_info.get('unprivileged_group')
-            
             if primary_protected and priv_group and unpriv_group and primary_protected in df.columns:
                 with st.spinner(t("calc_cddl")):
-                    cddl_df = calculate_cddl(df, target_col, favorable_val, primary_protected, priv_group, unpriv_group, proxy_attrs)
+                    cddl_df = calculate_cddl(df, target_col, favorable_val, primary_protected, priv_group, unpriv_group, cddl_proxies)
                     if st.session_state.lang == "PT":
                         cddl_df['Proxy (Estrato)'] = cddl_df['Proxy (Estrato)'].replace(translation_dict)
                 
