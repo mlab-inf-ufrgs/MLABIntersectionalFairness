@@ -26,6 +26,7 @@ def calculate_wilson_ci(successes, nobs, alpha=0.05):
     lower, upper = proportion_confint(count=successes, nobs=nobs, alpha=alpha, method='wilson')
     return lower, upper
 
+
 def intersectional_audit_metrics(df, sensitive_attrs, target_col, favorable_val=1):
     """
     Calculates Gerrymandering Audit Metrics for intersectional subgroups.
@@ -76,7 +77,7 @@ def intersectional_audit_metrics(df, sensitive_attrs, target_col, favorable_val=
         # Audit Verdict
         if n < 100:
             verdict = "Inviável (N<100)"
-        elif hidden_bias < -0.05:
+        elif hidden_bias < -0.10:
             verdict = "Alto Viés Oculto"
         elif real_gap < -0.1:
             verdict = "Alto Viés Direto"
@@ -202,7 +203,7 @@ def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
             
         hidden_bias = real_gap - expected_gap
         
-        if hidden_bias > 0.05:
+        if hidden_bias > 0.10:
             verdict = "⚠️ GERRYMANDERING"
         else:
             verdict = "OK"
