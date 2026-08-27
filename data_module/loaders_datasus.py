@@ -16,12 +16,9 @@ def load_and_preprocess_sih(ufs=['Todos']):
             df = df[df['uf'].isin(ufs)]
         return df
     
-    # Fallback apenas se o arquivo ainda não existir
-    return pd.DataFrame({
-        'sexo': ['Masculino', 'Feminino', 'Masculino', 'Feminino'] * 250,
-        'raca_cor': ['Branca', 'Preta', 'Parda', 'Branca'] * 250,
-        'desfecho': ['Alta', 'Óbito', 'Alta', 'Alta'] * 250
-    })
+    # Fallback explícito para evitar confusão com dados reais
+    st.error("⚠️ Base SIH real não encontrada! Execute os scripts de coleta para baixar os dados.")
+    return pd.DataFrame(columns=['sexo', 'raca_cor', 'desfecho', 'uf'])
 
 @st.cache_data(show_spinner=False)
 def load_and_preprocess_sim(ufs=['Todos']):
@@ -35,11 +32,9 @@ def load_and_preprocess_sim(ufs=['Todos']):
             df = df[df['uf'].isin(ufs)]
         return df
     
-    return pd.DataFrame({
-        'sexo': ['Masculino', 'Feminino', 'Feminino', 'Feminino'] * 250,
-        'raca_cor': ['Preta', 'Preta', 'Parda', 'Branca'] * 250,
-        'tipo_obito': ['Não Evitável', 'Evitável', 'Não Evitável', 'Não Evitável'] * 250
-    })
+    # Fallback explícito para evitar confusão com dados reais
+    st.error("⚠️ Base SIM real não encontrada! Execute os scripts de coleta para baixar os dados.")
+    return pd.DataFrame(columns=['sexo', 'raca_cor', 'tipo_obito', 'uf'])
 
 @st.cache_data(show_spinner=False)
 def load_and_preprocess_sinasc(ufs=['Todos']):
@@ -53,12 +48,9 @@ def load_and_preprocess_sinasc(ufs=['Todos']):
             df = df[df['uf'].isin(ufs)]
         return df
         
-    return pd.DataFrame({
-        'raca_cor_mae': ['Preta', 'Branca', 'Parda', 'Branca'] * 250,
-        'idade_mae': ['Jovem', 'Adulta', 'Jovem', 'Adulta'] * 250,
-        'escolaridade_mae': ['Fundamental', 'Médio', 'Superior', 'Médio'] * 250,
-        'desfecho_nascimento': ['Normal', 'Normal', 'Baixo Peso', 'Normal'] * 250
-    })
+    # Fallback explícito para evitar confusão com dados reais
+    st.error("⚠️ Base SINASC real não encontrada! Execute os scripts de coleta para baixar os dados.")
+    return pd.DataFrame(columns=['raca_cor_mae', 'idade_mae', 'escolaridade_mae', 'desfecho_nascimento', 'uf'])
 
 @st.cache_data(show_spinner=False)
 def load_and_preprocess_sinan(ufs=['Todos']):
@@ -72,9 +64,6 @@ def load_and_preprocess_sinan(ufs=['Todos']):
             df = df[df['uf'].isin(ufs)]
         return df
         
-    return pd.DataFrame({
-        'sexo': ['Masculino', 'Feminino', 'Masculino', 'Feminino'] * 250,
-        'raca_cor': ['Preta', 'Branca', 'Parda', 'Branca'] * 250,
-        'escolaridade': ['Fundamental', 'Médio', 'Superior', 'Médio'] * 250,
-        'evolucao_caso': ['Cura', 'Óbito', 'Cura', 'Cura'] * 250
-    })
+    # Fallback explícito para evitar confusão com dados reais
+    st.error("⚠️ Base SINAN real não encontrada! Execute os scripts de coleta para baixar os dados.")
+    return pd.DataFrame(columns=['sexo', 'raca_cor', 'escolaridade', 'evolucao_caso', 'uf'])
