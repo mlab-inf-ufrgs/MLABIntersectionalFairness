@@ -349,26 +349,41 @@ else:
             
         st.divider()
         st.subheader(t("cddl_header"))
-        if not proxy_attrs:
-            st.info(t("no_proxy"))
-        else:
-            primary_protected = dataset_info.get('primary_protected')
-            priv_group = dataset_info.get('privileged_group')
-            unpriv_group = dataset_info.get('unprivileged_group')
-            
-            if primary_protected and priv_group and unpriv_group and primary_protected in df.columns:
-                with st.spinner(t("calc_cddl")):
-                    cddl_df = calculate_cddl(df, target_col, favorable_val, primary_protected, priv_group, unpriv_group, proxy_attrs)
-                    if st.session_state.lang == "PT":
-                        cddl_df['Proxy (Estrato)'] = cddl_df['Proxy (Estrato)'].replace(translation_dict)
-                
-                st.dataframe(
-                    cddl_df.style.format({'CDDL': '{:.4f}'}),
-                    use_container_width=True
-                )
-                st.caption(t("caption_cddl"))
+        with st.expander("Matriz Completa de Disparidade Demográfica Condicional (CDDL)", expanded=False):
+            if len(selected_attrs) < 2:
+                st.info("Selecione pelo menos dois atributos na caixa acima para calcular a matriz cruzada de CDDL.")
             else:
-                st.warning(t("warn_metadata"))
+                with st.spinner(t("calc_cddl")):
+                    all_cddl_results = []
+                    
+                    for prot_attr in selected_attrs:
+                        # Obter grupos privilegiados/desprivilegiados dinamicamente
+                        dyn = calculate_dynamic_metrics(df_mapped, prot_attr, target_col, favorable_val)
+                        priv_group = dyn.get('priv')
+                        unpriv_group = dyn.get('unpriv')
+                        
+                        if priv_group and unpriv_group:
+                            cddl_proxies = [a for a in selected_attrs if a != prot_attr]
+                            if cddl_proxies:
+                                cddl_df_part = calculate_cddl(df_mapped, target_col, favorable_val, prot_attr, priv_group, unpriv_group, cddl_proxies)
+                                all_cddl_results.append(cddl_df_part)
+                                
+                    if all_cddl_results:
+                        final_cddl_df = pd.concat(all_cddl_results, ignore_index=True)
+                        
+                        if st.session_state.lang == "PT":
+                            final_cddl_df['Grupo Desprivilegiado'] = final_cddl_df['Grupo Desprivilegiado'].replace(translation_dict)
+                            
+                        # Ordenar por maior risco (CDDL mais alto)
+                        final_cddl_df = final_cddl_df.sort_values(by='CDDL', ascending=False).reset_index(drop=True)
+                        
+                        st.dataframe(
+                            final_cddl_df.style.format({'CDDL': '{:.4f}'}),
+                            use_container_width=True
+                        )
+                        st.caption(t("caption_cddl"))
+                    else:
+                        st.warning(t("warn_metadata"))
 
     with tab2:
         st.subheader(t("audit_pairs"))
