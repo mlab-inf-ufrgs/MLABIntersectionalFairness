@@ -6,7 +6,10 @@ from statsmodels.stats.proportion import proportion_confint
 
 def calculate_cramer_v(df, col1, col2):
     """Calculates Cramér's V statistic for categorical-categorical association."""
-    confusion_matrix = pd.crosstab(df[col1], df[col2])
+    # Reset index to avoid pandas ValueError on duplicate index labels during alignment
+    s1 = df[col1].reset_index(drop=True)
+    s2 = df[col2].reset_index(drop=True)
+    confusion_matrix = pd.crosstab(s1, s2)
     if confusion_matrix.size == 0 or confusion_matrix.sum().sum() == 0:
         return 0.0
         
