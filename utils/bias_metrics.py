@@ -263,12 +263,146 @@ def calculate_cddl(df, target_col, favorable_val, protected_attr, priv_group, un
         })
         
     return pd.DataFrame(results)
-def calculate_model_fairness_metrics(y_true, y_pred, sensitive_attr):
+def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_val=1):
     """
-    To be used in the 'Modelos' tab later.
-    Calculates Sensitivity Gap and AAOD.
+    Calculates intersectional post-training fairness metrics.
+
+    This function evaluates the fairness of a trained classifier across all
+    intersectional subgroups defined by `groups_series`. It is designed to be
+    called once per outer fold of the nested cross-validation pipeline and
+    then aggregated across folds.
+
+    Metrics implemented (based on the reference paper):
+
+    - **TPR** (True Positive Rate / Sensitivity / Recall):
+        TPR = TP / (TP + FN)
+        Measures the fraction of true positives correctly identified.
+
+    - **FPR** (False Positive Rate):
+        FPR = FP / (FP + TN)
+        Measures the fraction of actual negatives incorrectly predicted as positive.
+
+    - **Precision**:
+        Precision = TP / (TP + FP)
+
+    - **Post-training Disparate Impact (DI)**:
+        DI_u = P(ŷ=favorable | group=u) / P(ŷ=favorable | group=reference)
+        Where `reference` is the intersectional subgroup with the highest
+        favorable prediction rate in this fold (determined dynamically).
+        Values < 0.8 or > 1.25 are commonly considered disparate.
+
+    - **AAOD** (Average Absolute Odds Difference) per subgroup:
+        AAOD_u = 0.5 * (|FPR_u - FPR_ref| + |TPR_u - TPR_ref|)
+        Measures the mean absolute deviation of both error rates from the
+        reference group, capturing both under- and over-prediction simultaneously.
+
+    - **Max Intersectional AAOD** (aggregate scalar):
+        max_AAOD = max(AAOD_u for all viable subgroups)
+        We use the maximum (not the mean) to adopt the most conservative stance
+        and protect the worst-case subgroup, as recommended in high-stakes
+        decision contexts.
+
+    - **Sensitivity Gap** (aggregate scalar):
+        sensitivity_gap = max(TPR_u) - min(TPR_u) for all viable subgroups (N >= 30)
+        Measures the worst-case disparity in true positive rates.
+
+    Parameters
+    ----------
+    y_true : array-like
+        Ground-truth binary labels.
+    y_pred : array-like
+        Binary predictions from the trained model.
+    groups_series : pd.Series
+        Series of intersectional subgroup labels aligned with y_true and y_pred.
+        Example values: "Female & Black", "Male & White".
+    favorable_val : int or str, default=1
+        The value considered the favorable outcome (positive class).
+
+    Returns
+    -------
+    subgroup_metrics : pd.DataFrame
+        One row per subgroup with columns:
+        ['subgroup', 'n', 'tpr', 'fpr', 'precision', 'favorable_rate', 'post_di', 'aaod']
+    aggregate_metrics : dict
+        Scalar summary metrics:
+        {'max_aaod', 'sensitivity_gap', 'reference_group'}
     """
-    pass
+    y_true = pd.Series(y_true).reset_index(drop=True)
+    y_pred = pd.Series(y_pred).reset_index(drop=True)
+    groups = pd.Series(groups_series).reset_index(drop=True)
+
+    unique_groups = groups.unique()
+    results = []
+
+    for group in unique_groups:
+        mask = groups == group
+        yt = y_true[mask]
+        yp = y_pred[mask]
+        n = mask.sum()
+
+        if n == 0:
+            continue
+
+        fav_mask_true = (yt == favorable_val)
+        fav_mask_pred = (yp == favorable_val)
+
+        tp = int((fav_mask_pred & fav_mask_true).sum())
+        fn = int((~fav_mask_pred & fav_mask_true).sum())
+        fp = int((fav_mask_pred & ~fav_mask_true).sum())
+        tn = int((~fav_mask_pred & ~fav_mask_true).sum())
+
+        tpr = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        favorable_rate = fav_mask_pred.mean()
+
+        results.append({
+            'subgroup': group,
+            'n': n,
+            'tpr': tpr,
+            'fpr': fpr,
+            'precision': precision,
+            'favorable_rate': favorable_rate,
+            # DI and AAOD computed after reference group is identified below
+            'post_di': np.nan,
+            'aaod': np.nan,
+        })
+
+    if not results:
+        empty_df = pd.DataFrame(columns=['subgroup', 'n', 'tpr', 'fpr', 'precision',
+                                         'favorable_rate', 'post_di', 'aaod'])
+        return empty_df, {'max_aaod': np.nan, 'sensitivity_gap': np.nan, 'reference_group': None}
+
+    subgroup_df = pd.DataFrame(results)
+
+    # Reference group: highest favorable prediction rate (determined dynamically)
+    ref_idx = subgroup_df['favorable_rate'].idxmax()
+    ref_group = subgroup_df.loc[ref_idx, 'subgroup']
+    ref_favorable_rate = subgroup_df.loc[ref_idx, 'favorable_rate']
+    ref_tpr = subgroup_df.loc[ref_idx, 'tpr']
+    ref_fpr = subgroup_df.loc[ref_idx, 'fpr']
+
+    # Compute DI and AAOD for each subgroup
+    subgroup_df['post_di'] = subgroup_df['favorable_rate'].apply(
+        lambda r: r / ref_favorable_rate if ref_favorable_rate > 0 else np.nan
+    )
+    subgroup_df['aaod'] = subgroup_df.apply(
+        lambda row: 0.5 * (abs(row['fpr'] - ref_fpr) + abs(row['tpr'] - ref_tpr)),
+        axis=1
+    )
+
+    # Aggregate: viable subgroups only (N >= 30) for sensitivity gap
+    viable = subgroup_df[subgroup_df['n'] >= 30]
+    sensitivity_gap = (viable['tpr'].max() - viable['tpr'].min()) if len(viable) >= 2 else np.nan
+    max_aaod = subgroup_df['aaod'].max()
+
+    aggregate_metrics = {
+        'max_aaod': max_aaod,
+        'sensitivity_gap': sensitivity_gap,
+        'reference_group': ref_group,
+    }
+
+    return subgroup_df, aggregate_metrics
 
 def calculate_dynamic_metrics(df, attr, target_col, favorable_val):
     """

@@ -16,9 +16,96 @@ TEXTS = {
         "home_page_title": "Diagnóstico de Viés Interseccional",
         "home_title": "Análise de impacto cumulativo do viés social",
         "home_nav": "**Navegação:**\n- **Dados**: Diagnóstico pré-treinamento e Análise Exploratória (EDA). Avalia o viés inerente aos dados e auditoria de Gerrymandering.\n- **Modelos**: (Em Breve) Avaliação de disparidades e trade-offs de justiça algorítmica pós-treinamento.\n\nSelecione a aba desejada no menu lateral.",
-        "models_page_title": "Modelos (Em Breve)",
-        "models_title": "Modelos Pós-Treinamento",
-        "models_info": "**Aba em desenvolvimento.**\n\nNesta etapa futura, adicionaremos os resultados de modelos (RF, GBM, MLP) treinados sobre os datasets selecionados.\nAs métricas de auditoria incluirão:\n- Sensitivity Gap\n- Average Absolute Odds Difference (AAOD)\n- Disparate Impact (Pós-treinamento)\n\nPor enquanto, utilize a aba **Dados** para análise exploratória e diagnóstico de viés inerente (pré-treinamento).",
+        "models_page_title": "Modelos",
+        "models_title": "Avaliação Pós-Treinamento — Fairness Interseccional",
+        "models_info": "",
+
+        # Proveniência
+        "provenance_header": "🔬 Metodologia e Proveniência dos Experimentos",
+        "provenance_desc": (
+            "Os resultados desta aba foram produzidos por um pipeline de **Nested Cross-Validation** "
+            "independente do servidor Streamlit, garantindo que nenhum modelo seja treinado durante a navegação.\n\n"
+            "**Pipeline:** Outer CV K=3 (avaliação) + Inner CV K=3 (tuning via `RandomizedSearchCV`, `n_iter=30`).\n"
+            "**Modelos:** Random Forest, Gradient Boosting (scikit-learn).\n"
+            "**Métricas de otimização avaliadas:** Accuracy, Recall, Precision, ROC-AUC, PR-AUC.\n"
+            "**Atributos sensíveis excluídos das features** (modelo fairness-unaware, conforme artigo de referência).\n\n"
+            "Grupo de referência para DI/AAOD: subgrupo interseccional com **maior taxa de predição favorável** "
+            "na fold de teste (determinado dinamicamente por fold).\n"
+            "**Max AAOD** = AAOD do subgrupo mais prejudicado (estimativa conservadora, protege o pior caso)."
+        ),
+        "provenance_run_ts": "Executado em",
+        "provenance_outer_k": "Outer K",
+        "provenance_inner_k": "Inner K / Busca",
+        "provenance_dryrun_warn": "⚠️ Estes são resultados de **dry-run** (1 fold, 5 iterações). Execute o script completo para resultados definitivos.",
+        "no_results_warn": "Nenhum resultado encontrado. Execute o script de experimentos primeiro:",
+        "load_error": "Erro ao carregar os resultados:",
+
+        # Bloco 1
+        "b1_models_header": "1. Seleção de Contexto e Métricas Globais",
+        "select_attrs_combo": "Combinação de Atributos Interseccionais:",
+        "select_model": "Modelo:",
+        "select_opt_metric": "Métrica de Otimização:",
+        "global_metrics_header": "Desempenho Global (média ± desvio padrão — outer folds)",
+        "max_aaod_metric": "Max AAOD Interseccional",
+        "sens_gap_metric": "Sensitivity Gap",
+        "fairness_def_expander": "ℹ️ Definição das métricas de fairness",
+        "fairness_def_text": (
+            "* **Max AAOD (Average Absolute Odds Difference):** "
+            "`0.5 × (|FPR_u − FPR_ref| + |TPR_u − TPR_ref|)` calculado para cada subgrupo `u` em relação ao "
+            "grupo de referência (maior taxa favorável). Reportamos o **máximo** entre os subgrupos para "
+            "adotar postura conservadora e proteger o pior caso.\n"
+            "* **Sensitivity Gap:** `max(TPR) − min(TPR)` entre subgrupos viáveis (N ≥ 30). "
+            "Mede a disparidade máxima na capacidade do modelo de identificar corretamente o desfecho favorável.\n"
+            "* **Post-training DI:** `P(ŷ=favorável | grupo=u) / P(ŷ=favorável | grupo=referência)`. "
+            "Valores < 0.8 ou > 1.25 indicam disparidade pela Regra dos 80%."
+        ),
+
+        # Bloco 2 — Pareto
+        "pareto_header": "2. Trade-off: Desempenho × Injustiça Interseccional (Pareto)",
+        "pareto_desc": (
+            "Cada ponto representa uma combinação **(modelo × métrica de otimização)**. "
+            "O **quadrante ideal** é o canto inferior direito: alta performance e baixa injustiça. "
+            "Use este gráfico para identificar qual estratégia de otimização melhor equilibra eficiência e equidade."
+        ),
+        "pareto_xaxis_label": "Métrica de performance (eixo X):",
+        "pareto_ideal_label": "← Região ideal",
+        "max_aaod_label": "Max AAOD Interseccional",
+        "model_legend": "Modelo",
+        "opt_metric_legend": "Métrica de Otimização",
+        "pareto_caption": (
+            "Barras de erro representam o desvio padrão entre as outer folds. "
+            "Pontos mais à direita e mais abaixo indicam melhor trade-off performance/fairness."
+        ),
+
+        # Bloco 3 — Dumbbell
+        "dumbbell_header": "3. Disparate Impact Pós-Treinamento por Subgrupo Interseccional",
+        "dumbbell_desc": (
+            "Média do **Post-training DI** (± desvio padrão entre folds) para cada subgrupo interseccional. "
+            "A linha cinza em DI=1.0 indica paridade perfeita. "
+            "Linhas laranjas em 0.8 e 1.25 delimitam a Regra dos 80% (zona de disparidade)."
+        ),
+        "post_di_label": "DI Pós-treinamento",
+        "dumbbell_caption": (
+            "🔴 DI < 0.8 (subgrupo desfavorecido) | 🟠 DI > 1.25 (superrepresentado) | 🔵 dentro da faixa aceitável. "
+            "Barras de erro = ±1 desvio padrão entre outer folds."
+        ),
+        "dumbbell_table_expander": "📋 Tabela de dados completa por subgrupo",
+        "no_subgroup_data": "Dados de subgrupos não disponíveis para esta combinação.",
+
+        # Bloco 4 — Ranking
+        "ranking_header": "4. Ranking: Qual Métrica de Otimização É Mais Justa?",
+        "ranking_desc": (
+            "Heatmap do **AAOD médio** (entre outer folds) por combinação "
+            "*(métrica de otimização × subgrupo interseccional)*. "
+            "Cores mais escuras indicam maior injustiça para aquele subgrupo sob aquela estratégia de otimização. "
+            "Identifica qual escolha de função objetivo é mais prejudicial a grupos específicos."
+        ),
+        "ranking_model_select": "Modelo para o ranking:",
+        "ranking_caption": (
+            "Leitura: cada célula mostra o AAOD médio daquele subgrupo quando o modelo é otimizado "
+            "pela métrica da linha. Um AAOD próximo de zero indica paridade de erros com o grupo de referência."
+        ),
+        "export_ranking_csv": "📥 Exportar Ranking (CSV)",
         
         # Dados.py Texts
         "data_page_title": "Dados (EDA)",
@@ -124,9 +211,96 @@ TEXTS = {
         "home_page_title": "Intersectional Bias Diagnosis",
         "home_title": "Cumulative impact analysis of social bias",
         "home_nav": "**Navigation:**\n- **Data**: Pre-training diagnosis and Exploratory Data Analysis (EDA). Evaluates inherent data bias and Gerrymandering audit.\n- **Models**: (Coming Soon) Post-training evaluation of disparities and algorithmic fairness trade-offs.\n\nSelect the desired tab in the sidebar.",
-        "models_page_title": "Models (Coming Soon)",
-        "models_title": "Post-Training Models",
-        "models_info": "**Tab in development.**\n\nIn this future stage, we will add the results of models (RF, GBM, MLP) trained on the selected datasets.\nAudit metrics will include:\n- Sensitivity Gap\n- Average Absolute Odds Difference (AAOD)\n- Disparate Impact (Post-training)\n\nFor now, use the **Data** tab for exploratory analysis and inherent bias diagnosis (pre-training).",
+        "models_page_title": "Models",
+        "models_title": "Post-Training Evaluation — Intersectional Fairness",
+        "models_info": "",
+
+        # Provenance
+        "provenance_header": "🔬 Methodology and Experiment Provenance",
+        "provenance_desc": (
+            "The results on this tab were produced by a **Nested Cross-Validation** pipeline "
+            "that runs independently of the Streamlit server, ensuring no model is trained during browsing.\n\n"
+            "**Pipeline:** Outer CV K=3 (evaluation) + Inner CV K=3 (tuning via `RandomizedSearchCV`, `n_iter=30`).\n"
+            "**Models:** Random Forest, Gradient Boosting (scikit-learn).\n"
+            "**Optimization metrics evaluated:** Accuracy, Recall, Precision, ROC-AUC, PR-AUC.\n"
+            "**Sensitive attributes excluded from features** (fairness-unaware model, as per reference paper).\n\n"
+            "Reference group for DI/AAOD: intersectional subgroup with the **highest favorable prediction rate** "
+            "in the test fold (determined dynamically per fold).\n"
+            "**Max AAOD** = AAOD of the most disadvantaged subgroup (conservative estimate, protects the worst case)."
+        ),
+        "provenance_run_ts": "Run at",
+        "provenance_outer_k": "Outer K",
+        "provenance_inner_k": "Inner K / Search",
+        "provenance_dryrun_warn": "⚠️ These are **dry-run** results (1 fold, 5 iterations). Run the full script for definitive results.",
+        "no_results_warn": "No results found. Run the experiment script first:",
+        "load_error": "Error loading results:",
+
+        # Block 1
+        "b1_models_header": "1. Context Selection and Global Metrics",
+        "select_attrs_combo": "Intersectional Attribute Combination:",
+        "select_model": "Model:",
+        "select_opt_metric": "Optimization Metric:",
+        "global_metrics_header": "Global Performance (mean ± std — outer folds)",
+        "max_aaod_metric": "Max Intersectional AAOD",
+        "sens_gap_metric": "Sensitivity Gap",
+        "fairness_def_expander": "ℹ️ Fairness metrics definitions",
+        "fairness_def_text": (
+            "* **Max AAOD (Average Absolute Odds Difference):** "
+            "`0.5 × (|FPR_u − FPR_ref| + |TPR_u − TPR_ref|)` computed for each subgroup `u` relative to the "
+            "reference group (highest favorable rate). We report the **maximum** across subgroups to "
+            "adopt a conservative stance and protect the worst case.\n"
+            "* **Sensitivity Gap:** `max(TPR) − min(TPR)` across viable subgroups (N ≥ 30). "
+            "Measures the maximum disparity in the model's ability to correctly identify the favorable outcome.\n"
+            "* **Post-training DI:** `P(ŷ=favorable | group=u) / P(ŷ=favorable | group=reference)`. "
+            "Values < 0.8 or > 1.25 indicate disparity under the 80% Rule."
+        ),
+
+        # Block 2 — Pareto
+        "pareto_header": "2. Trade-off: Performance × Intersectional Unfairness (Pareto)",
+        "pareto_desc": (
+            "Each point represents a **(model × optimization metric)** combination. "
+            "The **ideal quadrant** is the lower right: high performance and low unfairness. "
+            "Use this chart to identify which optimization strategy best balances efficiency and equity."
+        ),
+        "pareto_xaxis_label": "Performance metric (X axis):",
+        "pareto_ideal_label": "← Ideal region",
+        "max_aaod_label": "Max Intersectional AAOD",
+        "model_legend": "Model",
+        "opt_metric_legend": "Optimization Metric",
+        "pareto_caption": (
+            "Error bars represent standard deviation across outer folds. "
+            "Points further right and lower indicate a better performance/fairness trade-off."
+        ),
+
+        # Block 3 — Dumbbell
+        "dumbbell_header": "3. Post-Training Disparate Impact by Intersectional Subgroup",
+        "dumbbell_desc": (
+            "Mean **Post-training DI** (± std across folds) for each intersectional subgroup. "
+            "The gray line at DI=1.0 indicates perfect parity. "
+            "Orange lines at 0.8 and 1.25 delimit the 80% Rule disparity zone."
+        ),
+        "post_di_label": "Post-training DI",
+        "dumbbell_caption": (
+            "🔴 DI < 0.8 (disadvantaged subgroup) | 🟠 DI > 1.25 (overrepresented) | 🔵 within acceptable range. "
+            "Error bars = ±1 standard deviation across outer folds."
+        ),
+        "dumbbell_table_expander": "📋 Full data table by subgroup",
+        "no_subgroup_data": "Subgroup data not available for this combination.",
+
+        # Block 4 — Ranking
+        "ranking_header": "4. Ranking: Which Optimization Metric Is Fairest?",
+        "ranking_desc": (
+            "Heatmap of **mean AAOD** (across outer folds) per "
+            "*(optimization metric × intersectional subgroup)* combination. "
+            "Darker colors indicate greater unfairness for that subgroup under that optimization strategy. "
+            "Identifies which objective function choice is most harmful to specific groups."
+        ),
+        "ranking_model_select": "Model for ranking:",
+        "ranking_caption": (
+            "Reading: each cell shows the mean AAOD of that subgroup when the model is optimized "
+            "by the row metric. An AAOD near zero indicates parity of errors with the reference group."
+        ),
+        "export_ranking_csv": "📥 Export Ranking (CSV)",
         
         # Dados.py Texts
         "data_page_title": "Data (EDA)",
