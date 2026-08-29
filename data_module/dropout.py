@@ -16,12 +16,12 @@ def load_and_preprocess_dropout():
         - Attendance: Daytime (Daytime/Evening attendance)
         - Debtor: No
     """
-    # Fetch dataset
-    dropout = fetch_ucirepo(id=697) 
-    X = dropout.data.features 
-    y = dropout.data.targets 
+    # Download dataset directly from UCI zip to avoid hanging issues with ucimlrepo
+    url = "https://archive.ics.uci.edu/static/public/697/predict+students+dropout+and+academic+success.zip"
+    df_raw = pd.read_csv(url, sep=';')
     
-    df = pd.concat([X, y], axis=1)
+    # We do not have X and y separated here, they are all in df_raw
+    df = df_raw.copy()
     
     # Clean hidden tabs in column names if any
     df.columns = df.columns.str.replace('\t', '').str.strip()

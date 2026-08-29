@@ -13,14 +13,14 @@ def load_and_preprocess_adult():
         - education_group: Graduate Degree
         - relationship: Husband
     """
-    # Fetch dataset
-    adult = fetch_ucirepo(id=2) 
-    
-    # data (as pandas dataframes) 
-    X = adult.data.features 
-    y = adult.data.targets 
-    
-    df = pd.concat([X, y], axis=1)
+    # Download dataset directly from UCI to avoid hanging issues with ucimlrepo
+    url = "https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data"
+    columns = [
+        "age", "workclass", "fnlwgt", "education", "education-num",
+        "marital-status", "occupation", "relationship", "race", "sex",
+        "capital-gain", "capital-loss", "hours-per-week", "native-country", "income"
+    ]
+    df = pd.read_csv(url, names=columns, sep=r',\s*', engine='python', na_values="?")
     
     # 1. Target Binarization
     # UCI repo sometimes has '>50K.' and '<=50K.'
