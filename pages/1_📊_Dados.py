@@ -51,6 +51,10 @@ if dataset_info.get('supports_uf', False):
 with st.spinner(t("loading")):
     df = load_data(dataset_name, uf=uf_selected)
 
+if len(df) == 0:
+    st.warning("⚠️ Os dados não foram encontrados ou estão vazios. Caso seja o primeiro uso, certifique-se de ter executado os scripts de extração em `scripts/`.")
+    st.stop()
+
 target_col = dataset_info['target']
 favorable_val = dataset_info['favorable_val']
 protected_attrs = dataset_info['protected_attributes']
@@ -117,7 +121,7 @@ base_general = alt.Chart(filtered_counts).encode(
 
 chart_general = base_general.mark_bar() + base_general.mark_text(dy=-5).encode(text='count:Q')
 
-st.altair_chart(chart_general, use_container_width=True)
+st.altair_chart(chart_general, width="stretch")
 
 st.divider()
 
@@ -200,7 +204,7 @@ if view_mode == t("view_agg"):
         column=alt.Column("Atributo:N", title=None, header=alt.Header(labelOrient='bottom', titleOrient='bottom', labelFontWeight='bold'))
     ).resolve_scale(x='independent')
 
-    st.altair_chart(faceted_chart, use_container_width=False)
+    st.altair_chart(faceted_chart, width="content")
     st.caption(f"{t('global_mean_legend')} ({global_favorable_rate:.1%}).")
 
 else:
@@ -228,7 +232,7 @@ else:
         align='left', baseline='bottom', dy=-5, dx=5, color='red', text=f"{t('global_mean')}: {global_favorable_rate:.1%}"
     ).encode(y='mean:Q', x=alt.value(0))
 
-    st.altair_chart((bar + text + rule + rule_label).properties(height=350), use_container_width=True)
+    st.altair_chart((bar + text + rule + rule_label).properties(height=350), width="stretch")
     
     dyn_metrics = calculate_dynamic_metrics(df_mapped, uni_attr, target_col, favorable_val)
     
@@ -287,7 +291,7 @@ else:
             
             layered_chart = (base_bar + text + rule_inter).facet(column=f"{selected_attrs[0]}:N")
             
-            st.altair_chart(layered_chart, use_container_width=False)
+            st.altair_chart(layered_chart, width="content")
             st.caption(t("caption_translucent"))
         
         else:
@@ -461,7 +465,7 @@ else:
             alt.datum[t('tbl_gap_type')] == t('tbl_real_gap')
         )
         
-        st.altair_chart((bars + text).properties(height=400), use_container_width=True)
+        st.altair_chart((bars + text).properties(height=400), width="stretch")
 
 st.divider()
 
@@ -511,6 +515,6 @@ if len(vars_to_correlate) > 1:
         )
         
         heatmap = (hm + text_hm).properties(height=max(400, len(vars_to_correlate)*40))
-        st.altair_chart(heatmap, use_container_width=True)
+        st.altair_chart(heatmap, width="stretch")
 else:
     st.info(t("insufficient_attrs"))

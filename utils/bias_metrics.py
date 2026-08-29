@@ -7,14 +7,22 @@ from statsmodels.stats.proportion import proportion_confint
 def calculate_cramer_v(df, col1, col2):
     """Calculates Cramér's V statistic for categorical-categorical association."""
     confusion_matrix = pd.crosstab(df[col1], df[col2])
+    if confusion_matrix.size == 0 or confusion_matrix.sum().sum() == 0:
+        return 0.0
+        
     chi2 = chi2_contingency(confusion_matrix)[0]
     n = confusion_matrix.sum().sum()
     phi2 = chi2 / n
     r, k = confusion_matrix.shape
+    
+    # Avoid division by zero in corrections if n is too small
+    if n <= 1:
+        return 0.0
+        
     phi2corr = max(0, phi2 - ((k-1)*(r-1))/(n-1))
     rcorr = r - ((r-1)**2)/(n-1)
     kcorr = k - ((k-1)**2)/(n-1)
-    if min((kcorr-1), (rcorr-1)) == 0:
+    if min((kcorr-1), (rcorr-1)) <= 0:
         return 0.0
     return np.sqrt(phi2corr / min((kcorr-1), (rcorr-1)))
 
