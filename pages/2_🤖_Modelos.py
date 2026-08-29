@@ -60,14 +60,30 @@ with st.expander(t("provenance_header"), expanded=True):
             st.warning(t("provenance_dryrun_warn"))
             
         st.markdown("---")
-        st.write("**Opções de re-execução:**")
-        c_btn1, c_btn2 = st.columns(2)
+        st.write("**Opções de re-execução e download:**")
+        c_btn1, c_btn2, c_btn3, c_btn4 = st.columns(4)
         with c_btn1:
             if st.button("🔄 Re-executar (Dry-run)"):
                 run_experiments_ui(dry_run=True)
         with c_btn2:
             if st.button("🚀 Re-executar Completo"):
                 run_experiments_ui(dry_run=False)
+        with c_btn3:
+            with open(ALL_AGG_PATH, "rb") as f:
+                st.download_button(
+                    label="📥 Dados Brutos Globais",
+                    data=f,
+                    file_name="all_results.parquet",
+                    mime="application/octet-stream"
+                )
+        with c_btn4:
+            with open(ALL_SUB_PATH, "rb") as f:
+                st.download_button(
+                    label="📥 Dados Brutos (Subgrupos)",
+                    data=f,
+                    file_name="all_subgroup_results.parquet",
+                    mime="application/octet-stream"
+                )
                 
     else:
         st.warning(t("no_results_warn"))
