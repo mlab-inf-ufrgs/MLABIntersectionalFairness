@@ -65,24 +65,17 @@ from utils.bias_metrics import calculate_model_fairness_metrics
 # ---------------------------------------------------------------------------
 
 # Datasets to run, with the intersectional attribute combinations to evaluate.
-# Each key must match a key in DATASETS (data_module/__init__.py).
-EXPERIMENT_CONFIG = {
-    "Adult 🇺🇸": {
-        "attr_combinations": [
-            ["sex", "race"],
-        ]
-    },
-    "COMPAS 🇺🇸": {
-        "attr_combinations": [
-            ["sex", "race"],
-        ]
-    },
-    "Dropout 🇵🇹": {
-        "attr_combinations": [
-            ["Gender", "Age_Group"],
-        ]
-    },
-}
+# Dynamically pulls all active datasets from data_module/__init__.py
+EXPERIMENT_CONFIG = {}
+for ds_key, ds_info in DATASETS.items():
+    protected = ds_info.get('protected_attributes', [])
+    if len(protected) >= 2:
+        # Pega as duas primeiras variáveis protegidas como o par interseccional principal
+        EXPERIMENT_CONFIG[ds_key] = {
+            "attr_combinations": [
+                [protected[0], protected[1]],
+            ]
+        }
 
 OPTIMIZATION_METRICS = ["accuracy", "recall", "precision", "roc_auc", "average_precision"]
 
