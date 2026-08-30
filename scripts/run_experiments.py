@@ -121,10 +121,10 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 def build_preprocessor(df_train, feature_cols):
     """
     Dynamically builds a ColumnTransformer that:
-      - One-hot encodes all categorical (object / category) columns.
+      - One-hot encodes all categorical (object / category / string) columns.
       - Standard-scales all numeric columns.
     """
-    cat_cols = [c for c in feature_cols if df_train[c].dtype in ["object", "category"]]
+    cat_cols = df_train[feature_cols].select_dtypes(exclude=['number']).columns.tolist()
     num_cols = [c for c in feature_cols if c not in cat_cols]
 
     transformers = []
