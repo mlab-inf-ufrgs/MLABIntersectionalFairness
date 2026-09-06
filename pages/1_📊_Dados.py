@@ -323,6 +323,17 @@ else:
                 }
                 audit_df[t('tbl_audit_verdict')] = audit_df[t('tbl_audit_verdict')].replace(verdict_map)
 
+            # Chart for 3+ attributes
+            chart_3plus = alt.Chart(audit_df).mark_bar().encode(
+                y=alt.Y(f"{t('tbl_subgroup')}:N", title=t('tbl_subgroup'), sort='-x'),
+                x=alt.X(f"{t('tbl_fav_rate')}:Q", title=t('tbl_fav_rate'), scale=alt.Scale(domain=[0, 1])),
+                opacity=alt.condition(alt.datum.N >= 100, alt.value(1.0), alt.value(0.3)),
+                color=alt.condition(alt.datum.N >= 100, alt.value('#1f77b4'), alt.value('gray')),
+                tooltip=[t('tbl_subgroup'), 'N', t('tbl_fav_rate'), t('tbl_audit_verdict')]
+            ).properties(height=max(300, len(audit_df) * 25))
+            
+            st.altair_chart(chart_3plus, use_container_width=True)
+
             # Estilização condicional
             def color_verdict(val):
                 color = 'green' if val == 'Ok' else 'orange' if 'Inviável' in val or 'Inviable' in val else 'red'

@@ -238,11 +238,21 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
                     random_state=42,
                     refit=True,
                 )
-                search.fit(X_train, y_train)
-                best_model = search.best_estimator_
+                try:
+                    search.fit(X_train, y_train)
+                    best_model = search.best_estimator_
 
-                # Predict on outer test fold
-                y_pred = best_model.predict(X_test)
+                    # Predict on outer test fold
+                    y_pred = best_model.predict(X_test)
+                except Exception as e:
+                    print(f" [Fold {fold_idx} Failed: {str(e)[:50]}]", end="", flush=True)
+                    fold_global_metrics.append({
+                        "fold": fold_idx,
+                        "accuracy": np.nan, "recall": np.nan, "precision": np.nan,
+                        "roc_auc": np.nan, "pr_auc": np.nan, "best_params": "FAILED",
+                    })
+                    continue
+
                 y_test_reset = y_test.reset_index(drop=True)
 
                 # --- Global performance metrics ---

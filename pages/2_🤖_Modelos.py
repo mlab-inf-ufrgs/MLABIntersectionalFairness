@@ -264,6 +264,12 @@ if not dumb_data.empty:
         n_mean=("n", "mean"),
     ).reset_index()
 
+    # Pre-calculate colors for Altair to avoid nested condition errors
+    dumb_avg["di_color"] = np.where(
+        dumb_avg["post_di_mean"] < 0.8, "#d73027",
+        np.where(dumb_avg["post_di_mean"] > 1.25, "#fc8d59", "#4575b4")
+    )
+
     # Reference line at DI = 1.0 (perfect parity)
     ref_line = alt.Chart(pd.DataFrame({"di": [1.0]})).mark_rule(
         color="gray", strokeDash=[6, 4], opacity=0.7
@@ -284,15 +290,7 @@ if not dumb_data.empty:
 
     dumb_points = dumb_base.mark_point(size=120, filled=True).encode(
         x=alt.X("post_di_mean:Q", title=t("post_di_label"), scale=alt.Scale(zero=False)),
-        color=alt.condition(
-            alt.datum.post_di_mean < 0.8,
-            alt.value("#d73027"),
-            alt.condition(
-                alt.datum.post_di_mean > 1.25,
-                alt.value("#fc8d59"),
-                alt.value("#4575b4"),
-            ),
-        ),
+        color=alt.Color("di_color:N", scale=None),
         tooltip=[
             alt.Tooltip("subgroup:N", title=t("tbl_subgroup")),
             alt.Tooltip("post_di_mean:Q", format=".3f", title=t("post_di_label")),
