@@ -300,67 +300,72 @@ else:
             with st.spinner(t("calc_gerry")):
                 audit_df = intersectional_audit_metrics(df_mapped, selected_attrs, target_col, favorable_val)
             
-            # Rename columns to match language
-            audit_df = audit_df.rename(columns={
-                'Subgrupo': t('tbl_subgroup'),
-                'Taxa Favorável': t('tbl_fav_rate'),
-                'Gap Real (Interseccional)': t('tbl_real_gap'),
-                'Gap Esperado (Marginal Máx)': t('tbl_exp_gap'),
-                'Viés Oculto (Excedente)': t('tbl_hidden_bias'),
-                'Score de Prioridade': t('tbl_prio_score'),
-                'DI Pré-treinamento': t('tbl_pre_di'),
-                'Veredito da Auditoria': t('tbl_audit_verdict')
-            })
-
-            # Translate verdicts if EN
-            if st.session_state.lang == "EN":
-                verdict_map = {
-                    "Inviável (N<100)": "Inviable (N<100)",
-                    "Alto Viés Oculto": "High Hidden Bias",
-                    "GERRYMANDERING": "GERRYMANDERING",
-                    "Viés Marginal Predominante": "Predominant Marginal Bias",
-                    "Ok": "Ok"
-                }
-                audit_df[t('tbl_audit_verdict')] = audit_df[t('tbl_audit_verdict')].replace(verdict_map)
-
-            # Chart for 3+ attributes
-            chart_3plus = alt.Chart(audit_df).mark_bar().encode(
-                y=alt.Y(f"{t('tbl_subgroup')}:N", title=t('tbl_subgroup'), sort='-x'),
-                x=alt.X(f"{t('tbl_fav_rate')}:Q", title=t('tbl_fav_rate'), scale=alt.Scale(domain=[0, 1])),
-                opacity=alt.condition(alt.datum.N >= 100, alt.value(1.0), alt.value(0.3)),
-                color=alt.condition(alt.datum.N >= 100, alt.value('#1f77b4'), alt.value('gray')),
-                tooltip=[t('tbl_subgroup'), 'N', t('tbl_fav_rate'), t('tbl_audit_verdict')]
-            ).properties(height=max(300, len(audit_df) * 25))
-            
-            st.altair_chart(chart_3plus, use_container_width=True)
-
-            # Estilização condicional
-            def color_verdict(val):
-                color = 'green' if val == 'Ok' else 'orange' if 'Inviável' in val or 'Inviable' in val else 'red'
-                return f'color: {color}'
+            if audit_df.empty:
+                st.warning("Dados insuficientes ou base vazia para gerar a auditoria com os atributos selecionados.")
+            else:
+                # Rename columns to match language
+                audit_df = audit_df.rename(columns={
+                    'Subgrupo': t('tbl_subgroup'),
+                    'Taxa Favorável': t('tbl_fav_rate'),
+                    'Gap Real (Interseccional)': t('tbl_real_gap'),
+                    'Gap Esperado (Marginal Máx)': t('tbl_exp_gap'),
+                    'Viés Oculto (Excedente)': t('tbl_hidden_bias'),
+                    'Score de Prioridade': t('tbl_prio_score'),
+                    'DI Pré-treinamento': t('tbl_pre_di'),
+                    'Veredito da Auditoria': t('tbl_audit_verdict')
+                })
+    
+                # Translate verdicts if EN
+                if st.session_state.lang == "EN":
+                    verdict_map = {
+                        "Inviável (N<100)": "Inviable (N<100)",
+                        "Alto Viés Oculto": "High Hidden Bias",
+                        "GERRYMANDERING": "GERRYMANDERING",
+                        "Viés Marginal Predominante": "Predominant Marginal Bias",
+                        "Ok": "Ok"
+                    }
+                    audit_df[t('tbl_audit_verdict')] = audit_df[t('tbl_audit_verdict')].replace(verdict_map)
+    
+                # Estilização condicional
+                def color_verdict(val):
+                    color = 'green' if val == 'Ok' else 'orange' if 'Inviável' in val or 'Inviable' in val else 'red'
+                    return f'color: {color}'
+                    
+                st.dataframe(
+                    audit_df.style.map(color_verdict, subset=[t('tbl_audit_verdict')]),
+                    column_config={
+                        t('tbl_subgroup'): st.column_config.TextColumn(t('tbl_subgroup'), width="large"),
+                        'N': st.column_config.NumberColumn('N', format="%d"),
+                        t('tbl_fav_rate'): st.column_config.ProgressColumn(
+                            t('tbl_fav_rate'),
+                            format="%.2f",
+                            min_value=0,
+                            max_value=1,
+                        ),
+                        t('tbl_real_gap'): st.column_config.NumberColumn(t('tbl_real_gap'), format="%.4f"),
+                        t('tbl_exp_gap'): st.column_config.NumberColumn(t('tbl_exp_gap'), format="%.4f"),
+                        t('tbl_hidden_bias'): st.column_config.NumberColumn(t('tbl_hidden_bias'), format="%.4f"),
+                        t('tbl_prio_score'): None, # Ocultar para simplificar
+                        t('tbl_pre_di'): None, # Ocultar para simplificar
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
                 
-            st.dataframe(
-                audit_df.style.map(color_verdict, subset=[t('tbl_audit_verdict')])
-                      .format({t('tbl_fav_rate'): '{:.2%}', t('tbl_real_gap'): '{:.4f}', 
-                               t('tbl_exp_gap'): '{:.4f}', t('tbl_hidden_bias'): '{:.4f}',
-                               t('tbl_prio_score'): '{:.2f}', t('tbl_pre_di'): '{:.4f}'}),
-                use_container_width=True
-            )
-            
-            st.caption(t("caption_inviable"))
-            
-            # Exportação Long CSV
-            long_csv = audit_df.melt(id_vars=[t('tbl_subgroup'), 'N'], 
-                                     value_vars=[t('tbl_fav_rate'), t('tbl_real_gap'), t('tbl_exp_gap'), t('tbl_hidden_bias'), t('tbl_prio_score'), t('tbl_pre_di')],
-                                     var_name=t('tbl_metric'), value_name=t('tbl_value'))
-            long_csv.insert(0, 'Dataset', dataset_name)
-            
-            st.download_button(
-                label=t("export_csv"),
-                data=long_csv.to_csv(index=False).encode('utf-8'),
-                file_name=f"{dataset_name}_intersectional_audit_long.csv",
-                mime="text/csv"
-            )
+                st.caption(t("caption_inviable"))
+                
+                # Exportação Long CSV
+                long_csv = audit_df.melt(id_vars=[t('tbl_subgroup'), 'N'], 
+                                         value_vars=[t('tbl_fav_rate'), t('tbl_real_gap'), t('tbl_exp_gap'), t('tbl_hidden_bias'), t('tbl_prio_score'), t('tbl_pre_di')],
+                                         var_name=t('tbl_metric'), value_name=t('tbl_value'))
+                long_csv.insert(0, 'Dataset', dataset_name)
+                
+                st.download_button(
+                    label=t("export_csv"),
+                    data=long_csv.to_csv(index=False).encode('utf-8'),
+                    file_name=f"{dataset_name}_intersectional_audit_long.csv",
+                    mime="text/csv"
+                )
             
         st.divider()
         st.subheader(t("cddl_header"))
@@ -474,7 +479,7 @@ else:
             stacked_chart = alt.Chart(stacked_df).mark_bar(stroke='white', strokeWidth=0.5).encode(
                 y=alt.Y(f"{t('tbl_pair')}:N", title=t('tbl_pair'), sort=alt.EncodingSortField(field='Total_Viable_N', op='max', order='descending')),
                 x=alt.X('N:Q', title='N (Total)'),
-                color=alt.condition(alt.datum['Viável'], alt.value('#1f77b4'), alt.value('gray')),
+                color=alt.Color('Subgroup:N', legend=None),
                 opacity=alt.condition(alt.datum['Viável'], alt.value(1.0), alt.value(0.3)),
                 order=alt.Order('N:Q', sort='descending'),
                 tooltip=[t('tbl_pair'), 'Subgroup', 'N', 'Viável']
