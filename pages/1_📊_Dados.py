@@ -479,7 +479,7 @@ else:
             stacked_chart = alt.Chart(stacked_df).mark_bar(stroke='white', strokeWidth=0.5).encode(
                 y=alt.Y(f"{t('tbl_pair')}:N", title=t('tbl_pair'), sort=alt.EncodingSortField(field='Total_Viable_N', op='max', order='descending')),
                 x=alt.X('N:Q', title='N (Total)'),
-                color=alt.Color('Subgroup:N', legend=None),
+                color=alt.Color('N:Q', scale=alt.Scale(scheme='viridis'), legend=alt.Legend(title='Tamanho (N)')),
                 opacity=alt.condition(alt.datum['Viável'], alt.value(1.0), alt.value(0.3)),
                 order=alt.Order('N:Q', sort='descending'),
                 tooltip=[t('tbl_pair'), 'Subgroup', 'N', 'Viável']
