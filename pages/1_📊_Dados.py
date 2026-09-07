@@ -444,6 +444,44 @@ else:
             use_container_width=True
         )
         
+        # New Stacked Bar Chart for Attribute Pairs Viability
+        st.markdown("**Distribuição de Subgrupos por Par de Atributos**" if st.session_state.lang == "PT" else "**Subgroup Distribution by Attribute Pair**")
+        
+        stacked_data = []
+        pairs_list = []
+        for i in range(len(selected_attrs)):
+            for j in range(i+1, len(selected_attrs)):
+                pairs_list.append((selected_attrs[i], selected_attrs[j]))
+                
+        for pair in pairs_list:
+            pair_name = f"{pair[0]} × {pair[1]}"
+            group_stats = df_mapped.groupby(list(pair), observed=True).size().reset_index(name='N')
+            for _, row in group_stats.iterrows():
+                subgroup_name = f"{row[pair[0]]} & {row[pair[1]]}"
+                stacked_data.append({
+                    t('tbl_pair'): pair_name,
+                    'Subgroup': subgroup_name,
+                    'N': row['N'],
+                    'Viável': row['N'] >= 100
+                })
+        
+        if stacked_data:
+            stacked_df = pd.DataFrame(stacked_data)
+            viable_totals = stacked_df[stacked_df['Viável']].groupby(t('tbl_pair'))['N'].sum().reset_index(name='Total_Viable_N')
+            stacked_df = stacked_df.merge(viable_totals, on=t('tbl_pair'), how='left')
+            stacked_df['Total_Viable_N'] = stacked_df['Total_Viable_N'].fillna(0)
+            
+            stacked_chart = alt.Chart(stacked_df).mark_bar(stroke='white', strokeWidth=0.5).encode(
+                y=alt.Y(f"{t('tbl_pair')}:N", title=t('tbl_pair'), sort=alt.EncodingSortField(field='Total_Viable_N', op='max', order='descending')),
+                x=alt.X('N:Q', title='N (Total)'),
+                color=alt.condition(alt.datum['Viável'], alt.value('#1f77b4'), alt.value('gray')),
+                opacity=alt.condition(alt.datum['Viável'], alt.value(1.0), alt.value(0.3)),
+                order=alt.Order('N:Q', sort='descending'),
+                tooltip=[t('tbl_pair'), 'Subgroup', 'N', 'Viável']
+            ).properties(height=max(250, len(pairs_list) * 40))
+            
+            st.altair_chart(stacked_chart, use_container_width=True)
+        
         st.markdown(f"**{dataset_name} — {t('gap_audit_title')}**")
         
         melted_pairs = pair_df.melt(
