@@ -59,6 +59,7 @@ sys.path.insert(0, PROJECT_ROOT)
 
 from data_module import DATASETS
 from utils.bias_metrics import calculate_model_fairness_metrics
+from utils.fair_networks import FairMLPClassifier, AdversarialFairMLPClassifier
 
 # ---------------------------------------------------------------------------
 # Experiment Configuration
@@ -98,6 +99,20 @@ MODELS = {
             "clf__subsample": [0.7, 1.0],
         },
     },
+    "FairMLP": {
+        "estimator": FairMLPClassifier(epochs=10, batch_size=256, lambda_fairness=0.5, hidden_dims=[128, 64], random_state=42),
+        "param_dist": {
+            "clf__lambda_fairness": [0.1, 0.5, 1.0],
+            "clf__lr": [0.001, 0.005]
+        },
+    },
+    "AdversarialFairMLP": {
+        "estimator": AdversarialFairMLPClassifier(epochs=10, batch_size=256, lambda_adv=1.0, hidden_dims=[128, 64], random_state=42),
+        "param_dist": {
+            "clf__lambda_adv": [0.5, 1.0, 2.0],
+            "clf__lr": [0.001, 0.005]
+        },
+    },
 }
 
 OUTER_K = 3
@@ -111,11 +126,14 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 # Helper: Build preprocessing pipeline
 # ---------------------------------------------------------------------------
 
-def build_preprocessor(df_train, feature_cols):
+from sklearn.preprocessing import OrdinalEncoder
+
+def build_preprocessor(df_train, feature_cols, sensitive_cols=None, pass_sensitive=False):
     """
     Dynamically builds a ColumnTransformer that:
       - One-hot encodes all categorical (object / category / string) columns.
       - Standard-scales all numeric columns.
+      - If pass_sensitive=True, Ordinal Encodes sensitive columns and passes them through.
     """
     cat_cols = df_train[feature_cols].select_dtypes(exclude=['number']).columns.tolist()
     num_cols = [c for c in feature_cols if c not in cat_cols]
@@ -128,6 +146,13 @@ def build_preprocessor(df_train, feature_cols):
             "cat",
             OneHotEncoder(handle_unknown="ignore", sparse_output=False),
             cat_cols,
+        ))
+        
+    if pass_sensitive and sensitive_cols:
+        transformers.append((
+            "sensitive",
+            OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+            sensitive_cols
         ))
 
     return ColumnTransformer(transformers=transformers, remainder="drop")
@@ -181,10 +206,9 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
     group_series_full = build_group_series(df, attr_combination)
 
     # Feature columns = all columns except target and the sensitive attrs we're auditing.
-    # Sensitive attrs are EXCLUDED from features to simulate a "fairness-unaware" model,
-    # consistent with the paper's setup: the model does not see the protected attribute.
+    # Sensitive attrs are kept in X. Standard models drop them, fair neural models use them for loss.
     feature_cols = [c for c in df.columns if c != target_col and c not in attr_combination]
-    X = df[feature_cols].copy()
+    X = df[feature_cols + attr_combination].copy()
     y_raw = df[target_col].copy()
 
     # Encode target if needed
@@ -195,6 +219,13 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
     else:
         y = y_raw.copy()
         favorable_encoded = favorable_val
+
+    # Determine global sensitive attribute dimensions for PyTorch models
+    global_sens_dims = None
+    if attr_combination:
+        global_sens_dims = []
+        for attr in attr_combination:
+            global_sens_dims.append(df[attr].nunique())
 
     agg_rows = []
     subgroup_rows = []
@@ -219,15 +250,35 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
                 y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
                 groups_test = group_series_full.iloc[test_idx].reset_index(drop=True)
 
+                # Identify if model requires sensitive attributes
+                is_fair_nn = model_name in ["FairMLP", "AdversarialFairMLP"]
+                
                 # Build pipeline
-                preprocessor = build_preprocessor(X_train, feature_cols)
+                preprocessor = build_preprocessor(
+                    X_train, 
+                    feature_cols, 
+                    sensitive_cols=attr_combination, 
+                    pass_sensitive=is_fair_nn
+                )
+                
+                estimator = model_cfg["estimator"]
+                if is_fair_nn:
+                    # Dynamically set the number of sensitive attributes and their categories
+                    estimator.set_params(
+                        num_sensitive_attrs=len(attr_combination),
+                        sensitive_dims_list=global_sens_dims
+                    )
+
                 pipe = Pipeline([
                     ("pre", preprocessor),
-                    ("clf", model_cfg["estimator"]),
+                    ("clf", estimator),
                 ])
 
                 # Inner CV: hyperparameter search
                 n_iter = 5 if dry_run else N_ITER_SEARCH
+                if is_fair_nn and not dry_run:
+                    n_iter = min(n_iter, 4) # Less searches for NNs to save time
+
                 search = RandomizedSearchCV(
                     pipe,
                     param_distributions=model_cfg["param_dist"],
@@ -266,10 +317,13 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
                     y_proba = best_model.predict_proba(X_test)
                     classes = list(best_model.classes_)
                     if favorable_encoded in classes:
+                        # CORREÇÃO DO BUG: garantindo que a classe favorável vira a classe positiva (1)
+                        # Isso previne que a pontuação de roc_auc_score inverta caso favorável seja 0 (como em COMPAS).
                         fav_col = classes.index(favorable_encoded)
                         y_score = y_proba[:, fav_col]
                         try:
-                            roc = roc_auc_score(y_test_reset, y_score)
+                            y_true_bin = (y_test_reset == favorable_encoded).astype(int)
+                            roc = roc_auc_score(y_true_bin, y_score)
                             prc = average_precision_score(
                                 y_test_reset, y_score, pos_label=favorable_encoded
                             )
