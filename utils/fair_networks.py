@@ -71,8 +71,8 @@ class FairMLPClassifier(BaseEstimator, ClassifierMixin):
         
         # Split features and sensitive attributes
         num_features = X.shape[1] - self.num_sensitive_attrs
-        X_features = X[:, :num_features]
-        X_sens = X[:, -self.num_sensitive_attrs:].astype(int)
+        X_features = np.asarray(X[:, :num_features], dtype=np.float32)
+        X_sens = np.asarray(X[:, -self.num_sensitive_attrs:], dtype=int)
         
         # Flatten intersectional groups to 1D based on global sensitive_dims_list
         # If sensitive_dims_list is None, fallback to discovering it (not recommended for strict CV)
@@ -98,7 +98,7 @@ class FairMLPClassifier(BaseEstimator, ClassifierMixin):
         
         # Convert to tensors
         X_tensor = torch.tensor(X_features, dtype=torch.float32)
-        y_tensor = torch.tensor(y, dtype=torch.float32)
+        y_tensor = torch.tensor(np.asarray(y, dtype=np.float32), dtype=torch.float32)
         group_tensor = torch.tensor(group_indices, dtype=torch.long)
         
         dataset = TensorDataset(X_tensor, y_tensor, group_tensor)
@@ -143,9 +143,9 @@ class FairMLPClassifier(BaseEstimator, ClassifierMixin):
 
     def predict_proba(self, X):
         check_is_fitted(self)
-        X = check_array(X)
+        X = check_array(X, dtype=None)
         num_features = X.shape[1] - self.num_sensitive_attrs
-        X_features = X[:, :num_features]
+        X_features = np.asarray(X[:, :num_features], dtype=np.float32)
         X_tensor = torch.tensor(X_features, dtype=torch.float32)
         
         self.model_.eval()
@@ -210,8 +210,8 @@ class AdversarialFairMLPClassifier(BaseEstimator, ClassifierMixin):
         self.classes_ = unique_labels(y)
         
         num_features = X.shape[1] - self.num_sensitive_attrs
-        X_features = X[:, :num_features]
-        X_sens = X[:, -self.num_sensitive_attrs:].astype(int)
+        X_features = np.asarray(X[:, :num_features], dtype=np.float32)
+        X_sens = np.asarray(X[:, -self.num_sensitive_attrs:], dtype=int)
         
         # Get number of classes per sensitive attribute
         self.sens_dims_ = self.sensitive_dims_list
@@ -224,7 +224,7 @@ class AdversarialFairMLPClassifier(BaseEstimator, ClassifierMixin):
             X_sens[:, i] = X_sens[:, i] - X_sens[:, i].min() # ensure 0-indexed locally
             
         X_tensor = torch.tensor(X_features, dtype=torch.float32)
-        y_tensor = torch.tensor(y, dtype=torch.float32)
+        y_tensor = torch.tensor(np.asarray(y, dtype=np.float32), dtype=torch.float32)
         s_tensor = torch.tensor(X_sens, dtype=torch.long)
         
         dataset = TensorDataset(X_tensor, y_tensor, s_tensor)
@@ -266,9 +266,9 @@ class AdversarialFairMLPClassifier(BaseEstimator, ClassifierMixin):
 
     def predict_proba(self, X):
         check_is_fitted(self)
-        X = check_array(X)
+        X = check_array(X, dtype=None)
         num_features = X.shape[1] - self.num_sensitive_attrs
-        X_features = X[:, :num_features]
+        X_features = np.asarray(X[:, :num_features], dtype=np.float32)
         X_tensor = torch.tensor(X_features, dtype=torch.float32)
         
         self.model_.eval()

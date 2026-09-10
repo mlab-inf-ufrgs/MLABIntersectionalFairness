@@ -135,14 +135,14 @@ def build_preprocessor(df_train, feature_cols, sensitive_cols=None, pass_sensiti
     if cat_cols:
         transformers.append((
             "cat",
-            OneHotEncoder(handle_unknown="ignore", sparse_output=False),
+            OneHotEncoder(handle_unknown="ignore", sparse_output=False, dtype=np.float32),
             cat_cols,
         ))
         
     if pass_sensitive and sensitive_cols:
         transformers.append((
             "sensitive",
-            OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1),
+            OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1, dtype=np.float32),
             sensitive_cols
         ))
 
@@ -202,14 +202,11 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
     X = df[feature_cols + attr_combination].copy()
     y_raw = df[target_col].copy()
 
-    # Encode target if needed
-    if y_raw.dtype == "object" or y_raw.dtype.name == "category":
-        le = LabelEncoder()
-        y = pd.Series(le.fit_transform(y_raw), index=y_raw.index)
-        favorable_encoded = int(le.transform([favorable_val])[0])
-    else:
-        y = y_raw.copy()
-        favorable_encoded = favorable_val
+    # Binary classification: Map favorable_val to 1 (positive outcome) and others to 0.
+    # This guarantees consistent positive label (pos_label=1) for all scikit-learn scorers
+    # (recall, precision, average_precision, roc_auc) and PyTorch models regardless of raw dtype.
+    y = (y_raw == favorable_val).astype(int)
+    favorable_encoded = 1
 
     # Determine global sensitive attribute dimensions for PyTorch models
     global_sens_dims = None
@@ -414,6 +411,206 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
 
 
 # ---------------------------------------------------------------------------
+# Lightweight Lambda Sweep for FairMLP (Non-nested simple 3-fold CV)
+# ---------------------------------------------------------------------------
+
+def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
+    """
+    Executes a fast, non-nested 3-fold CV sweep over fixed fairness penalty lambdas
+    for FairMLPClassifier: [0.0, 0.5, 1.0, 2.0, 4.0].
+    """
+    print(f"\n  --- FairMLP Lambda Sweep for {dataset_key} ({' & '.join(attr_combination)}) ---")
+    dataset_info = DATASETS[dataset_key]
+
+    if dataset_info.get("supports_uf", False):
+        df = dataset_info["loader"](["Todos"])
+    else:
+        df = dataset_info["loader"]()
+
+    target_col = dataset_info["target"]
+    favorable_val = dataset_info["favorable_val"]
+
+    missing = [c for c in attr_combination if c not in df.columns]
+    if missing:
+        print(f"  [SKIP] Missing columns for lambda sweep: {missing}")
+        return None, None
+
+    cols_needed = attr_combination + [target_col]
+    df = df.dropna(subset=cols_needed).copy()
+
+    group_series_full = build_group_series(df, attr_combination)
+    feature_cols = [c for c in df.columns if c != target_col and c not in attr_combination]
+    X = df[feature_cols + attr_combination].copy()
+    y_raw = df[target_col].copy()
+
+    # Binary classification: Map favorable_val to 1 (positive outcome) and others to 0.
+    y = (y_raw == favorable_val).astype(int)
+    favorable_encoded = 1
+
+    global_sens_dims = [df[attr].nunique() for attr in attr_combination]
+
+    lambdas = [0.0, 0.5, 1.0, 2.0, 4.0]
+    if dry_run:
+        lambdas = [0.0, 1.0]
+
+    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+    run_ts = datetime.now(timezone.utc).isoformat()
+
+    sweep_agg_rows = []
+    sweep_subgroup_rows = []
+
+    for lam in lambdas:
+        print(f"    -> FairMLP (λ={lam})", end="", flush=True)
+        fold_metrics = []
+        fold_subgroups = []
+
+        for fold_idx, (train_idx, test_idx) in enumerate(cv.split(X, y)):
+            if dry_run and fold_idx >= 1:
+                break
+
+            X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+            y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+            groups_test = group_series_full.iloc[test_idx].reset_index(drop=True)
+
+            preprocessor = build_preprocessor(
+                X_train,
+                feature_cols,
+                sensitive_cols=attr_combination,
+                pass_sensitive=True,
+            )
+
+            clf = FairMLPClassifier(
+                hidden_dims=(128, 64),
+                lr=0.001,
+                epochs=15 if not dry_run else 3,
+                batch_size=256,
+                lambda_fairness=lam,
+                num_sensitive_attrs=len(attr_combination),
+                sensitive_dims_list=global_sens_dims,
+                random_state=42 + fold_idx,
+            )
+
+            pipe = Pipeline([
+                ("pre", preprocessor),
+                ("clf", clf),
+            ])
+
+            try:
+                pipe.fit(X_train, y_train)
+                y_pred = pipe.predict(X_test)
+                y_proba = pipe.predict_proba(X_test)
+            except Exception as e:
+                print(f" [Fold {fold_idx} Failed: {str(e)[:50]}]", end="", flush=True)
+                continue
+
+            y_test_reset = y_test.reset_index(drop=True)
+
+            acc = accuracy_score(y_test_reset, y_pred)
+            rec = recall_score(y_test_reset, y_pred, pos_label=favorable_encoded, zero_division=0)
+            prec = precision_score(y_test_reset, y_pred, pos_label=favorable_encoded, zero_division=0)
+
+            roc = np.nan
+            prc = np.nan
+            classes = list(clf.classes_)
+            if favorable_encoded in classes:
+                fav_col = classes.index(favorable_encoded)
+                y_score = y_proba[:, fav_col]
+                try:
+                    y_true_bin = (y_test_reset == favorable_encoded).astype(int)
+                    roc = roc_auc_score(y_true_bin, y_score)
+                    prc = average_precision_score(y_test_reset, y_score, pos_label=favorable_encoded)
+                except ValueError:
+                    pass
+
+            fold_metrics.append({
+                "accuracy": acc,
+                "recall": rec,
+                "precision": prec,
+                "roc_auc": roc,
+                "pr_auc": prc,
+            })
+
+            # Intersectional fairness metrics
+            sg_df, agg = calculate_model_fairness_metrics(
+                y_true=y_test_reset,
+                y_pred=pd.Series(y_pred),
+                groups_series=groups_test,
+                favorable_val=favorable_encoded,
+            )
+            sg_df["fold"] = fold_idx
+            sg_df["model"] = "FairMLP"
+            sg_df["opt_metric"] = f"lambda_{lam}"
+            sg_df["lambda_fairness"] = lam
+            sg_df["dataset"] = dataset_key
+            sg_df["attrs"] = " & ".join(attr_combination)
+            sg_df["reference_group"] = agg["reference_group"]
+            sg_df["run_timestamp"] = run_ts
+            fold_subgroups.append(sg_df)
+
+            print(".", end="", flush=True)
+
+        print()  # newline after fold dots
+
+        if fold_metrics:
+            m_df = pd.DataFrame(fold_metrics)
+            s_df = pd.concat(fold_subgroups, ignore_index=True) if fold_subgroups else pd.DataFrame()
+
+            if not s_df.empty:
+                fold_agg = s_df.groupby("fold").apply(
+                    lambda g: pd.Series({
+                        "max_aaod": g["aaod"].max(),
+                        "sensitivity_gap": (
+                            g[g["n"] >= 30]["tpr"].max() - g[g["n"] >= 30]["tpr"].min()
+                            if len(g[g["n"] >= 30]) >= 2 else np.nan
+                        ),
+                        "reference_group": g["reference_group"].iloc[0],
+                    }), include_groups=False
+                ).reset_index()
+
+                max_aaod_mean = fold_agg["max_aaod"].mean()
+                max_aaod_std = fold_agg["max_aaod"].std()
+                sens_gap_mean = fold_agg["sensitivity_gap"].mean()
+                sens_gap_std = fold_agg["sensitivity_gap"].std()
+                ref_group = fold_agg["reference_group"].mode()[0]
+            else:
+                max_aaod_mean, max_aaod_std = np.nan, np.nan
+                sens_gap_mean, sens_gap_std = np.nan, np.nan
+                ref_group = None
+
+            sweep_agg_rows.append({
+                "dataset": dataset_key,
+                "attrs": " & ".join(attr_combination),
+                "model": "FairMLP",
+                "opt_metric": f"lambda_{lam}",
+                "accuracy_mean": m_df["accuracy"].mean(),
+                "accuracy_std": m_df["accuracy"].std(),
+                "recall_mean": m_df["recall"].mean(),
+                "recall_std": m_df["recall"].std(),
+                "precision_mean": m_df["precision"].mean(),
+                "precision_std": m_df["precision"].std(),
+                "roc_auc_mean": m_df["roc_auc"].mean(),
+                "roc_auc_std": m_df["roc_auc"].std(),
+                "pr_auc_mean": m_df["pr_auc"].mean(),
+                "pr_auc_std": m_df["pr_auc"].std(),
+                "run_timestamp": run_ts,
+                "outer_folds_run": len(m_df),
+                "dry_run": dry_run,
+                "max_aaod_mean": max_aaod_mean,
+                "max_aaod_std": max_aaod_std,
+                "sensitivity_gap_mean": sens_gap_mean,
+                "sensitivity_gap_std": sens_gap_std,
+                "reference_group": ref_group,
+                "lambda_fairness": lam,
+            })
+
+            sweep_subgroup_rows.extend(fold_subgroups)
+
+    sweep_agg_df = pd.DataFrame(sweep_agg_rows)
+    sweep_sub_df = pd.concat(sweep_subgroup_rows, ignore_index=True) if sweep_subgroup_rows else pd.DataFrame()
+    return sweep_agg_df, sweep_sub_df
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -425,6 +622,11 @@ def main():
         help="Run only 1 outer fold and 5 inner iterations (fast, for testing).",
     )
     parser.add_argument(
+        "--skip-existing",
+        action="store_true",
+        help="Skip datasets and models that already have parquet files saved in data/results/.",
+    )
+    parser.add_argument(
         "--datasets",
         nargs="+",
         default=None,
@@ -434,10 +636,19 @@ def main():
 
     configs_to_run = EXPERIMENT_CONFIG
     if args.datasets:
-        configs_to_run = {k: v for k, v in EXPERIMENT_CONFIG.items() if k in args.datasets}
+        selected = {}
+        for req in args.datasets:
+            req_norm = req.lower().replace(" ", "").replace("_", "").replace("🇺🇸", "us").replace("🇧🇷", "br").replace("🇵🇹", "pt")
+            for k, v in EXPERIMENT_CONFIG.items():
+                k_norm = k.lower().replace(" ", "").replace("_", "").replace("🇺🇸", "us").replace("🇧🇷", "br").replace("🇵🇹", "pt")
+                if req_norm in k_norm or k_norm in req_norm or req.lower() in k.lower():
+                    selected[k] = v
+        configs_to_run = selected
         if not configs_to_run:
-            print(f"[ERROR] No matching datasets found. Available: {list(EXPERIMENT_CONFIG.keys())}")
+            print(f"[ERROR] No matching datasets found for {args.datasets}. Available: {list(EXPERIMENT_CONFIG.keys())}")
             sys.exit(1)
+        else:
+            print(f"[INFO] Datasets selected to run: {list(configs_to_run.keys())}")
 
     all_agg = []
     all_subgroup = []
@@ -458,34 +669,47 @@ def main():
         for attr_combination in config["attr_combinations"]:
             attrs_str = "_".join(attr_combination).lower()
             out_prefix = f"{safe_key}_{attrs_str}"
+            out_agg = os.path.join(RESULTS_DIR, f"{out_prefix}_results.parquet")
+            out_sub = os.path.join(RESULTS_DIR, f"{out_prefix}_subgroup_results.parquet")
+            sweep_path = os.path.join(RESULTS_DIR, f"{out_prefix}_lambda_sweep.parquet")
 
             # 1) Standard Models (RF, GBM)
-            agg_df, subgroup_df = run_dataset_experiment(
-                dataset_key=dataset_key,
-                attr_combination=attr_combination,
-                dry_run=args.dry_run,
-            )
+            if args.skip_existing and os.path.exists(out_agg) and os.path.exists(out_sub):
+                print(f"\n[RESUME] Loading existing standard model results for {out_prefix}")
+                agg_df = pd.read_parquet(out_agg)
+                subgroup_df = pd.read_parquet(out_sub)
+            else:
+                agg_df, subgroup_df = run_dataset_experiment(
+                    dataset_key=dataset_key,
+                    attr_combination=attr_combination,
+                    dry_run=args.dry_run,
+                )
+
+                if agg_df is not None and not agg_df.empty:
+                    agg_df.to_parquet(out_agg, index=False)
+                    print(f"  [SAVED] {out_agg}")
+
+                    if not subgroup_df.empty:
+                        subgroup_df.to_parquet(out_sub, index=False)
+                        print(f"  [SAVED] {out_sub}")
 
             if agg_df is not None and not agg_df.empty:
-                out_agg = os.path.join(RESULTS_DIR, f"{out_prefix}_results.parquet")
-                out_sub = os.path.join(RESULTS_DIR, f"{out_prefix}_subgroup_results.parquet")
-
-                agg_df.to_parquet(out_agg, index=False)
-                print(f"  [SAVED] {out_agg}")
-
-                if not subgroup_df.empty:
-                    subgroup_df.to_parquet(out_sub, index=False)
-                    print(f"  [SAVED] {out_sub}")
-
                 all_agg.append(agg_df)
                 all_subgroup.append(subgroup_df)
                 
             # 2) Lightweight Lambda Sweep (FairMLP)
-            sweep_df = run_lambda_sweep(dataset_key, attr_combination)
-            if sweep_df is not None:
-                sweep_path = os.path.join(RESULTS_DIR, f"{out_prefix}_lambda_sweep.parquet")
-                sweep_df.to_parquet(sweep_path, index=False)
-                print(f"  [SAVED] {sweep_path}")
+            if args.skip_existing and os.path.exists(sweep_path):
+                print(f"\n[RESUME] Loading existing lambda sweep for {out_prefix}")
+                sweep_df = pd.read_parquet(sweep_path)
+                all_agg.append(sweep_df)
+            else:
+                sweep_df, sweep_sub = run_lambda_sweep(dataset_key, attr_combination, dry_run=args.dry_run)
+                if sweep_df is not None and not sweep_df.empty:
+                    sweep_df.to_parquet(sweep_path, index=False)
+                    print(f"  [SAVED] {sweep_path}")
+                    all_agg.append(sweep_df)
+                    if sweep_sub is not None and not sweep_sub.empty:
+                        all_subgroup.append(sweep_sub)
 
     if all_agg:
         consolidated_agg = pd.concat(all_agg, ignore_index=True)
