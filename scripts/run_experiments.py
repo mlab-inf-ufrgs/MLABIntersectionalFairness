@@ -49,6 +49,7 @@ from sklearn.metrics import (
     roc_auc_score, average_precision_score,
 )
 
+os.environ["PYTHONWARNINGS"] = "ignore"
 warnings.filterwarnings("ignore")
 
 # ---------------------------------------------------------------------------
@@ -87,7 +88,7 @@ OPTIMIZATION_METRICS = ["accuracy", "recall", "precision", "roc_auc", "average_p
 
 MODELS = {
     "RandomForest": {
-        "estimator": RandomForestClassifier(random_state=42, n_jobs=-1),
+        "estimator": RandomForestClassifier(random_state=42, n_jobs=1),
         "param_dist": {
             "clf__n_estimators": [50, 100, 200],
             "clf__max_depth": [5, 10, None],
