@@ -62,6 +62,11 @@ from utils.bias_metrics import calculate_model_fairness_metrics
 from utils.fair_networks import FairMLPClassifier, AdversarialFairMLPClassifier
 
 # ---------------------------------------------------------------------------
+# Configuration Flags
+# ---------------------------------------------------------------------------
+INCLUDE_ADVERSARIAL_MODEL = False
+
+# ---------------------------------------------------------------------------
 # Experiment Configuration
 # ---------------------------------------------------------------------------
 
@@ -97,20 +102,6 @@ MODELS = {
             "clf__max_depth": [3, 5],
             "clf__learning_rate": [0.05, 0.1, 0.2],
             "clf__subsample": [0.7, 1.0],
-        },
-    },
-    "FairMLP": {
-        "estimator": FairMLPClassifier(epochs=10, batch_size=256, lambda_fairness=0.5, hidden_dims=[128, 64], random_state=42),
-        "param_dist": {
-            "clf__lambda_fairness": [0.1, 0.5, 1.0],
-            "clf__lr": [0.001, 0.005]
-        },
-    },
-    "AdversarialFairMLP": {
-        "estimator": AdversarialFairMLPClassifier(epochs=10, batch_size=256, lambda_adv=1.0, hidden_dims=[128, 64], random_state=42),
-        "param_dist": {
-            "clf__lambda_adv": [0.5, 1.0, 2.0],
-            "clf__lr": [0.001, 0.005]
         },
     },
 }
@@ -288,6 +279,7 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
                     n_jobs=-1,
                     random_state=42,
                     refit=True,
+                    error_score="raise",
                 )
                 try:
                     search.fit(X_train, y_train)
@@ -467,6 +459,7 @@ def main():
             attrs_str = "_".join(attr_combination).lower()
             out_prefix = f"{safe_key}_{attrs_str}"
 
+            # 1) Standard Models (RF, GBM)
             agg_df, subgroup_df = run_dataset_experiment(
                 dataset_key=dataset_key,
                 attr_combination=attr_combination,
@@ -486,6 +479,13 @@ def main():
 
                 all_agg.append(agg_df)
                 all_subgroup.append(subgroup_df)
+                
+            # 2) Lightweight Lambda Sweep (FairMLP)
+            sweep_df = run_lambda_sweep(dataset_key, attr_combination)
+            if sweep_df is not None:
+                sweep_path = os.path.join(RESULTS_DIR, f"{out_prefix}_lambda_sweep.parquet")
+                sweep_df.to_parquet(sweep_path, index=False)
+                print(f"  [SAVED] {sweep_path}")
 
     if all_agg:
         consolidated_agg = pd.concat(all_agg, ignore_index=True)
