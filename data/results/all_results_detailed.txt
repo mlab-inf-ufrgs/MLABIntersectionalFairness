@@ -1,0 +1,31 @@
+                dataset             model         opt_metric  accuracy_mean  recall_mean  precision_mean  roc_auc_mean  pr_auc_mean  max_aaod_mean  sensitivity_gap_mean
+5              Adult 🇺🇸  GradientBoosting           accuracy       0.863521     0.632539        0.785799      0.917706     0.819436       0.073620              0.087321
+9              Adult 🇺🇸  GradientBoosting  average_precision       0.864504     0.644130        0.781548      0.919453     0.822649       0.084465              0.101356
+7              Adult 🇺🇸  GradientBoosting          precision       0.845442     0.496750        0.821295      0.899319     0.780488       0.138917              0.220850
+6              Adult 🇺🇸  GradientBoosting             recall       0.863330     0.643852        0.777227      0.918777     0.819544       0.081290              0.098164
+8              Adult 🇺🇸  GradientBoosting            roc_auc       0.864081     0.642646        0.780916      0.919491     0.822570       0.089728              0.115879
+0              Adult 🇺🇸      RandomForest           accuracy            NaN          NaN             NaN           NaN          NaN            NaN                   NaN
+4              Adult 🇺🇸      RandomForest  average_precision       0.851757     0.545505        0.805339      0.906409     0.795911       0.109636              0.155355
+2              Adult 🇺🇸      RandomForest          precision       0.824644     0.350019        0.889018      0.894855     0.768427       0.119939              0.216317
+1              Adult 🇺🇸      RandomForest             recall       0.841569     0.626114        0.712325      0.887629     0.752054       0.092691              0.093779
+3              Adult 🇺🇸      RandomForest            roc_auc       0.855137     0.599740        0.776334      0.907777     0.796390       0.139589              0.197666
+15            COMPAS 🇺🇸  GradientBoosting           accuracy       0.636066     0.712771        0.652600      0.690826     0.697776       0.264936              0.229782
+19            COMPAS 🇺🇸  GradientBoosting  average_precision       0.637113     0.723560        0.650211      0.690765     0.697936       0.251218              0.222653
+17            COMPAS 🇺🇸  GradientBoosting          precision       0.640401     0.664362        0.668354      0.690953     0.697349       0.269889              0.238225
+16            COMPAS 🇺🇸  GradientBoosting             recall       0.636066     0.712771        0.652600      0.691069     0.697812       0.264936              0.229782
+18            COMPAS 🇺🇸  GradientBoosting            roc_auc       0.641448     0.675150        0.665965      0.690906     0.697445       0.256171              0.231096
+10            COMPAS 🇺🇸      RandomForest           accuracy       0.640401     0.664362        0.668354      0.690646     0.697011       0.269889              0.238225
+14            COMPAS 🇺🇸      RandomForest  average_precision       0.640401     0.664362        0.668354      0.690646     0.697011       0.269889              0.238225
+12            COMPAS 🇺🇸      RandomForest          precision       0.640401     0.664362        0.668354      0.689974     0.696393       0.269889              0.238225
+11            COMPAS 🇺🇸      RandomForest             recall       0.641448     0.675150        0.665965      0.690638     0.696989       0.256171              0.231096
+13            COMPAS 🇺🇸      RandomForest            roc_auc       0.641448     0.675150        0.665965      0.690521     0.696716       0.256171              0.231096
+25  SINASC (DATASUS) 🇧🇷  GradientBoosting           accuracy       0.905659     1.000000        0.905659      0.530630     0.913041       0.000000              0.000000
+29  SINASC (DATASUS) 🇧🇷  GradientBoosting  average_precision            NaN          NaN             NaN           NaN          NaN            NaN                   NaN
+27  SINASC (DATASUS) 🇧🇷  GradientBoosting          precision            NaN          NaN             NaN           NaN          NaN            NaN                   NaN
+26  SINASC (DATASUS) 🇧🇷  GradientBoosting             recall            NaN          NaN             NaN           NaN          NaN            NaN                   NaN
+28  SINASC (DATASUS) 🇧🇷  GradientBoosting            roc_auc       0.905659     1.000000        0.905659      0.532786     0.913851       0.000000              0.000000
+20  SINASC (DATASUS) 🇧🇷      RandomForest           accuracy       0.905659     1.000000        0.905659      0.532040     0.913721       0.000000              0.000000
+24  SINASC (DATASUS) 🇧🇷      RandomForest  average_precision            NaN          NaN             NaN           NaN          NaN            NaN                   NaN
+22  SINASC (DATASUS) 🇧🇷      RandomForest          precision            NaN          NaN             NaN           NaN          NaN            NaN                   NaN
+21  SINASC (DATASUS) 🇧🇷      RandomForest             recall            NaN          NaN             NaN           NaN          NaN            NaN                   NaN
+23  SINASC (DATASUS) 🇧🇷      RandomForest            roc_auc       0.905659     1.000000        0.905659      0.532599     0.913752       0.000000              0.000000

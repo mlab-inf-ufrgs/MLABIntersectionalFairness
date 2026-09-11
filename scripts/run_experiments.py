@@ -49,8 +49,22 @@ from sklearn.metrics import (
     roc_auc_score, average_precision_score,
 )
 
+import gc
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
 os.environ["PYTHONWARNINGS"] = "ignore"
 warnings.filterwarnings("ignore")
+
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 # ---------------------------------------------------------------------------
 # Add project root to path so we can import data_module and utils
@@ -181,10 +195,11 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False, n_jobs=
 
     # Load data (no UF filter for experiments — we use the full dataset)
     print("  Loading data...")
+    raw_loader = getattr(dataset_info["loader"], "__wrapped__", dataset_info["loader"])
     if dataset_info.get("supports_uf", False):
-        df = dataset_info["loader"](["Todos"])
+        df = raw_loader(["Todos"])
     else:
-        df = dataset_info["loader"]()
+        df = raw_loader()
 
     target_col = dataset_info["target"]
     favorable_val = dataset_info["favorable_val"]
@@ -269,18 +284,23 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False, n_jobs=
                 ])
 
                 # Inner CV: hyperparameter search
-                n_iter = 5 if dry_run else N_ITER_SEARCH
+                is_large = len(X_train) > 200_000
+                param_dist = dict(model_cfg["param_dist"])
+                if is_large and model_name == "RandomForest":
+                    # Evita max_depth=None em bases massivas (1.65M linhas), o que gerava árvores
+                    # com 17 milhões de nós e estourava a RAM com ArrayMemoryError de 134 MiB por nó.
+                    param_dist["clf__max_depth"] = [5, 10, 15]
+                    param_dist["clf__n_estimators"] = [50, 100]
+
+                n_iter = 5 if dry_run else (10 if is_large else N_ITER_SEARCH)
                 if is_fair_nn and not dry_run:
                     n_iter = min(n_iter, 4) # Less searches for NNs to save time
 
-                # On Windows, datasets > 200k rows (e.g. SINASC with 1.65M train rows)
-                # fail to pickle across IPC workers, raising PicklingError / memory crash.
-                # Running sequentially (n_jobs=1) in the main process completely avoids IPC serialization.
-                eff_n_jobs = 1 if len(X_train) > 200_000 else n_jobs
+                eff_n_jobs = 1 if is_large else n_jobs
 
                 search = RandomizedSearchCV(
                     pipe,
-                    param_distributions=model_cfg["param_dist"],
+                    param_distributions=param_dist,
                     n_iter=n_iter,
                     cv=inner_cv,
                     scoring=opt_metric,
@@ -302,6 +322,8 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False, n_jobs=
                         "accuracy": np.nan, "recall": np.nan, "precision": np.nan,
                         "roc_auc": np.nan, "pr_auc": np.nan, "best_params": "FAILED",
                     })
+                    del preprocessor, pipe
+                    gc.collect()
                     continue
 
                 y_test_reset = y_test.reset_index(drop=True)
@@ -355,6 +377,9 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False, n_jobs=
                 sg_df["reference_group"] = agg["reference_group"]
                 sg_df["run_timestamp"] = run_ts
                 fold_subgroup_dfs.append(sg_df)
+
+                del search, best_model, pipe, preprocessor, X_train, X_test, y_train, y_test
+                gc.collect()
 
                 print(".", end="", flush=True)
 
@@ -433,10 +458,11 @@ def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
     print(f"\n  --- FairMLP Lambda Sweep for {dataset_key} ({' & '.join(attr_combination)}) ---")
     dataset_info = DATASETS[dataset_key]
 
+    raw_loader = getattr(dataset_info["loader"], "__wrapped__", dataset_info["loader"])
     if dataset_info.get("supports_uf", False):
-        df = dataset_info["loader"](["Todos"])
+        df = raw_loader(["Todos"])
     else:
-        df = dataset_info["loader"]()
+        df = raw_loader()
 
     target_col = dataset_info["target"]
     favorable_val = dataset_info["favorable_val"]
@@ -490,11 +516,12 @@ def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
                 pass_sensitive=True,
             )
 
+            is_large_data = len(X_train) > 200_000
             clf = FairMLPClassifier(
                 hidden_dims=(128, 64),
                 lr=0.001,
                 epochs=15 if not dry_run else 3,
-                batch_size=256,
+                batch_size=1024 if is_large_data else 256,
                 lambda_fairness=lam,
                 num_sensitive_attrs=len(attr_combination),
                 sensitive_dims_list=global_sens_dims,
@@ -512,6 +539,8 @@ def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
                 y_proba = pipe.predict_proba(X_test)
             except Exception as e:
                 print(f" [Fold {fold_idx} Failed: {str(e)[:50]}]", end="", flush=True)
+                del preprocessor, pipe
+                gc.collect()
                 continue
 
             y_test_reset = y_test.reset_index(drop=True)
@@ -557,6 +586,9 @@ def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
             sg_df["reference_group"] = agg["reference_group"]
             sg_df["run_timestamp"] = run_ts
             fold_subgroups.append(sg_df)
+
+            del pipe, clf, preprocessor, X_train, X_test, y_train, y_test
+            gc.collect()
 
             print(".", end="", flush=True)
 
@@ -651,8 +683,8 @@ def main():
     parser.add_argument(
         "--n-jobs",
         type=int,
-        default=2,
-        help="Number of parallel jobs for hyperparameter search (default: 2, prevents RAM exhaustion).",
+        default=1,
+        help="Number of parallel jobs for hyperparameter search (default: 1, robust on Windows).",
     )
     args = parser.parse_args()
 
