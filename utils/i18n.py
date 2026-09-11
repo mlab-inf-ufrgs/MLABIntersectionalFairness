@@ -106,6 +106,20 @@ TEXTS = {
             "pela métrica da linha. Um AAOD próximo de zero indica paridade de erros com o grupo de referência."
         ),
         "export_ranking_csv": "📥 Exportar Ranking (CSV)",
+
+        # Visão Consolidada Multi-Dataset
+        "tab_consolidated_title": "🌐 Visão Consolidada (Cross-Dataset)",
+        "tab_detailed_title": "🔍 Auditoria por Dataset",
+        "consolidated_header": "Desempenho Global e Disparidades Transversais",
+        "consolidated_desc": "Comparação transversal dos modelos avaliados em múltiplos domínios (crédito, justiça e saúde).",
+        "fig1_interactive_title": "Distribuição de Desempenho e Disparidade por Modelo",
+        "fig1_select_left": "Métrica do Painel Esquerdo",
+        "fig1_select_right": "Métrica do Painel Direito",
+        "btn_download_highres": "📥 Baixar Figura em Alta Resolução (PNG)",
+        "best_in_class_header": "🏆 Modelos de Destaque por Dataset",
+        "summary_table_header": "📊 Tabela Comparativa Consolidada",
+        "latex_code_header": "📄 Código LaTeX Pronto para Artigo / Tese",
+        "copy_latex_desc": "Copie o código abaixo diretamente para o seu documento LaTeX (usa o pacote booktabs):",
         
         # Dados.py Texts
         "data_page_title": "Dados (EDA)",
@@ -301,6 +315,20 @@ TEXTS = {
             "by the row metric. An AAOD near zero indicates parity of errors with the reference group."
         ),
         "export_ranking_csv": "📥 Export Ranking (CSV)",
+
+        # Consolidated Multi-Dataset View
+        "tab_consolidated_title": "🌐 Consolidated View (Cross-Dataset)",
+        "tab_detailed_title": "🔍 Audit by Dataset",
+        "consolidated_header": "Global Performance and Cross-Dataset Disparities",
+        "consolidated_desc": "Cross-domain comparison of models evaluated across credit, criminal justice, and public health.",
+        "fig1_interactive_title": "Performance and Disparity Distribution by Model",
+        "fig1_select_left": "Left Panel Metric",
+        "fig1_select_right": "Right Panel Metric",
+        "btn_download_highres": "📥 Download High-Resolution Figure (PNG)",
+        "best_in_class_header": "🏆 Best-in-Class Models by Dataset",
+        "summary_table_header": "📊 Consolidated Comparison Table",
+        "latex_code_header": "📄 Ready-to-use LaTeX Code for Paper / Thesis",
+        "copy_latex_desc": "Copy the code below directly into your LaTeX document (uses the booktabs package):",
         
         # Dados.py Texts
         "data_page_title": "Data (EDA)",

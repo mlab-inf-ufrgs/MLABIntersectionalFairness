@@ -155,14 +155,19 @@ def build_group_series(df, attr_cols):
     Creates a single string label per row combining all intersectional attributes.
     Example: "Male & White", "Female & Black"
     """
-    return df[attr_cols].astype(str).apply(" & ".join, axis=1)
+    if not attr_cols:
+        return pd.Series(["All"] * len(df), index=df.index)
+    res = df[attr_cols[0]].astype(str)
+    for col in attr_cols[1:]:
+        res = res + " & " + df[col].astype(str)
+    return res
 
 
 # ---------------------------------------------------------------------------
 # Core experiment loop
 # ---------------------------------------------------------------------------
 
-def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
+def run_dataset_experiment(dataset_key, attr_combination, dry_run=False, n_jobs=2):
     """
     Runs the full nested CV experiment for ONE dataset + ONE attribute combination.
     Returns two DataFrames: aggregate results and per-subgroup-per-fold results.
@@ -268,13 +273,18 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
                 if is_fair_nn and not dry_run:
                     n_iter = min(n_iter, 4) # Less searches for NNs to save time
 
+                # On Windows, datasets > 200k rows (e.g. SINASC with 1.65M train rows)
+                # fail to pickle across IPC workers, raising PicklingError / memory crash.
+                # Running sequentially (n_jobs=1) in the main process completely avoids IPC serialization.
+                eff_n_jobs = 1 if len(X_train) > 200_000 else n_jobs
+
                 search = RandomizedSearchCV(
                     pipe,
                     param_distributions=model_cfg["param_dist"],
                     n_iter=n_iter,
                     cv=inner_cv,
                     scoring=opt_metric,
-                    n_jobs=-1,
+                    n_jobs=eff_n_jobs,
                     random_state=42,
                     refit=True,
                     error_score="raise",
@@ -633,6 +643,17 @@ def main():
         default=None,
         help="Limit to specific dataset keys.",
     )
+    parser.add_argument(
+        "--skip-lambda",
+        action="store_true",
+        help="Skip the neural FairMLP lambda sweep and run only standard models.",
+    )
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=2,
+        help="Number of parallel jobs for hyperparameter search (default: 2, prevents RAM exhaustion).",
+    )
     args = parser.parse_args()
 
     configs_to_run = EXPERIMENT_CONFIG
@@ -684,6 +705,7 @@ def main():
                     dataset_key=dataset_key,
                     attr_combination=attr_combination,
                     dry_run=args.dry_run,
+                    n_jobs=args.n_jobs,
                 )
 
                 if agg_df is not None and not agg_df.empty:
@@ -699,18 +721,19 @@ def main():
                 all_subgroup.append(subgroup_df)
                 
             # 2) Lightweight Lambda Sweep (FairMLP)
-            if args.skip_existing and os.path.exists(sweep_path):
-                print(f"\n[RESUME] Loading existing lambda sweep for {out_prefix}")
-                sweep_df = pd.read_parquet(sweep_path)
-                all_agg.append(sweep_df)
-            else:
-                sweep_df, sweep_sub = run_lambda_sweep(dataset_key, attr_combination, dry_run=args.dry_run)
-                if sweep_df is not None and not sweep_df.empty:
-                    sweep_df.to_parquet(sweep_path, index=False)
-                    print(f"  [SAVED] {sweep_path}")
+            if not args.skip_lambda:
+                if args.skip_existing and os.path.exists(sweep_path):
+                    print(f"\n[RESUME] Loading existing lambda sweep for {out_prefix}")
+                    sweep_df = pd.read_parquet(sweep_path)
                     all_agg.append(sweep_df)
-                    if sweep_sub is not None and not sweep_sub.empty:
-                        all_subgroup.append(sweep_sub)
+                else:
+                    sweep_df, sweep_sub = run_lambda_sweep(dataset_key, attr_combination, dry_run=args.dry_run)
+                    if sweep_df is not None and not sweep_df.empty:
+                        sweep_df.to_parquet(sweep_path, index=False)
+                        print(f"  [SAVED] {sweep_path}")
+                        all_agg.append(sweep_df)
+                        if sweep_sub is not None and not sweep_sub.empty:
+                            all_subgroup.append(sweep_sub)
 
     if all_agg:
         consolidated_agg = pd.concat(all_agg, ignore_index=True)
