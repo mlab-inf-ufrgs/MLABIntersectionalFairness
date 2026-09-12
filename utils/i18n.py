@@ -15,9 +15,9 @@ TEXTS = {
         "sidebar_lang": "Idioma / Language",
         "home_page_title": "Diagnóstico de Viés Interseccional",
         "home_title": "Análise de impacto cumulativo do viés social",
-        "home_nav": "**Navegação:**\n- **Dados**: Diagnóstico pré-treinamento e Análise Exploratória (EDA). Avalia o viés inerente aos dados e auditoria de Gerrymandering.\n- **Modelos**: (Em Breve) Avaliação de disparidades e trade-offs de justiça algorítmica pós-treinamento.\n\nSelecione a aba desejada no menu lateral.",
+        "home_nav": "**Navegação:**\n- **Dados**: Diagnóstico pré-treinamento e Análise Exploratória. Avalia o viés em nível de dados.\n- **Modelos**: Avaliação de disparidades e trade-offs de justiça algorítmica pós-treinamento.\n\nSelecione a aba desejada no menu lateral.",
         "models_page_title": "Modelos",
-        "models_title": "Avaliação Pós-Treinamento — Fairness Interseccional",
+        "models_title": "Avaliação Pós-Treinamento",
         "models_info": "",
 
         # Proveniência
