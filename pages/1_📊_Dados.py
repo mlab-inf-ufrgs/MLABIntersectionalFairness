@@ -329,10 +329,17 @@ else:
                 # Estilização condicional
                 def color_verdict(val):
                     color = 'green' if val == 'Ok' else 'orange' if 'Inviável' in val or 'Inviable' in val else 'red'
-                    return f'color: {color}'
+                    weight = 'bold' if 'Viés Oculto' in str(val) or 'Hidden Bias' in str(val) or 'GERRYMANDERING' in str(val) else 'normal'
+                    return f'color: {color}; font-weight: {weight};'
+                    
+                def style_audit_hidden_bias(val):
+                    if isinstance(val, (int, float)) and val < -0.0005:
+                        return 'font-weight: bold; color: #cc0000; background-color: #fff0f0;'
+                    return ''
                     
                 st.dataframe(
-                    audit_df.style.map(color_verdict, subset=[t('tbl_audit_verdict')]),
+                    audit_df.style.map(color_verdict, subset=[t('tbl_audit_verdict')])
+                                  .map(style_audit_hidden_bias, subset=[t('tbl_hidden_bias')]),
                     column_config={
                         t('tbl_subgroup'): st.column_config.TextColumn(t('tbl_subgroup'), width="large"),
                         'N': st.column_config.NumberColumn('N', format="%d"),
@@ -435,10 +442,16 @@ else:
                 pair_df[t('tbl_audit_verdict')] = pair_df[t('tbl_audit_verdict')].replace(verdict_map)
             
         def color_pair_verdict(val):
-            return 'background-color: #ffcccc; color: #cc0000; font-weight: bold;' if 'GERRYMANDERING' in val else ''
+            return 'background-color: #ffcccc; color: #cc0000; font-weight: bold;' if 'GERRYMANDERING' in str(val) else 'color: green;'
             
+        def style_pair_hidden_bias(val):
+            if isinstance(val, (int, float)) and val > 0.0005:
+                return 'font-weight: bold; color: #cc0000; background-color: #fff0f0;'
+            return ''
+
         st.dataframe(
             pair_df.style.map(color_pair_verdict, subset=[t('tbl_audit_verdict')])
+                  .map(style_pair_hidden_bias, subset=[t('tbl_hidden_bias')])
                   .format({
                       t('tbl_gap_a'): '{:.2%}',
                       t('tbl_gap_b'): '{:.2%}',
@@ -447,6 +460,11 @@ else:
                       t('tbl_hidden_bias'): '{:+.2%}'
                   }),
             use_container_width=True
+        )
+        st.caption(
+            "💡 **Nota de auditoria:** Tendo em vista o desbalanceamento das bases e o alto volume amostral ($N$), qualquer viés oculto excedente acima de **0,05%** (+0.05%) é destacado em negrito como estatisticamente significativo (Justice Gerrymandering)."
+            if st.session_state.lang == "PT" else
+            "💡 **Audit note:** Considering class imbalance and large sample sizes ($N$), any excess hidden bias above **0.05%** (+0.05%) is highlighted in bold as statistically significant (Justice Gerrymandering)."
         )
         
         # New Stacked Bar Chart for Attribute Pairs Viability
