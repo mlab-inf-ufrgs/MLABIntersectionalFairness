@@ -417,7 +417,7 @@ else:
         st.markdown(t("audit_pairs_desc"))
         
         with st.spinner(t("scanning_pairs")):
-            pair_df = pairwise_gerrymandering_audit(df_mapped, selected_attrs, target_col, favorable_val)
+            pair_df = pairwise_gerrymandering_audit(df_mapped, selected_attrs, target_col, favorable_val, threshold=0.0005)
 
             # Rename columns
             pair_df = pair_df.rename(columns={
