@@ -1,0 +1,121 @@
+% ==============================================================================
+% SEÇÃO 5.3: RESULTADOS EXPERIMENTAIS: DA AUDITORIA DE DADOS AOS EFEITOS DO TREINAMENTO E MITIGAÇÃO POR RNA
+% Proposta de Qualificação de Doutorado - PPGC/UFRGS
+% ==============================================================================
+
+\section{Resultados Experimentais: Da Auditoria de Dados aos Efeitos do Treinamento e Mitigação por RNA}
+\label{sec:resultados_pre_vs_pos}
+
+Nesta seção, analisa-se criticamente a transição do viés algorítmico \textbf{a nível de dados (\textit{pré-treinamento})} para o viés manifestado nas \textbf{predições dos modelos (\textit{pós-treinamento})}, culminando na avaliação empírica da \textbf{mitigação via Redes Neurais com penalização de viés (\textit{FairMLP com variação de $\lambda$})}. A investigação organiza-se em três subseções dedicadas a cada \textit{dataset} do escopo da tese: \textbf{Adult} (US Census), \textbf{COMPAS} (Justiça Criminal) e \textbf{SINASC} (DATASUS, Saúde Neonatal no Brasil).
+
+O objetivo central desta análise empírica é demonstrar como o treinamento supervisionado padrão (\textit{baselines}) reage aos desequilíbrios históricos dos dados brutos --- ora \textbf{amplificando desproporcionalmente a penalização interseccional}, ora \textbf{gerando ilusões estatísticas de equidade sob desbalanceamento severo} ---, e como a introdução preliminar de penalização em uma Rede Neural Artificial (RNA) comprova a viabilidade da mitigação, mas ao mesmo tempo expõe os limites da parametrização escalar fixa, fundamentando a arquitetura metodológica proposta para o doutorado (\textbf{Rede Neural Multitarefa com Camada Reversa de Gradiente + Otimização Multiobjetivo NSGA-II + Interpretabilidade por SHAP}).
+
+% ------------------------------------------------------------------------------
+\subsection{Caso 1: Adult (US Census) --- Renda, Amplificação e Mitigação via RNA}
+\label{subsec:caso_adult}
+
+\subsubsection{Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)}
+O \textit{dataset} Adult ($N = 42.599$ instâncias) modela a predição de renda anual superior a US\$ 50.000 ($Y = 1$, classe favorável), com prevalência global de $25,28\%$. Ao decompor a base pelos atributos sensíveis Gênero ($\text{sex}$) e Raça ($\text{race}$), emergem disparidades substanciais de paridade estatística na distribuição original:
+\begin{itemize}
+    \item \textbf{Male \& White} ($N = 26.657$): $32,79\%$ possuem renda favorável (grupo de referência privilegiado, $\text{Pre-DI} = 1,000$).
+    \item \textbf{Male \& Black} ($N = 2.198$): $19,02\%$ possuem renda favorável ($\text{Pre-DI} = 0,580$; $\text{Pre-SPD} = -13,77\%$).
+    \item \textbf{Female \& White} ($N = 11.595$): $12,76\%$ possuem renda favorável ($\text{Pre-DI} = 0,389$; $\text{Pre-SPD} = -20,02\%$).
+    \item \textbf{Female \& Black} ($N = 2.149$): apenas $6,05\%$ possuem renda favorável ($\text{Pre-DI} = 0,185$; $\text{Pre-SPD} = -26,74\%$).
+\end{itemize}
+
+\subsubsection{Efeitos do Treinamento nos Baselines Tradicionais}
+Os modelos tradicionais (\textit{Gradient Boosting} e \textit{Random Forest}) alcançaram acurácias de $86,0\%$ e $84,3\%$ e ROC-AUC de $0,915$ e $0,899$. Todavia, o treinamento amplificou a penalização sobre o grupo mais vulnerável: a taxa predita de mulheres negras caiu de $6,05\%$ para \textbf{$3,80\%$}, derrubando o Disparate Impact de $\text{Pre-DI} = 0,185$ para $\text{Post-DI} = 0,149$, com $\text{TPR}$ de apenas $45,9\%$ e $\text{AAOD} = 0,1020$.
+
+\subsubsection{Mitigação por Rede Neural Artificial (FairMLP: Variação de $\lambda$)}
+Para avaliar a viabilidade de mitigar a penalização interseccional, treinou-se uma Rede Neural Artificial (\textit{FairMLP}) sob uma função de perda com regularização de equidade parametrizada pelo escalar $\lambda \in [0.0, 0.5, 1.0, 2.0, 4.0]$. A Tabela~\ref{tab:adult_lambda_sweep} resume a transição das métricas de desempenho e equidade.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{Adult: Efeito da Penalização de Viés via Rede Neural Artificial (\textit{FairMLP Lambda Sweep}).}
+\label{tab:adult_lambda_sweep}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Configuração} & \textbf{Acurácia} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{Max AAOD} $\downarrow$ & \textbf{Sens. Gap} $\downarrow$ \\
+\midrule
+FairMLP ($\lambda = 0.0$) & 0,8485 $\pm$ 0,0010 & 0,9034 $\pm$ 0,0012 & 0,7789 $\pm$ 0,0003 & 0,0932 $\pm$ 0,0352 & 0,1033 $\pm$ 0,0452 \\
+FairMLP ($\lambda = 0.5$) & 0,8483 $\pm$ 0,0012 & 0,9032 $\pm$ 0,0015 & 0,7786 $\pm$ 0,0007 & 0,0800 $\pm$ 0,0316 & 0,1014 $\pm$ 0,0252 \\
+FairMLP ($\lambda = 1.0$) & 0,8482 $\pm$ 0,0015 & 0,9029 $\pm$ 0,0016 & 0,7780 $\pm$ 0,0012 & 0,0786 $\pm$ 0,0258 & 0,1099 $\pm$ 0,0191 \\
+FairMLP ($\lambda = 2.0$) & 0,8473 $\pm$ 0,0005 & 0,9016 $\pm$ 0,0023 & 0,7758 $\pm$ 0,0026 & \textbf{0,0656} $\pm$ 0,0046 & 0,1164 $\pm$ 0,0374 \\
+FairMLP ($\lambda = 4.0$) & 0,8439 $\pm$ 0,0012 & 0,8966 $\pm$ 0,0039 & 0,7695 $\pm$ 0,0047 & 0,0689 $\pm$ 0,0115 & 0,1588 $\pm$ 0,0339 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A introdução de $\lambda = 2.0$ reduziu o $\text{Max AAOD}$ de \textbf{$0,0932$ para $0,0656$} (redução de **$29,6\%$** na injustiça máxima), com perda residual na acurácia ($< 0,12\%$). Em $\lambda = 4.0$, entretanto, o modelo satura: o \textit{recall} desaba de $61,9\%$ para $53,7\%$ e o \textit{Sensitivity Gap} expande para $0,1588$, revelando a natureza não-monótona do \textit{trade-off}.
+
+% ------------------------------------------------------------------------------
+\subsection{Caso 2: COMPAS (Justiça Penal) --- Risco, Assimetria e Mitigação via RNA}
+\label{subsec:caso_compas}
+
+\subsubsection{Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)}
+No COMPAS ($N = 6.688$), a condição favorável é a \textbf{não-reincidência / baixo risco} ($Y = 0$, $54,04\%$). Nos dados brutos:
+\begin{itemize}
+    \item \textbf{Female \& Caucasian} ($N = 562$): $64,59\%$ não reincidem (referência, $\text{Pre-DI} = 1,000$).
+    \item \textbf{Female \& African-American} ($N = 646$): $61,92\%$ não reincidem ($\text{Pre-DI} = 0,959$).
+    \item \textbf{Male \& Caucasian} ($N = 1.832$): $58,84\%$ não reincidem ($\text{Pre-DI} = 0,911$).
+    \item \textbf{Male \& African-American} ($N = 3.020$): $45,53\%$ não reincidem ($\text{Pre-DI} = 0,705$; $\text{Pre-SPD} = -19,06\%$).
+\end{itemize}
+
+\subsubsection{Efeitos do Treinamento nos Baselines Tradicionais}
+Os \textit{baselines} acentuaram as taxas de erro contra réus negros: a taxa de verdadeiros positivos ($\text{TPR}$) entre não-reincidentes foi de $81,4\%$ para mulheres caucasianas e $73,8\%$ para homens caucasianos, mas apenas \textbf{$58,1\%$} para homens negros ($\text{AAOD} = 0,2629$, \textit{Sensitivity Gap} de $23,5\%$).
+
+\subsubsection{Mitigação por Rede Neural Artificial (FairMLP: Variação de $\lambda$)}
+A Tabela~\ref{tab:compas_lambda_sweep} apresenta os resultados da \textit{FairMLP} no COMPAS ao longo do \textit{sweep} de $\lambda$.
+
+\begin{table}[htbp]
+\centering
+\small
+\caption{COMPAS: Efeito da Penalização de Viés via Rede Neural Artificial (\textit{FairMLP Lambda Sweep}).}
+\label{tab:compas_lambda_sweep}
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Configuração} & \textbf{Acurácia} & \textbf{ROC-AUC} & \textbf{Recall} $\uparrow$ & \textbf{Max AAOD} $\downarrow$ & \textbf{Sens. Gap} $\downarrow$ \\
+\midrule
+FairMLP ($\lambda = 0.0$) & 0,6361 $\pm$ 0,0080 & 0,6902 $\pm$ 0,0061 & 0,7128 $\pm$ 0,0970 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+FairMLP ($\lambda = 0.5$) & 0,6361 $\pm$ 0,0080 & 0,6902 $\pm$ 0,0061 & 0,7128 $\pm$ 0,0970 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+FairMLP ($\lambda = 1.0$) & 0,6361 $\pm$ 0,0080 & 0,6901 $\pm$ 0,0062 & 0,7128 $\pm$ 0,0970 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+FairMLP ($\lambda = 2.0$) & 0,6343 $\pm$ 0,0065 & 0,6889 $\pm$ 0,0077 & 0,7191 $\pm$ 0,0931 & 0,2666 $\pm$ 0,0532 & 0,2233 $\pm$ 0,0230 \\
+FairMLP ($\lambda = 4.0$) & 0,6346 $\pm$ 0,0069 & 0,6882 $\pm$ 0,0058 & \textbf{0,7833} $\pm$ 0,0839 & \textbf{0,2284} $\pm$ 0,0130 & \textbf{0,1972} $\pm$ 0,0349 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Diferente do Adult, no COMPAS penalizações brandas ($\lambda \le 1.0$) não foram suficientes para alterar as fronteiras de decisão. Contudo, em $\lambda = 4.0$, o $\text{Max AAOD}$ **despencou de $0,2649$ para $0,2284$** (redução superior a $14\%$), o \textit{Sensitivity Gap} caiu para **$0,1972$**, e o \textit{recall} da classe favorável cresceu de $71,28\%$ para **$78,33\%$**, neutralizando taxas de falsos positivos desfavoráveis contra jovens negros com sacrifício desprezível de acurácia ($0,6361 \to 0,6346$).
+
+% ------------------------------------------------------------------------------
+\subsection{Caso 3: SINASC (DATASUS) --- Desbalanceamento e a Limitação do $\lambda$ Escalar}
+\label{subsec:caso_sinasc}
+
+No SINASC ($N = 2.474.535$), o desfecho favorável é o peso adequado ($\ge 2.500\text{g}$, $Y = 1$, $90,57\%$), contra o baixo peso ao nascer ($9,43\%$). Mães pretas maduras apresentam risco relativo $48,5\%$ superior de recém-nascidos de baixo peso em relação a mães brancas adultas ($12,91\%$ vs $8,69\%$).
+
+Conforme evidenciado nos \textit{baselines}, o treinamento sob desbalanceamento severo colapsa na solução trivial constante ($100\%$ de predições normais, $\text{ROC-AUC} \approx 0,532$ e $\text{AAOD} = 0,0000$ por negligência). Quando uma Rede Neural é treinada sob uma perda desbalanceada com penalização escalar $\lambda$, o termo de equidade reforça a atração pelo platô degenerado, pois a predição constante já satisfaz as métricas de paridade. Esse achado comprova que o ajuste empírico de um escalar $\lambda$ é insuficiente em bases epidemiológicas reais sem um mecanismo multiobjetivo que impeça a degradação da classe minoritária.
+
+% ------------------------------------------------------------------------------
+\subsection{Discussão Integrada e Articulação com a Metodologia da Tese}
+\label{subsec:discussao_metodologia}
+
+Os resultados empíricos da RNA fundamentam diretamente a proposta de doutorado:
+\begin{enumerate}
+    \item \textbf{Da FairMLP para a Rede Neural Multitarefa com GRL:} \\
+    A \textit{FairMLP} comprovou que a regularização neural funciona, reduzindo a injustiça máxima em até $30\%$. No entanto, ao utilizar um único $\lambda$, ela não desacopla a interação não-linear entre múltiplos atributos sensíveis. A arquitetura multitarefa com gradiente reverso proposta:
+    \begin{equation}
+    L_{\text{total}} = L_{\text{task}} - \left( \lambda_1 L_{\text{adv1}} + \lambda_2 L_{\text{adv2}} \right)
+    \end{equation}
+    permite a calibração desacoplada de $\lambda_1$ (raça) e $\lambda_2$ (gênero) sobre uma representação latente compartilhada.
+
+    \item \textbf{Do Sweep Manual para o Algoritmo Evolucionário NSGA-II:} \\
+    Os experimentos comprovaram a existência de patamares inoperantes ($\lambda \le 1.0$ no COMPAS) e pontos de inflexão com perda de sensibilidade ($\lambda = 4.0$ no Adult). O \textbf{NSGA-II} substituirá o \textit{sweep} estático pela busca automática da \textbf{Fronteira de Pareto empírica}:
+    \begin{equation}
+    \max_{\lambda_1, \lambda_2, \theta} \; \left[ f_1 = \text{PR-AUC}, \quad f_2 = -\text{Max AAOD}, \quad f_3 = -\text{Sensitivity Gap} \right]
+    \end{equation}
+    garantindo que soluções degeneradas sob desbalanceamento sejam descartadas.
+
+    \item \textbf{Interpretabilidade e Auditoria com SHAP:} \\
+    A auditoria com valores de Shapley desagregada por subgrupo fechará a metodologia, verificando se a atenuação de $\text{Max AAOD}$ obtida pela rede neural decorreu da eliminação genuína de variáveis substitutas (\textit{proxies}).
+\end{enumerate}

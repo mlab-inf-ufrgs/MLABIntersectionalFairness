@@ -85,12 +85,12 @@ def intersectional_audit_metrics(df, sensitive_attrs, target_col, favorable_val=
         # Pre-training DI
         di = subgroup_rate / global_rate if global_rate > 0 else 0
         
-        # Audit Verdict
+        # Audit Verdict (limiar de 0.05% para viés oculto)
         if n < 100:
             verdict = "Inviável (N<100)"
-        elif hidden_bias < -0.10:
+        elif hidden_bias < -0.0005:
             verdict = "Alto Viés Oculto"
-        elif real_gap < -0.1:
+        elif real_gap < -0.05:
             verdict = "Alto Viés Direto"
         else:
             verdict = "Ok"
@@ -174,10 +174,11 @@ def calculate_base_metrics(df, dataset_info):
         'Distribuição de Classes (%)': class_dist
     }
 
-def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
+def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val, threshold=0.0005):
     """
     Varre todos os pares de atributos selecionados e compara a disparidade máxima marginal
     com a disparidade máxima interseccional.
+    Limiar padrão de viés oculto (gerrymandering): 0.05% (0.0005), sensível a bases desbalanceadas.
     """
     results = []
     
@@ -214,7 +215,7 @@ def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val):
             
         hidden_bias = real_gap - expected_gap
         
-        if hidden_bias > 0.10:
+        if hidden_bias > threshold:
             verdict = "⚠️ GERRYMANDERING"
         else:
             verdict = "OK"

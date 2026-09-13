@@ -1,0 +1,23 @@
+% Tabela Resumo: Desempenho e Equidade Interseccional por Dataset e Modelo
+% Pacotes recomendados no preâmbulo LaTeX: \usepackage{booktabs}, \usepackage{multirow}
+\begin{table}[htbp]
+\centering
+\small
+\caption{Desempenho preditivo e disparidade interseccional (médias $\pm$ desvios-padrão entre as métricas de otimização).}
+\label{tab:modelos_resumo}
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Dataset} & \textbf{Modelo} & \textbf{Acurácia} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{Max AAOD} $\downarrow$ & \textbf{Sens. Gap} $\downarrow$ \\
+\midrule
+Adult & Gradient Boosting & 0.860 $\pm$ 0.008 & 0.915 $\pm$ 0.009 & 0.813 $\pm$ 0.018 & 0.0936 $\pm$ 0.0260 & 0.1247 $\pm$ 0.0547 \\
+ & Random Forest & 0.843 $\pm$ 0.014 & 0.899 $\pm$ 0.010 & 0.778 $\pm$ 0.022 & 0.1155 $\pm$ 0.0196 & 0.1658 $\pm$ 0.0544 \\
+\midrule
+COMPAS & Gradient Boosting & 0.638 $\pm$ 0.003 & 0.691 $\pm$ 0.000 & 0.698 $\pm$ 0.000 & 0.2614 $\pm$ 0.0076 & 0.2303 $\pm$ 0.0055 \\
+ & Random Forest & 0.641 $\pm$ 0.001 & 0.690 $\pm$ 0.000 & 0.697 $\pm$ 0.000 & 0.2644 $\pm$ 0.0075 & 0.2354 $\pm$ 0.0039 \\
+\midrule
+SINASC & Gradient Boosting & 0.906 $\pm$ 0.000 & 0.532 $\pm$ 0.002 & 0.913 $\pm$ 0.001 & 0.0000 $\pm$ 0.0000 & 0.0000 $\pm$ 0.0000 \\
+ & Random Forest & 0.906 $\pm$ 0.000 & 0.532 $\pm$ 0.000 & 0.914 $\pm$ 0.000 & 0.0000 $\pm$ 0.0000 & 0.0000 $\pm$ 0.0000 \\
+\bottomrule
+\multicolumn{7}{l}{\footnotesize $\downarrow$ Indica métricas onde valores menores representam maior equidade interseccional.} \\
+\end{tabular}
+\end{table}

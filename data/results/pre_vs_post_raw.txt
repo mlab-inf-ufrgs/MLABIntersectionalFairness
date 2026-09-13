@@ -1,0 +1,33 @@
+=== ADULT (Global Favorable Rate: 0.2528, Total N=42599) ===
+      sex   race  count      mean    pre_di   pre_spd
+0  Female  Black   2149  0.060493  0.184504 -0.267376
+1  Female  White  11595  0.127641  0.389306 -0.200228
+2    Male  Black   2198  0.190173  0.580027 -0.137696
+3    Male  White  26657  0.327869  1.000000  0.000000
+
+=== COMPAS (Global Favorable Rate: 0.5404, Total N=6688) ===
+      sex              race   count  favorable_mean  pre_di_vs_ref  pre_spd_vs_ref
+0  Female  African-American   646.0        0.619195       0.958644       -0.026712
+1  Female         Caucasian   562.0        0.645907       1.000000        0.000000
+2  Female          Hispanic   102.0        0.676471       1.047318        0.030563
+3    Male  African-American  3020.0        0.455298       0.704897       -0.190609
+4    Male         Caucasian  1832.0        0.588428       0.911010       -0.057480
+5    Male          Hispanic   526.0        0.625475       0.968367       -0.020432
+
+=== SINASC (Global Favorable Rate: 0.9057, Total N=2474535) ===
+   raca_cor_mae       idade_mae     count  favorable_mean  pre_di_vs_ref  pre_spd_vs_ref
+0       Amarela     Jovem (<20)    1201.0        0.898418       0.983909       -0.014693
+1       Amarela  Adulta (20-34)    7753.0        0.913840       1.000798        0.000729
+2       Amarela    Madura (>34)    2708.0        0.887001       0.971406       -0.026110
+3        Branca     Jovem (<20)   68384.0        0.893586       0.978617       -0.019525
+4        Branca  Adulta (20-34)  588856.0        0.913111       1.000000        0.000000
+5        Branca    Madura (>34)  189067.0        0.892133       0.977026       -0.020978
+6      Indígena     Jovem (<20)    7138.0        0.878397       0.961983       -0.034714
+7      Indígena  Adulta (20-34)   16311.0        0.916621       1.003843        0.003510
+8      Indígena    Madura (>34)    2852.0        0.909187       0.995702       -0.003925
+9         Parda     Jovem (<20)  207038.0        0.893763       0.978811       -0.019348
+10        Parda  Adulta (20-34)  991802.0        0.913564       1.000496        0.000453
+11        Parda    Madura (>34)  209020.0        0.888437       0.972977       -0.024675
+12        Preta     Jovem (<20)   20366.0        0.878818       0.962443       -0.034294
+13        Preta  Adulta (20-34)  130078.0        0.897023       0.982381       -0.016088
+14        Preta    Madura (>34)   31961.0        0.870874       0.953744       -0.042237

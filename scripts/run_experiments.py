@@ -49,7 +49,22 @@ from sklearn.metrics import (
     roc_auc_score, average_precision_score,
 )
 
+import gc
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["PYTHONWARNINGS"] = "ignore"
 warnings.filterwarnings("ignore")
+
+try:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 # ---------------------------------------------------------------------------
 # Add project root to path so we can import data_module and utils
@@ -87,7 +102,7 @@ OPTIMIZATION_METRICS = ["accuracy", "recall", "precision", "roc_auc", "average_p
 
 MODELS = {
     "RandomForest": {
-        "estimator": RandomForestClassifier(random_state=42, n_jobs=-1),
+        "estimator": RandomForestClassifier(random_state=42, n_jobs=1),
         "param_dist": {
             "clf__n_estimators": [50, 100, 200],
             "clf__max_depth": [5, 10, None],
@@ -154,14 +169,19 @@ def build_group_series(df, attr_cols):
     Creates a single string label per row combining all intersectional attributes.
     Example: "Male & White", "Female & Black"
     """
-    return df[attr_cols].astype(str).apply(" & ".join, axis=1)
+    if not attr_cols:
+        return pd.Series(["All"] * len(df), index=df.index)
+    res = df[attr_cols[0]].astype(str)
+    for col in attr_cols[1:]:
+        res = res + " & " + df[col].astype(str)
+    return res
 
 
 # ---------------------------------------------------------------------------
 # Core experiment loop
 # ---------------------------------------------------------------------------
 
-def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
+def run_dataset_experiment(dataset_key, attr_combination, dry_run=False, n_jobs=2):
     """
     Runs the full nested CV experiment for ONE dataset + ONE attribute combination.
     Returns two DataFrames: aggregate results and per-subgroup-per-fold results.
@@ -175,10 +195,11 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
 
     # Load data (no UF filter for experiments — we use the full dataset)
     print("  Loading data...")
+    raw_loader = getattr(dataset_info["loader"], "__wrapped__", dataset_info["loader"])
     if dataset_info.get("supports_uf", False):
-        df = dataset_info["loader"](["Todos"])
+        df = raw_loader(["Todos"])
     else:
-        df = dataset_info["loader"]()
+        df = raw_loader()
 
     target_col = dataset_info["target"]
     favorable_val = dataset_info["favorable_val"]
@@ -263,17 +284,27 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
                 ])
 
                 # Inner CV: hyperparameter search
-                n_iter = 5 if dry_run else N_ITER_SEARCH
+                is_large = len(X_train) > 200_000
+                param_dist = dict(model_cfg["param_dist"])
+                if is_large and model_name == "RandomForest":
+                    # Evita max_depth=None em bases massivas (1.65M linhas), o que gerava árvores
+                    # com 17 milhões de nós e estourava a RAM com ArrayMemoryError de 134 MiB por nó.
+                    param_dist["clf__max_depth"] = [5, 10, 15]
+                    param_dist["clf__n_estimators"] = [50, 100]
+
+                n_iter = 5 if dry_run else (10 if is_large else N_ITER_SEARCH)
                 if is_fair_nn and not dry_run:
                     n_iter = min(n_iter, 4) # Less searches for NNs to save time
 
+                eff_n_jobs = 1 if is_large else n_jobs
+
                 search = RandomizedSearchCV(
                     pipe,
-                    param_distributions=model_cfg["param_dist"],
+                    param_distributions=param_dist,
                     n_iter=n_iter,
                     cv=inner_cv,
                     scoring=opt_metric,
-                    n_jobs=-1,
+                    n_jobs=eff_n_jobs,
                     random_state=42,
                     refit=True,
                     error_score="raise",
@@ -291,6 +322,8 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
                         "accuracy": np.nan, "recall": np.nan, "precision": np.nan,
                         "roc_auc": np.nan, "pr_auc": np.nan, "best_params": "FAILED",
                     })
+                    del preprocessor, pipe
+                    gc.collect()
                     continue
 
                 y_test_reset = y_test.reset_index(drop=True)
@@ -344,6 +377,9 @@ def run_dataset_experiment(dataset_key, attr_combination, dry_run=False):
                 sg_df["reference_group"] = agg["reference_group"]
                 sg_df["run_timestamp"] = run_ts
                 fold_subgroup_dfs.append(sg_df)
+
+                del search, best_model, pipe, preprocessor, X_train, X_test, y_train, y_test
+                gc.collect()
 
                 print(".", end="", flush=True)
 
@@ -422,10 +458,11 @@ def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
     print(f"\n  --- FairMLP Lambda Sweep for {dataset_key} ({' & '.join(attr_combination)}) ---")
     dataset_info = DATASETS[dataset_key]
 
+    raw_loader = getattr(dataset_info["loader"], "__wrapped__", dataset_info["loader"])
     if dataset_info.get("supports_uf", False):
-        df = dataset_info["loader"](["Todos"])
+        df = raw_loader(["Todos"])
     else:
-        df = dataset_info["loader"]()
+        df = raw_loader()
 
     target_col = dataset_info["target"]
     favorable_val = dataset_info["favorable_val"]
@@ -479,11 +516,12 @@ def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
                 pass_sensitive=True,
             )
 
+            is_large_data = len(X_train) > 200_000
             clf = FairMLPClassifier(
                 hidden_dims=(128, 64),
                 lr=0.001,
                 epochs=15 if not dry_run else 3,
-                batch_size=256,
+                batch_size=1024 if is_large_data else 256,
                 lambda_fairness=lam,
                 num_sensitive_attrs=len(attr_combination),
                 sensitive_dims_list=global_sens_dims,
@@ -501,6 +539,8 @@ def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
                 y_proba = pipe.predict_proba(X_test)
             except Exception as e:
                 print(f" [Fold {fold_idx} Failed: {str(e)[:50]}]", end="", flush=True)
+                del preprocessor, pipe
+                gc.collect()
                 continue
 
             y_test_reset = y_test.reset_index(drop=True)
@@ -546,6 +586,9 @@ def run_lambda_sweep(dataset_key, attr_combination, dry_run=False):
             sg_df["reference_group"] = agg["reference_group"]
             sg_df["run_timestamp"] = run_ts
             fold_subgroups.append(sg_df)
+
+            del pipe, clf, preprocessor, X_train, X_test, y_train, y_test
+            gc.collect()
 
             print(".", end="", flush=True)
 
@@ -632,6 +675,17 @@ def main():
         default=None,
         help="Limit to specific dataset keys.",
     )
+    parser.add_argument(
+        "--skip-lambda",
+        action="store_true",
+        help="Skip the neural FairMLP lambda sweep and run only standard models.",
+    )
+    parser.add_argument(
+        "--n-jobs",
+        type=int,
+        default=1,
+        help="Number of parallel jobs for hyperparameter search (default: 1, robust on Windows).",
+    )
     args = parser.parse_args()
 
     configs_to_run = EXPERIMENT_CONFIG
@@ -683,6 +737,7 @@ def main():
                     dataset_key=dataset_key,
                     attr_combination=attr_combination,
                     dry_run=args.dry_run,
+                    n_jobs=args.n_jobs,
                 )
 
                 if agg_df is not None and not agg_df.empty:
@@ -698,18 +753,19 @@ def main():
                 all_subgroup.append(subgroup_df)
                 
             # 2) Lightweight Lambda Sweep (FairMLP)
-            if args.skip_existing and os.path.exists(sweep_path):
-                print(f"\n[RESUME] Loading existing lambda sweep for {out_prefix}")
-                sweep_df = pd.read_parquet(sweep_path)
-                all_agg.append(sweep_df)
-            else:
-                sweep_df, sweep_sub = run_lambda_sweep(dataset_key, attr_combination, dry_run=args.dry_run)
-                if sweep_df is not None and not sweep_df.empty:
-                    sweep_df.to_parquet(sweep_path, index=False)
-                    print(f"  [SAVED] {sweep_path}")
+            if not args.skip_lambda:
+                if args.skip_existing and os.path.exists(sweep_path):
+                    print(f"\n[RESUME] Loading existing lambda sweep for {out_prefix}")
+                    sweep_df = pd.read_parquet(sweep_path)
                     all_agg.append(sweep_df)
-                    if sweep_sub is not None and not sweep_sub.empty:
-                        all_subgroup.append(sweep_sub)
+                else:
+                    sweep_df, sweep_sub = run_lambda_sweep(dataset_key, attr_combination, dry_run=args.dry_run)
+                    if sweep_df is not None and not sweep_df.empty:
+                        sweep_df.to_parquet(sweep_path, index=False)
+                        print(f"  [SAVED] {sweep_path}")
+                        all_agg.append(sweep_df)
+                        if sweep_sub is not None and not sweep_sub.empty:
+                            all_subgroup.append(sweep_sub)
 
     if all_agg:
         consolidated_agg = pd.concat(all_agg, ignore_index=True)

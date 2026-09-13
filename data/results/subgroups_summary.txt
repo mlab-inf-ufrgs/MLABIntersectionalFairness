@@ -1,0 +1,31 @@
+
+=== Dataset: Adult 🇺🇸 ===
+  Female & Black                 | N=    717 | FavRate=0.038 | PostDI=0.149 | TPR=0.459 | FPR=0.011 | AAOD=0.1020
+  Female & White                 | N=   3867 | FavRate=0.078 | PostDI=0.306 | TPR=0.483 | FPR=0.019 | AAOD=0.0853
+  Male & Black                   | N=    732 | FavRate=0.127 | PostDI=0.507 | TPR=0.517 | FPR=0.036 | AAOD=0.0601
+  Male & White                   | N=   8884 | FavRate=0.248 | PostDI=1.000 | TPR=0.593 | FPR=0.079 | AAOD=0.0000
+
+=== Dataset: COMPAS 🇺🇸 ===
+  Female & African-American      | N=    215 | FavRate=0.580 | PostDI=0.757 | TPR=0.679 | FPR=0.418 | AAOD=0.1736
+  Female & Caucasian             | N=    187 | FavRate=0.720 | PostDI=0.943 | TPR=0.814 | FPR=0.549 | AAOD=0.0436
+  Female & Hispanic              | N=     34 | FavRate=0.742 | PostDI=0.965 | TPR=0.886 | FPR=0.460 | AAOD=0.0729
+  Male & African-American        | N=   1007 | FavRate=0.448 | PostDI=0.585 | TPR=0.581 | FPR=0.337 | AAOD=0.2629
+  Male & Caucasian               | N=    611 | FavRate=0.641 | PostDI=0.840 | TPR=0.738 | FPR=0.504 | AAOD=0.1012
+  Male & Hispanic                | N=    175 | FavRate=0.671 | PostDI=0.878 | TPR=0.749 | FPR=0.540 | AAOD=0.0806
+
+=== Dataset: SINASC (DATASUS) 🇧🇷 ===
+  Amarela & Adulta (20-34)       | N=   2584 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Amarela & Jovem (<20)          | N=    400 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Amarela & Madura (>34)         | N=    903 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Branca & Adulta (20-34)        | N= 196285 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Branca & Jovem (<20)           | N=  22795 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Branca & Madura (>34)          | N=  63022 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Indígena & Adulta (20-34)      | N=   5437 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Indígena & Jovem (<20)         | N=   2379 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Indígena & Madura (>34)        | N=    951 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Parda & Adulta (20-34)         | N= 330601 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Parda & Jovem (<20)            | N=  69013 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Parda & Madura (>34)           | N=  69673 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Preta & Adulta (20-34)         | N=  43359 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Preta & Jovem (<20)            | N=   6789 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000
+  Preta & Madura (>34)           | N=  10654 | FavRate=1.000 | PostDI=1.000 | TPR=1.000 | FPR=1.000 | AAOD=0.0000

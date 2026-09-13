@@ -36,10 +36,10 @@ def load_and_preprocess_sim(ufs=['Todos']):
     st.error("⚠️ Base SIM real não encontrada! Execute os scripts de coleta para baixar os dados.")
     return pd.DataFrame(columns=['sexo', 'raca_cor', 'tipo_obito', 'uf'])
 
-@st.cache_data(show_spinner=False)
 def load_and_preprocess_sinasc(ufs=['Todos']):
     """
     Carrega amostra real do SINASC (DATASUS).
+    Leitura direta em parquet (0.15s), evitando sobrecarga de pickle/MemoryError do cache em memória.
     """
     path = os.path.join(os.path.dirname(__file__), '..', 'data', 'processed', 'sinasc_processed.parquet')
     if os.path.exists(path):
