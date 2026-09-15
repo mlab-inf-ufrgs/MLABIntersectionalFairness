@@ -36,23 +36,12 @@ ALL_SUB_PATH = os.path.join(RESULTS_DIR, "all_subgroup_results.parquet")
 # ---------------------------------------------------------------------------
 # Bloco 0 — Proveniência e Transparência Metodológica
 # ---------------------------------------------------------------------------
-def run_experiments_ui(dry_run=True):
-    from scripts.run_experiments import main as run_exp_main
-    import sys
-    
-    msg = "Executando testes rápidos (dry-run)..." if dry_run else "Executando pipeline completo... Isso pode demorar vários minutos. Acompanhe o terminal."
-    with st.spinner(msg):
-        old_argv = sys.argv
-        sys.argv = ['run_experiments.py']
-        if dry_run:
-            sys.argv.append('--dry-run')
-        try:
-            run_exp_main()
-        except Exception as e:
-            st.error(f"Erro ao executar: {e}")
-        finally:
-            sys.argv = old_argv
-    st.rerun()
+# Nota: os botões de re-execução (que disparavam scripts/run_experiments.py
+# diretamente pelo navegador) foram removidos desta página pública. O pipeline
+# de treino é pesado (validação cruzada aninhada sobre datasets de até ~2,5M
+# de linhas) e não deve ser disparável por qualquer visitante do app hospedado
+# no Streamlit Community Cloud. Para re-executar os experimentos, rode
+# `python scripts/run_experiments.py` localmente pelo terminal.
 
 with st.expander(t("provenance_header"), expanded=False):
     st.markdown(t("provenance_desc"))
@@ -65,16 +54,10 @@ with st.expander(t("provenance_header"), expanded=False):
         col3.metric(t("provenance_inner_k"), "3 × RandomizedSearchCV (n_iter=30)")
         if _meta.get("dry_run", False):
             st.warning(t("provenance_dryrun_warn"))
-            
+
         st.markdown("---")
-        st.write("**Opções de re-execução e download:**")
-        c_btn1, c_btn2, c_btn3, c_btn4 = st.columns(4)
-        with c_btn1:
-            if st.button("🔄 Re-executar (Dry-run)"):
-                run_experiments_ui(dry_run=True)
-        with c_btn2:
-            if st.button("🚀 Re-executar Completo"):
-                run_experiments_ui(dry_run=False)
+        st.write("**Download dos dados brutos:**")
+        c_btn3, c_btn4 = st.columns(2)
         with c_btn3:
             with open(ALL_AGG_PATH, "rb") as f:
                 st.download_button(
@@ -91,19 +74,14 @@ with st.expander(t("provenance_header"), expanded=False):
                     file_name="all_subgroup_results.parquet",
                     mime="application/octet-stream"
                 )
-                
+
     else:
         st.warning(t("no_results_warn"))
-        
-        st.write("Você pode executar os experimentos diretamente por aqui:")
-        c_btn1, c_btn2 = st.columns(2)
-        with c_btn1:
-            if st.button("Executar Experimentos Agora (Dry-run)", type="primary"):
-                run_experiments_ui(dry_run=True)
-        with c_btn2:
-            if st.button("Executar Experimentos Completos (Demorado)"):
-                run_experiments_ui(dry_run=False)
-                
+        st.info(
+            "Nenhum resultado pré-computado foi encontrado em `data/results/`. "
+            "Rode `python scripts/run_experiments.py` localmente pelo terminal para gerá-los "
+            "e depois faça commit dos arquivos `.parquet` gerados."
+        )
         st.stop()
 
 st.divider()

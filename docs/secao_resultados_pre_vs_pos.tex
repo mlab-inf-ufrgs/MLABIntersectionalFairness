@@ -1,116 +1,403 @@
 % ==============================================================================
-% SEÇÃO 5.3: RESULTADOS EXPERIMENTAIS: DA AUDITORIA DE DADOS AOS EFEITOS DO TREINAMENTO E MITIGAÇÃO POR RNA
+% SEÇÃO 5.4: RESULTADOS EXPERIMENTAIS: DA AUDITORIA DE DADOS AOS EFEITOS DO TREINAMENTO E MITIGAÇÃO POR RNA
 % Proposta de Qualificação de Doutorado - PPGC/UFRGS
 % ==============================================================================
 
 \section{Resultados Experimentais: Da Auditoria de Dados aos Efeitos do Treinamento e Mitigação por RNA}
 \label{sec:resultados_pre_vs_pos}
 
-Nesta seção, analisa-se criticamente a transição do viés algorítmico \textbf{a nível de dados (\textit{pré-treinamento})} para o viés manifestado nas \textbf{predições dos modelos (\textit{pós-treinamento})}, culminando na avaliação empírica da \textbf{mitigação via Redes Neurais com penalização de viés (\textit{FairMLP com variação de $\lambda$})}. A investigação organiza-se em três subseções dedicadas a cada \textit{dataset} do escopo da tese: \textbf{Adult} (US Census), \textbf{COMPAS} (Justiça Criminal) e \textbf{SINASC} (DATASUS, Saúde Neonatal no Brasil).
+Nesta seção, analisa-se criticamente a transição do viés algorítmico \textbf{a nível de dados (\textit{pré-treinamento})} para o viés manifestado nas \textbf{predições dos modelos de aprendizado de máquina (\textit{pós-treinamento})}, culminando na avaliação empírica da \textbf{mitigação via Redes Neurais com penalização de viés (\textit{FairMLP com variação de $\lambda$})}. A investigação organiza-se em três subseções dedicadas a cada \textit{dataset} do escopo: \textbf{Adult} (US Census), \textbf{COMPAS} (Justiça Criminal) e \textbf{SINASC} (DATASUS, Saúde Neonatal no Brasil).
 
 O objetivo central desta análise empírica é demonstrar como o treinamento supervisionado padrão (\textit{baselines}) reage aos desequilíbrios históricos dos dados brutos --- ora \textbf{amplificando desproporcionalmente a penalização interseccional}, ora \textbf{gerando ilusões estatísticas de equidade sob desbalanceamento severo} ---, e como a introdução preliminar de penalização em uma Rede Neural Artificial (RNA) comprova a viabilidade da mitigação, mas ao mesmo tempo expõe os limites da parametrização escalar fixa, fundamentando a arquitetura metodológica proposta para o doutorado (\textbf{Rede Neural Multitarefa com Camada Reversa de Gradiente + Otimização Multiobjetivo NSGA-II + Interpretabilidade por SHAP}).
 
-% ------------------------------------------------------------------------------
+% ==============================================================================
 \subsection{Caso 1: Adult (US Census) --- Renda, Amplificação e Mitigação via RNA}
 \label{subsec:caso_adult}
 
-\subsubsection{Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)}
-O \textit{dataset} Adult ($N = 42.599$ instâncias) modela a predição de renda anual superior a US\$ 50.000 ($Y = 1$, classe favorável), com prevalência global de $25,28\%$. Ao decompor a base pelos atributos sensíveis Gênero ($\text{sex}$) e Raça ($\text{race}$), emergem disparidades substanciais de paridade estatística na distribuição original:
+\subsubsection{A. Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)}
+
+O \textit{dataset} Adult manteve $42.599$ ($87\%$) das $48.842$ instâncias originais após o pré-processamento. Os dados apresentam forte desbalanceamento da classe-alvo, com apenas cerca de $25\%$ das amostras atingindo o critério de alta renda (renda anual superior a US\$50K). A escassez de exemplos positivos pode prejudicar o aprendizado de padrões para os desfechos favoráveis. Além disso, representa uma dificuldade adicional para minorias com baixa representatividade, que consequentemente também tendem a apresentar pouca interseção com a classe positiva.
+
+Os atributos sensíveis e \textit{proxies} socioeconômicos em geral são multiclasse no Adult. Para avaliação de equidade de forma unidimensional em nível de dados, adotamos como critério atribuir os grupos com maior taxa de sucesso (renda anual superior a US\$50K) como privilegiados e aqueles com menor taxa como desprivilegiados.
+
+\begin{table}[H]
+    \centering
+    \caption{Métricas dinâmicas de viés avaliadas por atributo sensível (Adult).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ll|cccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Atributo}} & \textit{Privilegiado} & \textit{Desprivilegiado} & \textit{CI} & \textit{DI} & \textit{KL} & \textit{KS} \\
+        \hline
+        sex              & Male            & Female    & 0,35  & 0,37 & 0,141 & 0,200 \\
+        race             & White           & Black     & \textbf{0,80}  & 0,47 & 0,072 & 0,141 \\
+        age\_group       & Middle-aged     & Young     & -0,10 & 0,34 & 0,188 & 0,240 \\
+        education\_group & Graduate Degree & Schooling & -0,68 & 0,23 & 0,614 & \textbf{0,483} \\
+        relationship     & Wife            & Own-child & -0,47 & \textbf{0,03} & \textbf{1,287} & 0,466 \\
+        \hline
+        \multicolumn{7}{l}{\small \textbf{CI}: Class Imbalance | \textbf{DI}: Disparate Impact | \textbf{KL}: Kullback-Leibler | \textbf{KS}: Kolmogorov-Smirnov}
+    \end{tabular}
+    }
+    \label{tab:adult_dynamic_metrics}
+\end{table}
+
+Com relação à distribuição de amostras, a métrica CI mostra que o \textit{dataset} apresenta um número consideravelmente maior de exemplos de populações privilegiadas para os atributos protegidos sexo e raça. Ao mesmo tempo, enquanto o atributo idade mostra uma distribuição mais equilibrada, o conjunto tem um tamanho amostral muito superior para grupos desprivilegiados nos \textit{proxies} socioeconômicos educação e relacionamento.
+
+Quanto às taxas de sucesso, o DI pré-treino mostra grandes disparidades na distribuição entre as populações privilegiada e desprivilegiada em todos os três atributos sensíveis, assumindo valores entre $0,34$ e $0,47$. Em relação a sexo e raça, o privilégio nas taxas de sucesso de homens brancos fica evidente.
+
+Em relação à idade, o fator renda pode se confundir com a progressão de carreira e construção de patrimônio ao longo da vida. Os \textit{proxies} socioeconômicos também podem apresentar fatores de confusão similares: maior educação tende a atrair oportunidades para melhores salários, ao mesmo tempo que pessoas casadas tendem a compor renda de forma conjunta na unidade familiar. Contudo, estas variáveis também representam acesso a educação e padrões de relacionamento influenciados por condições socioeconômicas, especialmente no contexto onde os dados foram coletados, na sociedade estadunidense da década de 1990.
+
+Neste cenário, não se pode ignorar que estas variáveis apresentam disparidades ainda maiores que os atributos sensíveis, com DI de $0,23$ ao comparar pessoas com educação básica àquelas com pós-graduação, e $0,03$ ao comparar mulheres casadas com pessoas que criam filhos sozinhas. Neste último exemplo, a métrica encontrada mostra uma taxa de sucesso quase inexistente para a população desprivilegiada.
+
+A divergência KL e o Kolmogorov-Smirnov confirmaram a diferença de distribuição de positivos, com divergências menores porém significativas nos grupos segmentados pelos atributos sensíveis, e bem maiores nos \textit{proxies} socioeconômicos. Estas métricas mostram o viés no nível de dados, que reflete as desigualdades estruturais nos níveis de renda do recorte populacional que constitui o \textit{dataset}.
+
+\paragraph{Auditoria Interseccional de Gerrymandering}
+
+\begin{table}[H]
+    \centering
+    \caption{Auditoria de viés interseccional oculto em pares de atributos (Adult).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Par de Interseção}} & \textit{Gap A} & \textit{Gap B} & \textit{Esperado} & \textit{Real} & \textit{Oculto} \\
+        \hline
+        \textbf{education\_group $\times$ relationship} & \textbf{48,28\%} & \textbf{46,58\%} & \textbf{48,28\%} & \textbf{83,85\%} & \textbf{+35,57\%} \\
+        \textbf{sex $\times$ education\_group} & \textbf{20,02\%} & \textbf{48,28\%} & \textbf{48,28\%} & \textbf{65,72\%} & \textbf{+17,44\%} \\
+        \textbf{age\_group $\times$ education\_group} & \textbf{23,98\%} & \textbf{48,28\%} & \textbf{48,28\%} & \textbf{63,07\%} & \textbf{+14,78\%} \\
+        \textbf{sex $\times$ age\_group} & \textbf{20,02\%} & \textbf{23,98\%} & \textbf{23,98\%} & \textbf{37,13\%} & \textbf{+13,16\%} \\
+        \textbf{age\_group $\times$ relationship} & \textbf{23,98\%} & \textbf{46,58\%} & \textbf{46,58\%} & \textbf{57,83\%} & \textbf{+11,25\%} \\
+        race $\times$ age\_group & 14,11\% & 23,98\% & 23,98\% & 33,10\% & +9,12\% \\
+        race $\times$ education\_group & 14,11\% & 48,28\% & 48,28\% & 56,40\% & +8,12\% \\
+        sex $\times$ race & 20,02\% & 14,11\% & 20,02\% & 26,74\% & +6,71\% \\
+        race $\times$ relationship & 14,11\% & 46,58\% & 46,58\% & 49,60\% & +3,02\% \\
+        sex $\times$ relationship & 20,02\% & 46,58\% & 46,58\% & 46,85\% & +0,27\% \\
+        \hline
+        \multicolumn{6}{l}{\small Gap Esperado é o valor máximo entre Gap A e Gap B. Em \textbf{negrito}, interseções com Viés Oculto > $10\%$ (limiar de gerrymandering $=0,05\%$).}
+    \end{tabular}
+    }
+    \label{tab:adult_gerrymandering}
+\end{table}
+
+Metade das interseções mostram viés oculto severo, com disparidade nas taxas crescendo acima de $10\%$ na análise cruzada em relação à análise marginal. É uma demonstração clara do efeito combinatório do viés, que reforça que a análise marginal fica incompleta, pois perde informação relevante sobre as penalizações sobrepostas. O atributo educação, selecionado como \textit{proxy} socioeconômico, atua como forte catalisador das disparidades, mostrando as maiores taxas de adição de desigualdade quando cruzado a todo atributo sensível ou \textit{proxy} socioeconômico.
+
+Observando os atributos sensíveis, embora a literatura aborde mais frequentemente o viés racial, as interseções incluindo sexo ou idade apresentaram maior viés oculto. Os cruzamentos com raça não ultrapassaram o limiar de $10\%$. Isso pode indicar que o viés racial presente neste \textit{dataset} se manifesta de forma consistente em todo o grupo marginalmente --- ou que variáveis de classe socioeconômica (como educação) estão absorvendo e mascarando o impacto racial no nível de dados, atuando como variáveis de confusão.
+
+\paragraph{Análise CDDL --- Disparidade Condicionada por Proxy}
+
+\begin{table}[H]
+    \centering
+    \caption{Matriz completa de CDDL por atributo protegido (vítima) $\times$ variável proxy (condição), Adult. Ordenada por CDDL decrescente.}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lll|c}
+        \hline
+        \multicolumn{1}{c}{\textit{Atributo Protegido (Vítima)}} & \textit{Grupo Desprivilegiado} & \textit{Variável Proxy (Condição)} & \textit{CDDL} \\
+        \hline
+        age\_group & Young & race & \textbf{0,3106} \\
+        age\_group & Young & education\_group & 0,3043 \\
+        education\_group & Schooling & relationship & 0,2967 \\
+        age\_group & Young & sex & 0,2956 \\
+        education\_group & Schooling & sex & 0,2712 \\
+        education\_group & Schooling & age\_group & 0,2652 \\
+        education\_group & Schooling & race & 0,2511 \\
+        sex & Female & education\_group & 0,2470 \\
+        sex & Female & race & 0,2240 \\
+        age\_group & Young & relationship & 0,2218 \\
+        sex & Female & age\_group & 0,2188 \\
+        relationship & Own-child & race & 0,1685 \\
+        relationship & Own-child & education\_group & 0,1636 \\
+        relationship & Own-child & sex & 0,1634 \\
+        relationship & Own-child & age\_group & 0,1450 \\
+        race & Black & age\_group & 0,0713 \\
+        sex & Female & relationship & 0,0691 \\
+        race & Black & education\_group & 0,0590 \\
+        race & Black & sex & 0,0579 \\
+        race & Black & relationship & 0,0516 \\
+        \hline
+        \multicolumn{4}{l}{\small Cada linha mede a disparidade condicional sofrida pelo grupo desprivilegiado (col. 2), segmentando os rótulos pelos estratos da variável proxy (col. 3).}
+    \end{tabular}
+    }
+    \label{tab:adult_cddl}
+\end{table}
+
+A avaliação da métrica CDDL (\textit{Conditional Demographic Disparity in Labels}) no \textit{dataset} Adult revela que as disparidades nos rótulos não se distribuem de maneira uniforme entre os atributos sensíveis, evidenciando uma forte dinâmica interseccional. Os resultados demonstram que o viés afeta desproporcionalmente indivíduos jovens (\textit{age\_group = Young}) e com menor nível de escolaridade formal (\textit{education\_group = Schooling}), que ocupam as três primeiras posições do ranking. O grupo de jovens apresentou o maior índice de disparidade de todo o experimento ($\text{CDDL} = 0,310$) quando o atributo raça foi introduzido como variável de condicionamento (\textit{proxy}), sugerindo que a desvantagem estrutural associada à idade é severamente amplificada ao se considerar recortes raciais.
+
+Adicionalmente, a raça atua como o \textit{proxy} mais forte para expor disparidades latentes em outros grupos demográficos. Quando \textit{race} é utilizada como condição, o CDDL médio das vítimas atinge $0,238$, o maior impacto entre todas as variáveis condicionantes analisadas.
+
+Um achado contraintuitivo desta análise é o comportamento do próprio atributo \textit{race} quando tratado como atributo protegido vítima: indivíduos negros apresentaram os menores valores de CDDL (entre $0,051$ e $0,071$), independentemente da variável de condicionamento aplicada. Este fenômeno indica que, para este cenário específico, as disparidades focadas estritamente em raça parecem mitigadas ou mascaradas por outras variáveis estruturais --- exigindo uma investigação mais profunda sobre como o viés de representação histórica está sendo codificado nos dados originais.
+
+\paragraph{Nota metodológica sobre o recorte interseccional}
+Diferentemente da auditoria de dados acima --- que avalia os cinco atributos sensíveis disponíveis (\textit{sex}, \textit{race}, \textit{age\_group}, \textit{education\_group}, \textit{relationship}) e todos os seus pares ---, o treinamento dos modelos e a avaliação pós-treino das Seções B e C foram restritos a uma única interseção por \textit{dataset} (\textit{sex} $\times$ \textit{race} no Adult e no COMPAS; \textit{raca\_cor\_mae} $\times$ \textit{idade\_mae} no SINASC). A escolha se justifica por dois motivos: (i) comparabilidade direta com a literatura de justiça algorítmica, que tipicamente usa \textit{sex} $\times$ \textit{race} como recorte padrão no Adult; e (ii) viabilidade computacional do pipeline completo (validação cruzada aninhada + \textit{lambda sweep} da FairMLP) dentro do escopo desta proposta de qualificação. É importante registrar que a própria auditoria de gerrymandering (Tabela~\ref{tab:adult_gerrymandering}) identificou pares com viés oculto ainda maior que \textit{sex} $\times$ \textit{race} --- notavelmente \textit{education\_group} $\times$ \textit{relationship} ($+35,57\%$, o maior de toda a tabela) ---, que não foram submetidos ao treinamento de modelos nesta etapa. A extensão da avaliação pós-treino e da mitigação para múltiplos atributos sensíveis simultâneos, incluindo pares além do escolhido aqui, é endereçada diretamente pela arquitetura multitarefa com Camada Reversa de Gradiente proposta para a tese (Seção~\ref{subsec:sintese_comparativa}), desenhada desde a concepção para mais de dois atributos sensíveis ao mesmo tempo --- superando a limitação do recorte bivariado utilizado nestes experimentos preliminares.
+
+\subsubsection{B. Efeitos do Treinamento nos Baselines Tradicionais}
+
+Ao decompor a base pelos atributos sensíveis Gênero e Raça, emergem disparidades substanciais de paridade estatística na distribuição original:
 \begin{itemize}
-    \item \textbf{Male \& White} ($N = 26.657$): $32,79\%$ possuem renda favorável (grupo de referência privilegiado, $\text{Pre-DI} = 1,000$).
+    \item \textbf{Male \& White} ($N = 26.657$): $32,79\%$ possuem renda favorável (grupo de referência, $\text{Pre-DI} = 1,000$).
     \item \textbf{Male \& Black} ($N = 2.198$): $19,02\%$ possuem renda favorável ($\text{Pre-DI} = 0,580$; $\text{Pre-SPD} = -13,77\%$).
     \item \textbf{Female \& White} ($N = 11.595$): $12,76\%$ possuem renda favorável ($\text{Pre-DI} = 0,389$; $\text{Pre-SPD} = -20,02\%$).
     \item \textbf{Female \& Black} ($N = 2.149$): apenas $6,05\%$ possuem renda favorável ($\text{Pre-DI} = 0,185$; $\text{Pre-SPD} = -26,74\%$).
 \end{itemize}
 
-\subsubsection{Efeitos do Treinamento nos Baselines Tradicionais}
-Os modelos tradicionais (\textit{Gradient Boosting} e \textit{Random Forest}) alcançaram acurácias de $86,0\%$ e $84,3\%$ e ROC-AUC de $0,915$ e $0,899$. Todavia, o treinamento amplificou a penalização sobre o grupo mais vulnerável: a taxa predita de mulheres negras caiu de $6,05\%$ para \textbf{$3,80\%$}, derrubando o Disparate Impact de $\text{Pre-DI} = 0,185$ para $\text{Post-DI} = 0,149$, com $\text{TPR}$ de apenas $45,9\%$ e $\text{AAOD} = 0,1020$.
+O melhor \textit{baseline} em termos de utilidade preditiva foi o Gradient Boosting otimizado por PR-AUC, atingindo acurácia de $86,5\%$ e ROC-AUC de $0,919$. Todavia, o treinamento \textbf{amplificou} a penalização sobre o grupo mais vulnerável: a taxa de predição favorável para mulheres negras caiu de $6,05\%$ (dados) para apenas $4,80\%$ (modelo), derrubando o Disparate Impact de $\text{Pre-DI} = 0,185$ para $\text{Post-DI} = 0,174$. A TPR deste subgrupo atingiu apenas $56,1\%$ e o Max Intersectional AAOD chegou a $0,0845$.
 
-\subsubsection{Mitigação por Rede Neural Artificial (FairMLP: Variação de $\lambda$)}
-Para avaliar a viabilidade de mitigar a penalização interseccional, treinou-se uma Rede Neural Artificial (\textit{FairMLP}) sob uma função de perda com regularização de equidade parametrizada pelo escalar $\lambda \in [0.0, 0.5, 1.0, 2.0, 4.0]$. A Tabela~\ref{tab:adult_lambda_sweep} resume a transição das métricas de desempenho e equidade.
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{Adult: Efeito da Penalização de Viés via Rede Neural Artificial (\textit{FairMLP Lambda Sweep}).}
-\label{tab:adult_lambda_sweep}
-\begin{tabular}{lccccc}
-\toprule
-\textbf{Configuração} & \textbf{Acurácia} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{Max AAOD} $\downarrow$ & \textbf{Sens. Gap} $\downarrow$ \\
-\midrule
-FairMLP ($\lambda = 0.0$) & 0,8485 $\pm$ 0,0010 & 0,9034 $\pm$ 0,0012 & 0,7789 $\pm$ 0,0003 & 0,0932 $\pm$ 0,0352 & 0,1033 $\pm$ 0,0452 \\
-FairMLP ($\lambda = 0.5$) & 0,8483 $\pm$ 0,0012 & 0,9032 $\pm$ 0,0015 & 0,7786 $\pm$ 0,0007 & 0,0800 $\pm$ 0,0316 & 0,1014 $\pm$ 0,0252 \\
-FairMLP ($\lambda = 1.0$) & 0,8482 $\pm$ 0,0015 & 0,9029 $\pm$ 0,0016 & 0,7780 $\pm$ 0,0012 & 0,0786 $\pm$ 0,0258 & 0,1099 $\pm$ 0,0191 \\
-FairMLP ($\lambda = 2.0$) & 0,8473 $\pm$ 0,0005 & 0,9016 $\pm$ 0,0023 & 0,7758 $\pm$ 0,0026 & \textbf{0,0656} $\pm$ 0,0046 & 0,1164 $\pm$ 0,0374 \\
-FairMLP ($\lambda = 4.0$) & 0,8439 $\pm$ 0,0012 & 0,8966 $\pm$ 0,0039 & 0,7695 $\pm$ 0,0047 & 0,0689 $\pm$ 0,0115 & 0,1588 $\pm$ 0,0339 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+    \centering
+    \caption{Métricas de equidade interseccional pós-treino por subgrupo (Adult, GradientBoosting --- melhor baseline, média entre 3 folds externos).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|cccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Subgrupo}} & \textit{N (teste/fold)} & \textit{Taxa Favorável} & \textit{Post-DI} & \textit{TPR} & \textit{FPR} & \textit{AAOD} \\
+        \hline
+        Male \& White & 8.886 & 0,275 & 1,000 & 0,655 & 0,089 & 0,000 \\
+        Male \& Black & 733 & 0,142 & 0,516 & 0,586 & 0,037 & 0,061 \\
+        Female \& White & 3.865 & 0,098 & 0,357 & 0,601 & 0,025 & 0,059 \\
+        \textbf{Female \& Black} & \textbf{716} & \textbf{0,048} & \textbf{0,174} & \textbf{0,561} & \textbf{0,014} & \textbf{0,084} \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:adult_subgroup_posttrain}
 \end{table}
 
-A introdução de $\lambda = 2.0$ reduziu o $\text{Max AAOD}$ de \textbf{$0,0932$ para $0,0656$} (redução de **$29,6\%$** na injustiça máxima), com perda residual na acurácia ($< 0,12\%$). Em $\lambda = 4.0$, entretanto, o modelo satura: o \textit{recall} desaba de $61,9\%$ para $53,7\%$ e o \textit{Sensitivity Gap} expande para $0,1588$, revelando a natureza não-monótona do \textit{trade-off}.
+O padrão observado é paradigmático: o modelo aprende a descartar precocemente instâncias de mulheres negras por sua baixíssima representação entre positivos, gerando uma taxa de falsos negativos elevada ($\text{FNR} = 43,9\%$) que sequer se reflete no AUROC global, o qual permanece confortavelmente acima de $0,91$.
 
-% ------------------------------------------------------------------------------
+\subsubsection{C. Mitigação por Rede Neural Artificial (FairMLP: Variação de $\lambda$)}
+
+Para avaliar a viabilidade de mitigar a penalização interseccional, treinou-se uma FairMLP sob variação do escalar de penalização $\lambda \in \{0,0;\ 0,5;\ 1,0;\ 2,0;\ 4,0\}$. Como a penalização de equidade é ponderada por $\lambda$ na função de perda ($\mathcal{L} = \mathcal{L}_{\text{BCE}} + \lambda \cdot \mathcal{L}_{\text{DP}}$), a configuração $\lambda = 0,0$ anula completamente esse termo, funcionando como uma \textbf{MLP convencional sem qualquer mitigação de viés} --- o baseline de rede neural equivalente aos baselines de árvore (Random Forest/Gradient Boosting) da Seção B, mas mantendo a mesma arquitetura da FairMLP.
+
+\begin{table}[H]
+    \centering
+    \caption{Adult: Efeito da penalização de viés na FairMLP (lambda sweep).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Configuração}} & \textit{Acurácia} & \textit{ROC-AUC} & \textit{PR-AUC} & \textit{Max AAOD} $\downarrow$ & \textit{Sens. Gap} $\downarrow$ \\
+        \hline
+        \textbf{MLP sem mitigação} ($\lambda = 0,0$) & 0,8485 $\pm$ 0,0010 & 0,9034 $\pm$ 0,0012 & 0,7789 $\pm$ 0,0003 & 0,0940 $\pm$ 0,0344 & 0,1025 $\pm$ 0,0476 \\
+        FairMLP ($\lambda = 0,5$) & 0,8483 $\pm$ 0,0011 & 0,9033 $\pm$ 0,0014 & 0,7786 $\pm$ 0,0007 & 0,0804 $\pm$ 0,0313 & 0,1018 $\pm$ 0,0251 \\
+        FairMLP ($\lambda = 1,0$) & 0,8480 $\pm$ 0,0014 & 0,9029 $\pm$ 0,0016 & 0,7780 $\pm$ 0,0011 & 0,0789 $\pm$ 0,0259 & 0,1079 $\pm$ 0,0166 \\
+        FairMLP ($\lambda = 2,0$) & 0,8473 $\pm$ 0,0004 & 0,9015 $\pm$ 0,0023 & 0,7759 $\pm$ 0,0026 & \textbf{0,0668} $\pm$ 0,0027 & 0,1212 $\pm$ 0,0346 \\
+        FairMLP ($\lambda = 4,0$) & 0,8442 $\pm$ 0,0012 & 0,8965 $\pm$ 0,0039 & 0,7695 $\pm$ 0,0046 & 0,0692 $\pm$ 0,0116 & 0,1571 $\pm$ 0,0320 \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:adult_lambda_sweep}
+\end{table}
+
+\begin{enumerate}
+    \item \textbf{Redução Substancial da Injustiça:} A introdução do fator $\lambda = 2,0$ reduziu o Max AAOD de $0,0940$ para $0,0668$, uma redução de \textbf{$29,0\%$ na disparidade máxima}, com perda residual desprezível na acurácia (queda de aproximadamente $0,12$ ponto percentual) e no ROC-AUC ($0,9034$ para $0,9015$).
+    \item \textbf{Ponto de Inflexão e Degradação:} Ao aumentar para $\lambda = 4,0$, o modelo atinge saturação: o Recall desaba de $62,1\%$ para $54,0\%$ e o Sensitivity Gap sobe para $0,1571$, demonstrando empiricamente que a relação entre equidade e penalização é \textbf{não-monótona}, exigindo mecanismos avançados de busca de Pareto.
+\end{enumerate}
+
+% ==============================================================================
 \subsection{Caso 2: COMPAS (Justiça Penal) --- Risco, Assimetria e Mitigação via RNA}
 \label{subsec:caso_compas}
 
-\subsubsection{Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)}
-No COMPAS ($N = 6.688$), a condição favorável é a \textbf{não-reincidência / baixo risco} ($Y = 0$, $54,04\%$). Nos dados brutos:
-\begin{itemize}
-    \item \textbf{Female \& Caucasian} ($N = 562$): $64,59\%$ não reincidem (referência, $\text{Pre-DI} = 1,000$).
-    \item \textbf{Female \& African-American} ($N = 646$): $61,92\%$ não reincidem ($\text{Pre-DI} = 0,959$).
-    \item \textbf{Male \& Caucasian} ($N = 1.832$): $58,84\%$ não reincidem ($\text{Pre-DI} = 0,911$).
-    \item \textbf{Male \& African-American} ($N = 3.020$): $45,53\%$ não reincidem ($\text{Pre-DI} = 0,705$; $\text{Pre-SPD} = -19,06\%$).
-\end{itemize}
+\subsubsection{A. Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)}
 
-\subsubsection{Efeitos do Treinamento nos Baselines Tradicionais}
-Os \textit{baselines} acentuaram as taxas de erro contra réus negros: a taxa de verdadeiros positivos ($\text{TPR}$) entre não-reincidentes foi de $81,4\%$ para mulheres caucasianas e $73,8\%$ para homens caucasianos, mas apenas \textbf{$58,1\%$} para homens negros ($\text{AAOD} = 0,2629$, \textit{Sensitivity Gap} de $23,5\%$).
+No COMPAS ($N = 6.688$), a condição favorável é a \textbf{não-reincidência em dois anos} ($Y = 0$, prevalência global de $54,04\%$). O grupo com maior taxa de não-reincidência (Mulheres Caucasianas, $64,59\%$) foi tomado como referência.
 
-\subsubsection{Mitigação por Rede Neural Artificial (FairMLP: Variação de $\lambda$)}
-A Tabela~\ref{tab:compas_lambda_sweep} apresenta os resultados da \textit{FairMLP} no COMPAS ao longo do \textit{sweep} de $\lambda$.
-
-\begin{table}[htbp]
-\centering
-\small
-\caption{COMPAS: Efeito da Penalização de Viés via Rede Neural Artificial (\textit{FairMLP Lambda Sweep}).}
-\label{tab:compas_lambda_sweep}
-\begin{tabular}{lccccc}
-\toprule
-\textbf{Configuração} & \textbf{Acurácia} & \textbf{ROC-AUC} & \textbf{Recall} $\uparrow$ & \textbf{Max AAOD} $\downarrow$ & \textbf{Sens. Gap} $\downarrow$ \\
-\midrule
-FairMLP ($\lambda = 0.0$) & 0,6361 $\pm$ 0,0080 & 0,6902 $\pm$ 0,0061 & 0,7128 $\pm$ 0,0970 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
-FairMLP ($\lambda = 0.5$) & 0,6361 $\pm$ 0,0080 & 0,6902 $\pm$ 0,0061 & 0,7128 $\pm$ 0,0970 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
-FairMLP ($\lambda = 1.0$) & 0,6361 $\pm$ 0,0080 & 0,6901 $\pm$ 0,0062 & 0,7128 $\pm$ 0,0970 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
-FairMLP ($\lambda = 2.0$) & 0,6343 $\pm$ 0,0065 & 0,6889 $\pm$ 0,0077 & 0,7191 $\pm$ 0,0931 & 0,2666 $\pm$ 0,0532 & 0,2233 $\pm$ 0,0230 \\
-FairMLP ($\lambda = 4.0$) & 0,6346 $\pm$ 0,0069 & 0,6882 $\pm$ 0,0058 & \textbf{0,7833} $\pm$ 0,0839 & \textbf{0,2284} $\pm$ 0,0130 & \textbf{0,1972} $\pm$ 0,0349 \\
-\bottomrule
-\end{tabular}
+\begin{table}[H]
+    \centering
+    \caption{Disparidades de paridade estatística pré-treino por subgrupo interseccional (COMPAS).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|cccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Subgrupo}} & \textit{N} & \textit{Taxa Favorável} & \textit{Pre-DI} & \textit{Pre-SPD} \\
+        \hline
+        Female \& Caucasian & 562 & 0,6459 & 1,000 & 0,000 \\
+        Female \& Hispanic & 102 & 0,6765 & 1,047 & +3,06\% \\
+        Female \& African-American & 646 & 0,6192 & 0,959 & -2,67\% \\
+        Male \& Caucasian & 1.832 & 0,5884 & 0,911 & -5,75\% \\
+        Male \& Hispanic & 526 & 0,6255 & 0,968 & -2,04\% \\
+        \textbf{Male \& African-American} & \textbf{3.020} & \textbf{0,4553} & \textbf{0,705} & \textbf{-19,06\%} \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:compas_pretrain}
 \end{table}
 
-Diferente do Adult, no COMPAS penalizações brandas ($\lambda \le 1.0$) não foram suficientes para alterar as fronteiras de decisão. Contudo, em $\lambda = 4.0$, o $\text{Max AAOD}$ **despencou de $0,2649$ para $0,2284$** (redução superior a $14\%$), o \textit{Sensitivity Gap} caiu para **$0,1972$**, e o \textit{recall} da classe favorável cresceu de $71,28\%$ para **$78,33\%$**, neutralizando taxas de falsos positivos desfavoráveis contra jovens negros com sacrifício desprezível de acurácia ($0,6361 \to 0,6346$).
+A magnitude da disparidade entre os grupos extremos é notória: a taxa de não-reincidência de homens negros ($45,53\%$) está \textbf{$19,06$ pontos percentuais} abaixo do grupo de referência, com Pre-DI de $0,705$ --- abaixo do limiar da Regra dos $80\%$, configurando potencial impacto desproporcional nos dados brutos antes mesmo do treinamento. Homens negros constituem $45,2\%$ da base, sendo o maior subgrupo, ao passo que os demais concentram-se em faixas muito menores.
 
-% ------------------------------------------------------------------------------
-\subsection{Caso 3: SINASC (DATASUS) --- Desbalanceamento e a Limitação do $\lambda$ Escalar}
+\subsubsection{B. Efeitos do Treinamento nos Baselines Tradicionais}
+
+O melhor \textit{baseline} (Gradient Boosting, otimizado por ROC-AUC) atingiu acurácia de $64,1\%$ e ROC-AUC de $0,691$. Os \textit{baselines} \textbf{acentuaram severamente} as assimetrias de erro contra réus negros:
+
+\begin{table}[H]
+    \centering
+    \caption{Métricas de equidade interseccional pós-treino por subgrupo (COMPAS, GradientBoosting --- melhor baseline, média entre 3 folds externos).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|cccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Subgrupo}} & \textit{N (teste/fold)} & \textit{Taxa Favorável} & \textit{Post-DI} & \textit{TPR} & \textit{FPR} & \textit{AAOD} \\
+        \hline
+        Female \& Caucasian & 187 & 0,710 & $0,950^{*}$ & 0,804 & 0,538 & 0,033 \\
+        Female \& Hispanic & 34 & 0,724 & 0,961 & 0,871 & 0,435 & 0,072 \\
+        Female \& African-American & 215 & 0,567 & 0,759 & 0,671 & 0,399 & 0,170 \\
+        Male \& Caucasian & 611 & 0,634 & 0,849 & 0,733 & 0,494 & 0,091 \\
+        Male \& Hispanic & 175 & 0,657 & 0,879 & 0,736 & 0,523 & 0,079 \\
+        \textbf{Male \& African-American} & \textbf{1.007} & \textbf{0,437} & \textbf{0,583} & \textbf{0,573} & \textbf{0,323} & \textbf{0,256} \\
+        \hline
+        \multicolumn{7}{l}{\small $^{*}$Female \& Caucasian foi referência em 2 dos 3 folds; no fold restante, Female \& Hispanic assumiu com $N=29$ (abaixo do limiar $N=30$), por isso a média não chega a $1,000$.}
+    \end{tabular}
+    }
+    \label{tab:compas_subgroup_posttrain}
+\end{table}
+
+A TPR entre réus afro-americanos do sexo masculino ($57,3\%$) ficou \textbf{$23,1$ pontos percentuais} abaixo da TPR de mulheres caucasianas ($80,4\%$), resultando em Max Intersectional AAOD de $0,256$. O modelo aprende que a condição de ser homem negro é preditora de reincidência, amplificando a taxa de falsos positivos especificamente neste grupo --- uma manifestação algorítmica direta do padrão documentado por Angwin et al. (2016).
+
+\subsubsection{C. Mitigação por Rede Neural Artificial (FairMLP: Variação de $\lambda$)}
+
+Como no Caso 1, a linha $\lambda = 0,0$ corresponde à \textbf{MLP sem mitigação} (penalização de equidade anulada), servindo de baseline de rede neural comparável ao Gradient Boosting da Seção B.
+
+\begin{table}[H]
+    \centering
+    \caption{COMPAS: Efeito da penalização de viés na FairMLP (lambda sweep).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Configuração}} & \textit{Acurácia} & \textit{ROC-AUC} & \textit{PR-AUC} & \textit{Max AAOD} $\downarrow$ & \textit{Sens. Gap} $\downarrow$ \\
+        \hline
+        \textbf{MLP sem mitigação} ($\lambda = 0,0$) & 0,6361 $\pm$ 0,0080 & 0,6902 $\pm$ 0,0061 & 0,6972 $\pm$ 0,0109 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+        FairMLP ($\lambda = 0,5$) & 0,6361 $\pm$ 0,0080 & 0,6902 $\pm$ 0,0061 & 0,6972 $\pm$ 0,0109 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+        FairMLP ($\lambda = 1,0$) & 0,6361 $\pm$ 0,0080 & 0,6901 $\pm$ 0,0062 & 0,6968 $\pm$ 0,0114 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+        FairMLP ($\lambda = 2,0$) & 0,6343 $\pm$ 0,0065 & 0,6889 $\pm$ 0,0077 & 0,6952 $\pm$ 0,0143 & 0,2666 $\pm$ 0,0532 & 0,2233 $\pm$ 0,0230 \\
+        FairMLP ($\lambda = 4,0$) & 0,6346 $\pm$ 0,0069 & 0,6882 $\pm$ 0,0058 & 0,6938 $\pm$ 0,0103 & \textbf{0,2284} $\pm$ 0,0130 & \textbf{0,1972} $\pm$ 0,0349 \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:compas_lambda_sweep}
+\end{table}
+
+Para $\lambda \in \{0,0;\ 0,5;\ 1,0\}$, a RNA converge para exatamente o mesmo patamar de AAOD ($0,2649$) que os \textit{baselines} tradicionais --- sem qualquer avanço de equidade. Somente com $\lambda = 4,0$ observou-se redução relevante: Max AAOD de $0,2649$ para $0,2284$ ($-13,8\%$) e Sensitivity Gap de $0,2298$ para $0,1972$ ($-14,2\%$).
+
+O contraste com o Adult é revelador: enquanto no Adult $\lambda = 2,0$ já produzia ganhos de equidade substanciais, no COMPAS a mesma magnitude não produz efeito. O viés no COMPAS é \textbf{mais profundamente enraizado nos padrões de dados} --- a disparidade estrutural de $19\%$ entre grupos na base bruta cria gradientes de aprendizado que resistem à regularização escalar, fundamentando a necessidade de estratégias de mitigação mais sofisticadas, como o NSGA-II com otimização multiobjetivo.
+
+% ==============================================================================
+\subsection{Caso 3: SINASC (DATASUS) --- Ilusão de Equidade sob Desbalanceamento Severo}
 \label{subsec:caso_sinasc}
 
-No SINASC ($N = 2.474.535$), o desfecho favorável é o peso adequado ($\ge 2.500\text{g}$, $Y = 1$, $90,57\%$), contra o baixo peso ao nascer ($9,43\%$). Mães pretas maduras apresentam risco relativo $48,5\%$ superior de recém-nascidos de baixo peso em relação a mães brancas adultas ($12,91\%$ vs $8,69\%$).
+\subsubsection{A. Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)}
 
-Conforme evidenciado nos \textit{baselines}, o treinamento sob desbalanceamento severo colapsa na solução trivial constante ($100\%$ de predições normais, $\text{ROC-AUC} \approx 0,532$ e $\text{AAOD} = 0,0000$ por negligência). Quando uma Rede Neural é treinada sob uma perda desbalanceada com penalização escalar $\lambda$, o termo de equidade reforça a atração pelo platô degenerado, pois a predição constante já satisfaz as métricas de paridade. Esse achado comprova que o ajuste empírico de um escalar $\lambda$ é insuficiente em bases epidemiológicas reais sem um mecanismo multiobjetivo que impeça a degradação da classe minoritária.
+O SINASC ($N = 2.474.535$) apresenta o mais severo desbalanceamento de classes do conjunto de experimentos: $90,57\%$ dos nascimentos apresentam peso normal (desfecho favorável, $Y=1$), contra apenas $9,43\%$ com baixo peso ($Y=0$, desfecho desfavorável). Esta assimetria extrema cria condições propícias para classificadores triviais (\textit{dummy classifiers}) que predizem sempre a classe majoritária com altíssima acurácia nominal.
 
-% ------------------------------------------------------------------------------
+\begin{table}[H]
+    \centering
+    \caption{Seleção de disparidades de paridade estatística pré-treino por subgrupo (SINASC). Referência: Branca \& Adulta (20-34).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|cccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Subgrupo}} & \textit{N} & \textit{Taxa Favorável} & \textit{Pre-DI} & \textit{Pre-SPD} \\
+        \hline
+        Branca \& Adulta (20-34) & 588.856 & 0,9131 & 1,000 (ref.) & 0,000 \\
+        Amarela \& Adulta (20-34) & 7.753 & 0,9138 & 1,001 & +0,07\% \\
+        Indígena \& Adulta (20-34) & 16.311 & 0,9166 & 1,004 & +0,35\% \\
+        Parda \& Adulta (20-34) & 991.802 & 0,9136 & 1,000 & +0,05\% \\
+        Preta \& Adulta (20-34) & 130.078 & 0,8970 & 0,982 & -1,61\% \\
+        Branca \& Jovem ($<$20) & 68.384 & 0,8936 & 0,979 & -1,95\% \\
+        Indígena \& Jovem ($<$20) & 7.138 & 0,8784 & 0,962 & -3,47\% \\
+        Preta \& Jovem ($<$20) & 20.366 & 0,8788 & 0,962 & -3,43\% \\
+        Parda \& Jovem ($<$20) & 207.038 & 0,8938 & 0,979 & -1,93\% \\
+        Preta \& Madura ($>$34) & 31.961 & 0,8709 & 0,954 & \textbf{-4,22\%} \\
+        Indígena \& Madura ($>$34) & 2.852 & 0,9092 & 0,996 & -0,39\% \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:sinasc_pretrain}
+\end{table}
+
+À primeira vista, as disparidades de Pre-SPD parecem modestas (entre $-4,22\%$ e $+0,35\%$). Contudo, esta aparente moderação é \textbf{estatisticamente enganosa}: uma diferença de $4\%$ na taxa de desfecho favorável, partindo de uma base de $90\%$, representa que mães pretas maduras têm uma probabilidade de \textbf{baixo peso ao nascer quase $50\%$ maior} que mães brancas adultas. O subgrupo de maior vulnerabilidade combinada é \textbf{Preta \& Madura ($>$34)} com Pre-SPD de $-4,22\%$.
+
+O padrão interseccional é clinicamente coerente com a literatura obstétrica: mulheres mais jovens (abaixo de 20 anos) e mais maduras (acima de 34 anos) apresentam consistentemente maiores taxas de baixo peso ao nascer em todas as raças/cores, caracterizando os estratos de risco extremo de idade materna. Mães de raça/cor Preta apresentam as menores taxas favoráveis dentro de cada faixa etária.
+
+\subsubsection{B. Efeitos do Treinamento nos Baselines Tradicionais e Ilusão de Equidade}
+
+Os resultados do SINASC revelam o fenômeno mais crítico dos três experimentos. Random Forest e Gradient Boosting atingiram acurácia de $90,57\%$ e PR-AUC de $0,914$, com Recall de $100\%$, Max Intersectional AAOD de $0,000$ e Sensitivity Gap de $0,000$ --- aparentemente \textbf{equidade perfeita}.
+
+Esta é uma \textbf{ilusão estatística perigosa}. Os modelos aprenderam a predizer \textbf{sempre a classe majoritária (peso normal)}, sem detectar um único caso de baixo peso ao nascer. O ROC-AUC de apenas $0,532$ (marginalmente acima da linha de chance de $0,500$) confirma que os modelos não possuem capacidade discriminativa real. O Recall de $100\%$ reflete que todas as instâncias preditas são positivas --- não há nenhuma predição negativa.
+
+O resultado de $\text{AAOD}=0$ e $\text{Sensitivity Gap}=0$ é consequência direta desse comportamento: quando todos os subgrupos recebem apenas predições positivas, as taxas de erro são identicamente zero para todos. Esta \textbf{paridade trivial} é a manifestação mais insidiosa do viés algorítmico sob desbalanceamento severo: as métricas de equidade tradicionais reportam conformidade inexistente.
+
+\subsubsection{C. Mitigação por Rede Neural Artificial (FairMLP: Variação de $\lambda$)}
+
+Novamente, $\lambda = 0,0$ representa a \textbf{MLP sem mitigação}, reproduzindo o mesmo colapso trivial já observado nos baselines de árvore da Seção B.
+
+\begin{table}[H]
+    \centering
+    \caption{SINASC: Efeito da penalização de viés na FairMLP (lambda sweep).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Configuração}} & \textit{Acurácia} & \textit{ROC-AUC} & \textit{PR-AUC} & \textit{Max AAOD} $\downarrow$ & \textit{Sens. Gap} $\downarrow$ \\
+        \hline
+        \textbf{MLP sem mitigação} ($\lambda = 0,0$) & 0,9057 $\pm$ 0,0000 & 0,5326 $\pm$ 0,0006 & 0,9138 $\pm$ 0,0002 & 0,000 & 0,000 \\
+        FairMLP ($\lambda = 0,5$) & 0,9057 $\pm$ 0,0000 & 0,5323 $\pm$ 0,0008 & 0,9137 $\pm$ 0,0002 & 0,000 & 0,000 \\
+        FairMLP ($\lambda = 1,0$) & 0,9057 $\pm$ 0,0000 & 0,5326 $\pm$ 0,0006 & 0,9138 $\pm$ 0,0002 & 0,000 & 0,000 \\
+        FairMLP ($\lambda = 2,0$) & 0,9057 $\pm$ 0,0000 & 0,5324 $\pm$ 0,0009 & 0,9138 $\pm$ 0,0002 & 0,000 & 0,000 \\
+        FairMLP ($\lambda = 4,0$) & 0,9057 $\pm$ 0,0000 & 0,5323 $\pm$ 0,0010 & 0,9137 $\pm$ 0,0003 & 0,000 & 0,000 \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:sinasc_lambda_sweep}
+\end{table}
+
+A FairMLP reproduz exatamente o mesmo comportamento colapsado dos \textit{baselines} ao longo de todo o espectro de $\lambda$. A penalização de equidade escalar não tem qualquer efeito quando o modelo já atingiu o mínimo trivial de perda ao predizer a classe majoritária. A função $\mathcal{L}_{\text{fairness}}$ não gera gradientes informativos, pois todos os subgrupos recebem o mesmo desfecho predito.
+
+Esta é a limitação fundamental que a presente tese busca superar: \textbf{a penalização escalar de equidade é ineficaz quando o problema de desbalanceamento de classes não é tratado conjuntamente}. A resolução exige uma abordagem de otimização multiobjetivo que simultaneamente considere a penalização de classe e a penalização de equidade --- exatamente o que a arquitetura NSGA-II proposta endereça.
+
+% ==============================================================================
+\subsection{Síntese Comparativa e Fundamentação da Proposta Metodológica}
+\label{subsec:sintese_comparativa}
+
+\begin{table}[H]
+    \centering
+    \caption{Síntese comparativa dos três cenários experimentais.}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|p{2.8cm}|p{4.2cm}|p{4.2cm}}
+        \hline
+        \multicolumn{1}{c|}{\textit{Dataset}} & \textit{Cenário de Falha} & \textit{Manifestação} & \textit{Efeito da FairMLP} \\
+        \hline
+        \textbf{Adult} & Amplificação de viés moderado & Post-DI $=0,174$ para Female \& Black; AAOD $=0,085$ & Mitigação parcial efetiva: $-29,0\%$ AAOD com $\lambda=2,0$ \\
+        \textbf{COMPAS} & Amplificação de viés severo e resistente & AAOD $=0,256$; Sensitivity Gap $=23,1$pp & Resistência estrutural: apenas $\lambda=4,0$ produz $-13,8\%$ AAOD \\
+        \textbf{SINASC} & Ilusão de equidade por colapso trivial & AAOD $=0$ por predição uniforme; ROC-AUC $=0,532$ & Nenhum efeito em qualquer $\lambda$; FairMLP colapsa identicamente \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:synthesis}
+\end{table}
+
+Este conjunto de achados fundamenta empiricamente a proposta metodológica da tese em três dimensões:
+
+\begin{enumerate}
+    \item \textbf{Necessidade de otimização multiobjetivo (NSGA-II):} A relação entre equidade e utilidade preditiva é não-monótona (Adult) e resistente à penalização escalar (COMPAS), tornando a busca de compromissos ótimos de Pareto indispensável.
+    \item \textbf{Necessidade de mitigação integrada de desbalanceamento:} O colapso total no SINASC demonstra que a regularização de equidade é ineficaz sem um componente paralelo que endereça a assimetria de classes --- seja via ponderação de amostras, \textit{oversampling} focado, ou função de perda composta.
+    \item \textbf{Necessidade de métricas auditáveis e interseccionais:} A aparente equidade perfeita do SINASC e o ROC-AUC favorável do Adult seriam suficientes para validar estes modelos em protocolos de avaliação tradicionais, demonstrando que a auditoria interseccional com métricas de pior caso (Max AAOD, Sensitivity Gap, PR-AUC) é condição necessária, não opcional, para sistemas de decisão algorítmica em contextos de alto impacto social.
+\end{enumerate}
+
+% ==============================================================================
 \subsection{Discussão Integrada e Articulação com a Metodologia da Tese}
 \label{subsec:discussao_metodologia}
 
 Os resultados empíricos da RNA fundamentam diretamente a proposta de doutorado:
 \begin{enumerate}
     \item \textbf{Da FairMLP para a Rede Neural Multitarefa com GRL:} \\
-    A \textit{FairMLP} comprovou que a regularização neural funciona, reduzindo a injustiça máxima em até $30\%$. No entanto, ao utilizar um único $\lambda$, ela não desacopla a interação não-linear entre múltiplos atributos sensíveis. A arquitetura multitarefa com gradiente reverso proposta:
+    A \textit{FairMLP} comprovou que a regularização neural funciona no Adult, reduzindo a injustiça máxima em até $30\%$. No entanto, ao utilizar um único $\lambda$ escalar, ela não desacopla a interação não-linear entre múltiplos atributos sensíveis, nem lida com o colapso trivial sob desbalanceamento severo (SINASC). A arquitetura multitarefa com gradiente reverso proposta:
     \begin{equation}
     L_{\text{total}} = L_{\text{task}} - \left( \lambda_1 L_{\text{adv1}} + \lambda_2 L_{\text{adv2}} \right)
     \end{equation}
     permite a calibração desacoplada de $\lambda_1$ (raça) e $\lambda_2$ (gênero) sobre uma representação latente compartilhada.
 
     \item \textbf{Do Sweep Manual para o Algoritmo Evolucionário NSGA-II:} \\
-    Os experimentos comprovaram a existência de patamares inoperantes ($\lambda \le 1.0$ no COMPAS) e pontos de inflexão com perda de sensibilidade ($\lambda = 4.0$ no Adult). O \textbf{NSGA-II} substituirá o \textit{sweep} estático pela busca automática da \textbf{Fronteira de Pareto empírica}:
+    Os experimentos comprovaram a existência de patamares inoperantes ($\lambda \le 1,0$ no COMPAS), pontos de inflexão com perda de sensibilidade ($\lambda = 4,0$ no Adult) e colapso total independente de $\lambda$ (SINASC). O \textbf{NSGA-II} substituirá o \textit{sweep} estático pela busca automática da \textbf{Fronteira de Pareto empírica}:
     \begin{equation}
     \max_{\lambda_1, \lambda_2, \theta} \; \left[ f_1 = \text{PR-AUC}, \quad f_2 = -\text{Max AAOD}, \quad f_3 = -\text{Sensitivity Gap} \right]
     \end{equation}

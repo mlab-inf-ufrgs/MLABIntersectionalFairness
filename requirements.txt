@@ -14,5 +14,3 @@ folktables
 
 google-cloud-storage
 pyarrow
-
-torch
