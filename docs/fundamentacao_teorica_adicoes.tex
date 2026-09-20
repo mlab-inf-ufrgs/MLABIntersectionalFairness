@@ -1,0 +1,194 @@
+% ==============================================================================
+% CONTEÚDO CONCEITUAL MOVIDO DE "TRABALHOS RELACIONADOS" PARA "FUNDAMENTAÇÃO TEÓRICA"
+% Gerado por reorganização automática — conteúdo preservado verbatim do original,
+% apenas com títulos de (sub)seção, \label novos, e remoção de \newpage
+% (que eram específicos da paginação do capítulo de origem).
+%
+% ATENÇÃO: seu capítulo de Fundamentação Teórica já parece ter \label{sec:metricas}
+% e \label{sec:sdoh} definidos em outro lugar (são referenciados a partir de
+% Trabalhos Relacionados). Os labels abaixo foram escolhidos para NÃO colidir com
+% esses — ajuste os nomes se preferir reaproveitar/unificar com seções existentes.
+% ==============================================================================
+
+\section{Métricas de Desempenho e de Equidade Algorítmica}
+\label{sec:metricas_desempenho_equidade}
+
+Matematicamente, a AUROC expressa a probabilidade de um classificador pontuar uma instância positiva aleatória ($X^+$) acima de uma negativa aleatória ($X^-$) \cite{hanley1982meaning}, sendo calculada pela integral da Taxa de Verdadeiros Positivos ($\text{TPR}$) em função da Taxa de Falsos Positivos ($\text{FPR}$) ao longo de todos os limiares de decisão $\tau \in $:
+\begin{equation}
+\text{AUROC} = \int_{0}^{1} \text{TPR}(\tau) \, d(\text{FPR}(\tau)) = P(\hat{S}(X^+) > \hat{S}(X^-))
+\end{equation}
+onde $\hat{S}(x)$ representa o escore contínuo ou probabilidade predita pelo modelo \cite{bradley1997use}. O uso da AUROC como métrica de desempenho em cenários que incluem populações minoritárias pode mascarar disparidades nos resultados, conforme demonstrado por \citet{davis2006relationship} e \citet{saito2015precision}, pois um grande contingente de verdadeiros negativos na classe majoritária mantém a taxa de falsos positivos artificialmente comprimida.
+
+As métricas de desempenho clássicas derivam da matriz de confusão binária entre a classe real $Y \in \{0, 1\}$ e a predição $\hat{Y} \in \{0, 1\}$ \cite{sokolova2009systematic}:
+\begin{itemize}
+    \item \textbf{Verdadeiros Positivos (TP, \emph{True Positives}):} instâncias positivas corretamente classificadas ($\hat{Y} = 1 \mid Y = 1$);
+    \item \textbf{Verdadeiros Negativos (TN, \emph{True Negatives}):} instâncias negativas corretamente classificadas ($\hat{Y} = 0 \mid Y = 0$);
+    \item \textbf{Falsos Positivos (FP, \emph{False Positives}):} instâncias negativas incorretamente classificadas como positivas ($\hat{Y} = 1 \mid Y = 0$, erro Tipo I);
+    \item \textbf{Falsos Negativos (FN, \emph{False Negatives}):} instâncias positivas incorretamente classificadas como negativas ($\hat{Y} = 0 \mid Y = 1$, erro Tipo II).
+\end{itemize}
+A partir desses componentes, a Acurácia Geral, também muito utilizada pelos trabalhos selecionados, é definida pela proporção total de decisões corretas sobre o universo $N$:
+\begin{equation}
+\text{Acurácia} = \frac{\text{TP} + \text{TN}}{\text{TP} + \text{TN} + \text{FP} + \text{FN}} = \frac{\text{TP} + \text{TN}}{N}
+\end{equation}
+
+Entretanto, a acurácia deve ser interpretada com cautela em conjuntos de dados desbalanceados. Nessa situação, um classificador que prediz sistematicamente a classe majoritária pode obter uma acurácia elevada sem identificar adequadamente a classe minoritária \cite{he2009learning}. Consequentemente, recomenda-se complementar a acurácia com métricas sensíveis aos diferentes tipos de erro.
+
+Alguns trabalhos escolheram métricas mais informativas, como a Acurácia Balanceada e a Área sob a Curva Precisão-Revocação (AUPRC, \emph{Area Under Precision-Recall Curve}). A Acurácia Balanceada compensa a assimetria amostral ao ponderar equitativamente a sensibilidade e a especificidade \cite{brodersen2010balanced}:
+\begin{equation}
+\text{Acurácia Balanceada} = \frac{\text{TPR} + \text{TNR}}{2} = \frac{1}{2} \left( \frac{\text{TP}}{\text{TP} + \text{FN}} + \frac{\text{TN}}{\text{TN} + \text{FP}} \right)
+\end{equation}
+enquanto a AUPRC calcula a integral da curva relacionando Precisão ($\text{TP} / (\text{TP} + \text{FP})$) e Revocação ($\text{TPR}$)\cite{davis2006relationship}:
+\begin{equation}
+\text{AUPRC} = \int_{0}^{1} \text{Precisão}(R) \, dR
+\end{equation}
+concentrando a avaliação estritamente na capacidade de recuperar instâncias da classe minoritária positiva, sem sofrer o amortecimento causado pelo volume de verdadeiros negativos \cite{saito2015precision}.
+
+Por fim, em um menor número de trabalhos, também foram utilizadas métricas orientadas à comparação direta entre subgrupos populacionais, com base nas taxas de erro derivadas da matriz de confusão:
+\begin{gather}
+\text{Taxa de Verdadeiros Positivos (TPR)} = \frac{\text{TP}}{\text{TP} + \text{FN}} \\[8pt]
+\text{Taxa de Falsos Negativos (FNR)} = \frac{\text{FN}}{\text{TP} + \text{FN}} = 1 - \text{TPR} \\[8pt]
+\text{Taxa de Falsos Positivos (FPR)} = \frac{\text{FP}}{\text{FP} + \text{TN}} \\[8pt]
+\text{Taxa de Verdadeiros Negativos (TNR)} = \frac{\text{TN}}{\text{TN} + \text{FP}} = 1 - \text{FPR} \\[8pt]
+\text{Taxa de Descoberta Falsa (FDR)} = \frac{\text{FP}}{\text{TP} + \text{FP}} = 1 - \text{Precisão} \\[8pt]
+\text{Taxa de Omissão Falsa (FOR)} = \frac{\text{FN}}{\text{TN} + \text{FN}}
+\end{gather}
+Nesse contexto, a equidade algorítmica entre subgrupos é quantificada pelas assimetrias absolutas ou relativas observadas nestas taxas entre os recortes demográficos.
+
+\section{Otimização Multiobjetivo e Fronteira de Pareto}
+\label{sec:moop_pareto}
+
+Um cenário com múltiplos objetivos conflitantes, como o que encontramos aqui, configura um problema de otimização multiobjetivo. Diferentemente da otimização simples, na qual se busca maximizar ou minimizar uma única função, a otimização multiobjetivo considera simultaneamente um conjunto de funções objetivo potencialmente conflitantes. Formalmente, seja $X$ o espaço de soluções factíveis, seja $x \in X$ uma solução candidata e seja
+$\mathbf{f}(x) = (f_1(x), f_2(x), \ldots, f_k(x))$ o vetor de objetivos
+associado a essa solução. O problema pode ser representado, sem perda
+de generalidade, como:
+
+\begin{equation}
+    \min_{x \in X} \mathbf{f}(x)
+    =
+    \min_{x \in X}
+    \left(f_1(x), f_2(x), \ldots, f_k(x)\right).
+\end{equation}
+
+Nesse contexto, $X$ corresponde ao espaço de decisão, formado pelas
+configurações ou modelos que podem ser considerados, enquanto
+$\mathbf{f}(x)$ representa o resultado de cada configuração no espaço
+de objetivos. Como os objetivos são, em geral, conflitantes, não se
+espera necessariamente a existência de uma solução que seja
+simultaneamente ótima em todas as dimensões. Em vez disso, a análise
+busca identificar soluções eficientes, isto é, soluções para as quais
+não seja possível melhorar um objetivo sem provocar a deterioração de
+pelo menos um dos demais. Essa formulação é tradicionalmente associada
+à teoria da otimização multiobjetivo e ao conceito de eficiência de
+Pareto \cite{pareto1964cours}.
+
+Para formalizar essa relação, considere inicialmente o caso de
+objetivos a serem minimizados. Uma solução $x^{(1)} \in X$ domina uma
+solução $x^{(2)} \in X$ quando:
+
+\begin{equation}
+    f_i\left(x^{(1)}\right)
+    \leq
+    f_i\left(x^{(2)}\right)
+    \quad
+    \text{para todo } i \in \{1,\ldots,k\},
+\end{equation}
+
+e
+
+\begin{equation}
+    f_j\left(x^{(1)}\right)
+    <
+    f_j\left(x^{(2)}\right)
+    \quad
+    \text{para pelo menos um } j.
+\end{equation}
+
+Em outras palavras, $x^{(1)}$ é pelo menos tão boa quanto
+$x^{(2)}$ em todos os objetivos e estritamente melhor em pelo menos
+um deles. Uma solução é denominada não dominada quando não existe
+outra solução factível que a domine. O conjunto de todas as soluções
+não dominadas no espaço de decisão é denominado conjunto
+Pareto-ótimo, ou conjunto eficiente. A imagem desse conjunto no
+espaço de objetivos constitui a Fronteira de Pareto:
+
+\begin{equation}
+    \mathcal{P}
+    =
+    \left\{
+        x \in X \,\middle|\,
+        \nexists\, x' \in X
+        \text{ tal que }
+        \mathbf{f}(x') \preceq \mathbf{f}(x)
+        \text{ e }
+        \mathbf{f}(x') \neq \mathbf{f}(x)
+    \right\},
+\end{equation}
+
+\begin{equation}
+    \operatorname{PF}
+    =
+    \left\{
+        \mathbf{f}(x) \mid x \in \mathcal{P}
+    \right\}.
+\end{equation}
+
+A Fronteira de Pareto não corresponde, portanto, a uma única solução
+ótima, mas a um conjunto de soluções que expressam diferentes
+compromissos entre os objetivos. Cada ponto da fronteira representa
+uma solução para a qual uma melhoria em pelo menos um objetivo exige
+a piora de outro, dadas as restrições e o conjunto de soluções
+considerados. A escolha de uma solução específica entre essas
+alternativas depende de preferências normativas ou operacionais, como
+a prioridade atribuída à equidade, ao desempenho global, à proteção
+de determinados grupos ou à imposição de limites mínimos de
+desempenho \cite{miettinen1999nonlinear,deb2015multi}.
+
+No contexto desta pesquisa, as funções objetivo podem representar,
+por exemplo, uma medida de erro ou desempenho preditivo e uma ou mais
+medidas de injustiça algorítmica. Se o desempenho for maximizado e a
+injustiça minimizada, o problema pode ser representado como:
+
+\begin{equation}
+    \max_{x \in X}
+    \left(
+        D(x),
+        -I_{g_1}(x),
+        -I_{g_2}(x),
+        \ldots,
+        -I_{g_m}(x)
+    \right),
+\end{equation}
+
+em que $D(x)$ representa o desempenho do modelo e
+$I_{g_r}(x)$ representa a injustiça medida para o grupo ou dimensão
+$g_r$. A utilização do sinal negativo converte a minimização da
+injustiça em maximização, permitindo representar todos os objetivos
+na mesma direção.
+
+Uma solução será preferível a outra, segundo a relação de dominância,
+somente quando apresentar desempenho pelo menos tão alto e injustiça
+pelo menos tão baixa, com melhoria estrita em uma dessas dimensões.
+Modelos que não forem dominados constituem alternativas eficientes
+para a análise, ainda que nenhum deles seja superior em todos os
+objetivos.
+
+O fenômeno pode, assim, ser compreendido por meio de uma Fronteira de
+Pareto definida sobre a relação entre equidade e desempenho. Em cenários com múltiplos atributos sensíveis, a análise pode incluir simultaneamente métricas referentes a diferentes grupos e grupos interseccionais. Nesse caso, a fronteira pode revelar que uma solução não dominada globalmente
+ainda produz perdas desproporcionais para uma população específica. Dado um conjunto de objetivos conflitantes, a Fronteira de Pareto indica os limites teóricos da relação entre eles, permitindo visualizar o quanto a melhora de um objetivo prejudica os demais, bem como selecionar modelos com perdas toleráveis e ganhos significativos em cada objetivo. Pode-se chegar a fronteiras com diferentes formatos, e deslocadas em relação a um ou mais objetivos.
+
+Por essa razão, a identificação de soluções não dominadas não elimina
+a necessidade de julgamento substantivo sobre quais compromissos são
+aceitáveis; ela apenas organiza as alternativas que não podem ser
+descartadas por dominância. A seleção final entre essas alternativas
+deve considerar os objetivos da aplicação, as restrições de desempenho,
+os riscos associados aos diferentes grupos e os critérios normativos
+adotados na pesquisa.
+
+\section{Supervisão Humana e Marcos Regulatórios em IA na Saúde}
+\label{sec:supervisao_humana}
+
+Nas diretrizes internacionais propostas pela Organização Mundial de Saúde em \citeyear{who2021ethics}, a autonomia humana ocupa o lugar de princípio fundamental, junto a outros como segurança, transparência e interpretabilidade. O documento determina que humanos devem manter o controle sobre os sistemas de saúde e as decisões médicas, de forma que a IA deve ser restrita a uma ferramenta de apoio. Estas diretrizes apontam para o conceito de \textit{human-in-the-loop}, que mantém o especialista humano no ciclo de tomada de decisão \cite{who2021ethics}.
+
+Embora a regulamentação da IA ainda esteja em estágio inicial em boa parte do mundo, a intervenção humana tende a se manter como necessidade obrigatória, especialmente em domínios sensíveis como a saúde. A legislação da União Europeia já inclui modelos clínicos de IA na categoria de alto risco, para a qual a supervisão humana efetiva dos resultados dos modelos é obrigatória. Essa exigência inclui a possibilidade de intervenção de um supervisor, com o objetivo de prevenir ou minimizar os riscos à saúde, à segurança ou aos direitos fundamentais que possam surgir \cite{eu2024aiact}.
+
+No Brasil, a Lei Geral de Proteção de Dados também já assegura o direito à revisão de decisões tomadas unicamente com base em tratamento automatizado de dados que afetem os interesses dos titulares \cite{brasil2018lgpd}. Mesmo que exista um padrão ouro para decisões de projeto no futuro, manter a agência humana sobre as decisões clínicas é indispensável. Os modelos de AM precisar fornecer informações e recomendações de forma a dar suporte à decisão humana, mas não a substitui-la. Consequentemente, as exigências de transparência e interpretabilidade dos modelos de AM e seus resultados também se tornam maiores, para viabilizar a tomada de decisão adequadamente qualificada.

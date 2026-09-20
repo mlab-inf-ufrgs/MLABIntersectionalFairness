@@ -1,0 +1,474 @@
+\chapter{Trabalhos Relacionados}
+
+% artigos que abordam temas e problemas similares, discutindo apenas os objetivos/metodologias/resultados, sem entrar em definições conceituais.
+
+\section{Panorama geral dos vieses em saúde}\label{sec:panorama}
+% A revisão precisa estar integrada (uma revisão só)
+%1a etapa - compreender os vieses na saúde e os principais métodos de mitigação
+
+Iniciamos a revisão de literatura com o objetivo de caracterizar os principais tipos de vieses em modelos de AM na área da saúde. Foram incluídos trabalhos que desenvolveram ou validaram modelos de AM para prever desfechos relacionados à saúde e que identificaram, quantitativa ou qualitativamente, o problema do viés em seus modelos, avaliando seu impacto ou propondo estratégias de mitigação. As palavras-chave foram definidas de acordo com estas considerações e usadas para busca
+nas bases de dados bibliográficas Embase\footnote{\url{https://www.elsevier.com/products/embase}}, PubMed\footnote{\url{https://pubmed.ncbi.nlm.nih.gov/}} e DBLP\footnote{\url{https://dblp.org/}} por artigos publicados de 1 de janeiro de 2020 a 26 de outubro de 2022. Os termos de busca e os artigos selecionados estão disponíveis em repositório público \footnote{ \url{https://chasquebox.ufrgs.br/public/e7bdd6}}.
+
+Foram incluídos tanto artigos de periódicos quanto artigos completos em anais de conferências, bem como a literatura cinza, composta por estudos não revisados por pares no momento da coleta. A inclusão de literatura cinza ocorreu na forma de preprints indexados na Europe PMC e na categoria de ciência da computação no ArXiv,  que é indexada pelo DBLP. Foram incluídos tanto problemas de classificação quanto de regressão, sem restrições quanto aos dados de entrada, abrangendo trabalhos com dados tabulares, imagem médica, informações de áudio ou vídeo, dentre outras mídias. Além de informações sobre a caracterização do problema, do tipo de viés e dos algoritmos utilizados, também foram coletadas informações sobre as estratégias de interpretabilidade e explicabilidade usadas, considerando seu potencial para compreensão de como os modelos aprendem e como podem incorporar vieses às suas predições.
+
+De um total de 4760 artigos encontrados na busca inicial, um conjunto de 56 atendiam a todos os critérios de inclusão. A análise deste grupo de publicações mostrou um cenário bastante diverso e heterogêneo de metodologias, com forte predominância de aplicações de diagnóstico ou prognóstico de pacientes e um número crescente de trabalhos realizados por ano. Os resultados foram publicados previamente
+%na forma de uma Revisão Rápida inspirada no framework PRISMA \cite{page2021prisma}, apresentada no 25º Simpósio Brasileiro de Computação Aplicada à Saúde
+\cite{de2025justicca}.
+
+Aqui, apresentamos as principais lacunas encontradas nos trabalhos, agrupadas por etapa do ciclo de vida dos modelos de AM. Na etapa inicial, de \textbf{Formulação do Problema}, encontramos três falhas críticas. A primeira é a ausência de um padrão ouro para decisões de projeto relacionadas às compensações entre desempenho e justiça. Não há uma métrica universal para avaliação de justiça, mas sim várias propostas de métricas, que impactam a qualidade dos resultados e possuem conflitos teóricos entre si, não podendo ser satisfeitas simultaneamente. De maneira semelhante, não existe uma estratégia de mitigação de viés aplicável a qualquer cenário. Diferentes estratégias oferecem diferentes vantagens e desvantagens, cujos efeitos representam riscos e benefícios que dependem do contexto da aplicação de saúde  \cite{alday2022age,mosteiro2022bias,park2021comparison,yuan2021assessing}.
+
+As métricas de justiça também possuem compensações inevitáveis com as métricas de desempenho. O teorema da impossibilidade (Seção \ref{sec:metricas}) prova a existência destas compensações, embora a extensão de sua manifestação a partir do uso de abordagens de equidade algorítmica no treinamento de modelos preditivos clínicos ainda seja pouco conhecida. Pfohl, Foryciarz \& Shah (\citeyear{pfohl2021empirical}) realizaram um estudo empírico de destaque na aplicação de estratégias de regularização, caracterizando de forma robusta o impacto da penalização de violações da equidade de grupo. Os autores demonstraram que penalizar as diferenças nas distribuições das predições entre os grupos induz uma degradação quase universal nas métricas de desempenho, embora com efeitos bastante heterogêneos, incluindo variações vinculadas a conjuntos de dados, resultados, atributos sensíveis, definições de grupo e estratégias de regularização.
+
+A ausência de um padrão ouro leva à tomada de decisão arbitrária. Neste contexto, os efeitos heterogêneros observados por Pfohl, Foryciarz \& Shah (\citeyear{pfohl2021empirical}) constituem um obstáculo à estabilidade e reprodutibilidade dos resultados. Esta barreira poderia ser contornada através da definição de métricas específicas e intervalos de compensação fixos. Por exemplo, determinar um percentual específico de perda tolerável para a métrica de acurácia em troca de um percentual mínimo de ganho na métrica de justiça. Porém, isso leva à segunda lacuna na etapa de Formulação do Problema: limiares estáticos ou decisões automáticas sobre estes aspectos de projeto podem implicar em problemas éticos.
+
+A relação entre problemas clínicos e os determinantes sociais da saúde é complexa (Seção \ref{sec:sdoh}), de forma que as melhores soluções de compromisso entre desempenho e justiça podem sofrer grandes variações para diferentes problemas clínicos.
+Automatizar a resolução do conflito entre desempenho e justiça remove a possibilidade de ponderação contextual que a decisão ética exige. O custo humano do erro de um modelo varia drasticamente de acordo com a sua finalidade, podendo representar problemas que incluem erros diagnósticos, atraso ou negação na admissão hospitalar ou em unidades de terapia intensiva, prescrição equivocada de tratamentos, dentre outros. Os equívocos neste tipo de tentativa de mitigação de viés social podem até acarretar, posteriormente, a introdução de viés de automação e viés de feedback na etapa de \textbf{Pós-processamento e Uso}.
+
+% [MOVIDO PARA FUNDAMENTAÇÃO TEÓRICA — Seção "Supervisão Humana e Marcos Regulatórios em IA na Saúde", \label{sec:supervisao_humana}]
+% Bloco original: 3 parágrafos sobre diretrizes da OMS (who2021ethics), EU AI Act (eu2024aiact) e LGPD (brasil2018lgpd).
+Este cenário de riscos éticos motiva os marcos regulatórios e princípios de supervisão humana discutidos na Seção~\ref{sec:supervisao_humana} (diretrizes da OMS, EU AI Act e LGPD), que reforçam a exigência de manter a agência humana sobre as decisões clínicas mesmo diante de eventuais avanços técnicos na definição de padrões ouro de equidade.
+
+A terceira lacuna presente na etapa de Formulação do Problema dos trabalhos é a predominância de abordagens de justiça com foco em apenas um atributo sensível, geralmente binário. Embora esta seja a alternativa mais simples e esteja fundamentada no uso das métricas de justiça tradicionalmente estabelecidas, ela possui fortes limitações. A própria noção de justiça de grupo já implica a pressuposição de que os grupos representados em atributos categóricos são construções bem definidas que correspondem a populações homogêneas, um equívoco que pode marginalizar ainda mais os grupos que não são bem representados por estes atributos. Por exemplo, estudos que foquem apenas no sexo como atributo sensível e considerem apenas homem e mulher como valores possíveis ignoram todas as variações biológicas e relacionadas a identidade de gênero que fogem dessa representação \cite{park2022fairness}. Além disso, ao abordar cada atributo de forma independente, os atributos sensíveis são tratados como construções abstratas e intercambiáveis, sem levar em consideração as diferenças contextuais entre eles \cite{pfohl2021empirical}.
+
+Estas abordagens de justiça que consideram os atributos sensíveis de forma individual, independente e isolada, predominam na literatura atual. Contudo, a interação entre sistemas de opressão gera efeitos sociais próprios e formas únicas de discriminação \cite{crenshaw2022demarginalizing,buolamwini2018gender}. Portanto, as estratégias de promoção de equidade hoje tendem a gerar modelos que desconsideram as desigualdades únicas experienciadas por pessoas pertencentes a mais de um grupo protegido, para os quais a discriminação do modelo pode ser exacerbada. Mesmo abordagens que oferecem ganhos de justiça de maneira global tendem a mascarar vieses interseccionais, sendo insuficientes para abordar a influência das hierarquias sociais sobre os modelos.
+
+Estes casos configuram o que se chama de \textit{gerrymandering} de justiça, quando um modelo pode parecer justo ao observar os resultados para os atributos sensíveis separadamente, mas ao mesmo tempo, mostrar preconceitos graves contra subgrupos definidos pela interseção dessas identidades \cite{kearns2018preventing}. Dentre os estudos selecionados na revisão, \citet{seyyed2021underdiagnosis} se destaca ao detalhar esse viés cumulativo na prática. O estudo mostra mulheres hispânicas mais subdiagnosticadas do que mulheres brancas, por exemplo, dentre outros grupos interseccionais proporcionalmente mais prejudicados do que os pertencentes a somente uma população vulnerável. Trata-se de uma prova de que análises que não consideram mais de um atributo sensível, mesmo com ganhos na justiça global, ainda podem mascarar o viés algorítmico.
+
+Na etapa de \textbf{Coleta de Dados}, que ocorre após a Formulação do Problema, os trabalhos confirmam e reforçam a introdução frequente de vieses. A escassez de dados sobre populações não-caucasianas em dados biomédicos — fruto dos vieses histórico e de representação — resulta em modelos de AM com performance inferior para esses grupos \cite{afrose2022subpopulation,burlina2021addressing,gao2020deep,roosli2022peeking}. A introdução de viés de anotação por meio da subjetividade dos profissionais de saúde também gera impactos mensuráveis na qualidade dos prontuários clínicos, e consequentemente, nos resultados dos modelos \cite{afshar2022development}.
+
+Outra fonte de viés social é o uso de resultados de testes laboratoriais ou diagnósticos como \textit{proxy} para o prontuário do paciente, tendo em vista que a revisão dos prontuários completos pode ser proibitivamente cara. As disparidades no atendimento clínico levam a diferenças nas taxas de testagem para determinadas doenças em diferentes populações, que por sua vez podem levar a subnotificação em grupos vulneráveis. Há uma prática comum de atribuir rótulos negativos para pacientes não testados, para evitar que a sua remoção reduza demais o tamanho de amostra do modelo. Contudo, essa prática gera distorções, pois implica na presunção equivocada de que a ausência de teste equivale à ausência da doença \cite{chang2208disparate}. Segundo nossa taxonomia do viés social, é um caso de viés de medição.
+
+Outra exemplo de situação que pode resultar na introdução de viés de medição é quando o padrão ouro existente na prática clínica não é levado em consideração na coleta de dados. Os bancos de dados de imagens dermatológicas muitas vezes rotulam as amostras apenas pela avaliação de especialistas baseadas em fotografias, sem acesso ao histórico do paciente nem confirmação histopatológica do diagnóstico. Essa prática introduz um ruído que pode afetar desproporcionalmente minorias, especialmente os pacientes de pele mais escura \cite{daneshjou2022disparities}. Além disso, existem casos clínicos em que não existe um padrão ouro para avaliação da condição em questão, como no caso da predição de efeitos colaterais a medicamentos por exemplo \cite{chandak2020using}, o que agrega complexidade ao problema.
+
+Dos 56 trabalhos selecionados, 27 traziam alguma proposta ou avaliação de métodos para mitigação de viés. Como pode ser visto nas Tabelas \ref{tab:mitigacao_pre}, \ref{tab:mitigacao_in} e \ref{tab:mitigacao_pos}, as abordagens são diversas, mas majoritariamente aplicadas antes ou durante o treinamento dos modelos. As estratégias de mitigação reportadas enfrentam diversas limitações. Considerando as abordagens aplicadas na fase de \textbf{Pré-processamento}, métodos eficazes para grupos isolados (como reponderação e balanceamento via amostragem, por exemplo) podem ser insuficientes em conjuntos de dados com diversidade inerentemente baixa, por exemplo.
+
+\citet{afrose2022subpopulation} criticam os métodos mais modernos de sub e superamostragem por suas limitações ao lidar com amostras interseccionais. Eles propuseram uma estratégia de mitigação híbrida que inclui superamostragem incremental e seletiva da classe minoritária combinada com a customização de modelos, em uma tentativa de combater as limitações nos métodos disponíveis. \citet{burlina2021addressing} também tentam superar esses desafios por meio da geração de amostras sintéticas usando redes adversariais generativas. Ambos os estudos evidenciam que métodos globais de balanceamento são insuficientes para corrigir disparidades em saúde, demandando arquiteturas de dados mais complexas.
+
+
+\newpage
+\begin{longtable}{p{3cm}|p{11cm}}%|p{8cm}|p{1.5cm}|}
+\caption{Estratégias de Mitigação de Viés Pré-processamento (2020-2022)} \label{tab:mitigacao_pre} \\
+
+% --- Cabeçalho ---
+\hline
+%\multicolumn{1}{c|}{\textit{Etapa}} &
+\multicolumn{2}{c}{\textit{Pré-processamento}} \\ \hline
+\multicolumn{1}{c|}{\textit{Abordagem}} & \multicolumn{1}{c}{\textit{Estratégia}} %& \multicolumn{1}{c}{\textit{Ref.}}
+\\ \hline
+Balanceamento de dados &
+Superamostragem para compensar a desproporção da classe minoritária \cite{zarei2022machine}.\\
+\cline{2-2}
+& Garantia de diversidade demográfica e divisão de dados independente por participante \cite{han2022sounds}. \\
+\hline
+Reclassificação de amostras & Re-rotulagem seletiva para correção de prevalência \cite{seker2022preprocessing}. \\
+\hline
+Reponderação &
+Ponderação de amostras por estratos demográficos \cite{allen2020racially}. \\
+\hline
+Escore de propensão & Uso de Bagging de Árvores de Classificação para estimar o escore de propensão e estratificar amostras, removendo o viés de confusão \cite{otok2020propensity}.\\
+\cline{2-2}
+& Uso de Random Forest para gerar escores de propensão e criar coortes balanceadas \cite{chandak2020using}.\\
+\hline
+Aumento de dados &
+Uso de métodos generativos para gerar imagens sintéticas de retinas com pigmentação mais escura (grupo sub-representado) \cite{burlina2021addressing}. \\
+\hline
+Transformação de dados &
+Extração e representação de sub-formas de onda de eletrocardiograma para corrigir falsos negativos do modelo base \cite{honarvar2022enhancing}. \\
+\cline{2-2}
+& Uso do algoritmo Disparate Impact Remover (DIR) para modificação dos atributos, removendo a correlação com as variáveis sensíveis antes do treino \cite{park2022fairness}. \\
+\hline
+Engenharia \newline de atributos & Inclusão de variáveis moderadoras contextuais \cite{cohen2022natural}. \\
+\hline
+\multicolumn{2}{l}{\small Fonte: Elaborado pela autora.} \\ % Adicionado para seguir o padrão da imagem
+\end{longtable}
+
+\newpage
+
+
+\begin{longtable}{p{2.5cm}|p{11.5cm}}%|p{8cm}|p{1.5cm}|}
+\caption{Estratégias de Mitigação de Viés Em-processamento (2020-2022)} \label{tab:mitigacao_in} \\
+\hline
+\multicolumn{2}{c}{\textit{Em-processamento}} \\ \hline
+\hline
+\multicolumn{1}{c|}{\textit{Abordagem}} & \multicolumn{1}{c}{\textit{Estratégia}} %& \textbf{Ref.}
+\\ \hline
+Regularização &
+Introdução de termo de penalização na função de custo para minimizar diferenças de desempenho entre grupos durante o treinamento \cite{alday2022age}. \\
+\cline{2-2}
+& Adição de termos de regularização à função de custo para penalizar violações de justiça \cite{pfohl2021empirical} \\
+\cline{2-2}
+& Acréscimo de termo de regularização baseado em um gargalo de informação, forçando o desemaranhamento de representações ligadas ao viés e o emaranhamento de representações da classe alvo \cite{tartaglione2021end}. \\
+\cline{2-2}
+& Uso de Redes Neurais Recorrentes (RNNs) com regularização baseada em Informação Mútua para separar %(desemaranhar) confundidores variáveis no tempo das representações preditivas de desfecho
+\cite{chu2022disentangled}. \\
+\hline
+Ajuste fino & Ajuste de modelos pré-treinados utilizando um conjunto de dados representativo \cite{daneshjou2022disparities}. \\
+\cline{2-2}
+& Investigação do impacto da escolha das sementes aleatórias na maximização de equidade \cite{amir2021impact}. \\
+\hline
+Treinamento adversarial & Rede Generativa Adversarial modificada para forçar o encoder a aprender representações estatisticamente independentes do atributo sensível \cite{adeli2021representation}. \\
+\cline{2-2}
+& Uso de coorte condicionada pela saída para derivar atributos que são condicionalmente independentes da variável de confusão \cite{zhao2020training}. \\
+\hline
+Transferência de aprendizado & Uso de modelos pré-treinados em grupos majoritários (fonte) com posterior ajuste fino ou adaptação de domínio para grupos minoritários (alvo) \cite{gao2020deep}. \\
+\hline
+Reforço &
+Definição de uma função de recompensa ponderada pela frequência dos grupos sensíveis para agentes de Aprendizado por Reforço priorizarem equidade
+\cite{yang2022algorithmic}.
+\\ \hline
+Modelagem Customizada &
+Adoção de Filtros de Kalman que priorizam a trajetória individual do paciente em vez da média populacional \cite{zhalechian2022augmenting}. \\
+\hline
+\multicolumn{2}{l}{\small Fonte: Elaborado pela autora.} \\ % Adicionado para seguir o padrão da imagem
+\end{longtable}
+
+\newpage
+
+\begin{longtable}{p{3cm}|p{11cm}}%|p{8cm}|p{1.5cm}|}
+\caption{Estratégias de Mitigação de Viés Pós-processamento ou Híbrido (2020-2022)} \label{tab:mitigacao_pos} \\
+\hline
+\multicolumn{2}{c}{\textit{Pós-processamento}} \\ \hline
+\multicolumn{1}{c|}{\textit{Abordagem}} & \multicolumn{1}{c}{\textit{Estratégia}} %& \textbf{Ref.}
+\\ \hline
+Recalibração de Grupo &
+Ajuste das curvas de risco para subgrupos, para garantir calibração local \cite{foryciarz2022evaluating} \\ \hline
+
+\multicolumn{2}{c}{\textit{Híbridos}} \\
+\hline
+\multicolumn{1}{c|}{\textit{Abordagem}} & \multicolumn{1}{c}{\textit{Estratégia}} %& \textbf{Ref.}
+\\ \hline
+Pré \newline \& & Aplicação de reponderação e regularização via termo de penalização \cite{mosteiro2022bias} \\
+\cline{2-2}
+Em-processamento & Comparação entre remoção de atributos sensíveis, reponderação e regularização via termo de penalização \cite{park2021comparison}. \\
+\hline
+Pré \newline \& Pós- & Remoção de Features, Sobreamostragem e Ajuste de Limiar \cite{yuan2021assessing}. \\
+\cline{2-2}
+processamento & Superamostragem com Double Prioritized Bias Correction, calibração de probabilidades e ajuste de limiares \cite{afrose2022subpopulation}. \\
+\cline{2-2}
+& Comparação entre Debiased Word Embeddings e Equalized Odds Post-processing \cite{chen2020exploring}. \\
+\hline
+\multicolumn{2}{l}{\small Fonte: Elaborado pela autora.} \\ % Adicionado para seguir o padrão da imagem
+\end{longtable}
+
+A ausência de informações sobre atributos protegidos em bancos de dados de imagem médica também constitui uma barreira importante,  sendo um exemplo de viés de variável omitida introduzido no pré-processamento \cite{beheshtian2022generalizability,larrazabal2020gender,seyyed2020chexclusion}. Além disso, as compensações entre desempenho e justiça também podem ser afetadas pela aleatoriedade no particionamento dos dados, bem como pela natureza estocástica de uma parte considerável dos modelos de AM. \citet{amir2021impact} mostram que a justiça dos modelos é impactada inclusive pela escolha das sementes aleatórias. Mudanças em hiperparâmetros ao longo do pipeline podem tanto reduzir quanto exacerbar essa instabilidade estocástica.
+
+Na etapa de \textbf{Criação do modelo}, a maioria dos trabalhos selecionados utilizou aprendizado tradicional ou aprendizado profundo, com pouca representatividade de outros paradigmas. Os trabalhos com aprendizado tradicional apresentaram muita variedade de tipos de dados e métodos usados, sendo mais frequentes os algoritmos \emph{Logistic Regression} e \emph{Random Forest}. Já dentre os trabalhos usando aprendizado profundo, houve uma predominância de estudos focados em imagem médica, com a maioria dos trabalhos usando redes convolucionais com dados não textuais (radiografias, eletrocardiogramas, dados de ressonância magnética e vídeos, dentre outros).
+
+Dentre os 56 trabalhos analisados, a grande maioria usou a métrica Área Sob a Curva Característica de Operação do Receptor (AUROC, \emph{Area Under Receiver Operating Characteristic Curve}) na avaliação de desempenho.
+% [MOVIDO PARA FUNDAMENTAÇÃO TEÓRICA — Seção "Métricas de Desempenho e de Equidade Algorítmica", \label{sec:metricas_desempenho_equidade}]
+% Bloco original: definição matemática da AUROC (Eq. 3.1), matriz de confusão (TP/TN/FP/FN),
+% Acurácia, ressalva sobre acurácia em bases desbalanceadas, Acurácia Balanceada, AUPRC, e o
+% bloco de taxas TPR/FNR/FPR/TNR/FDR/FOR usadas para quantificar equidade entre subgrupos.
+As definições formais da AUROC, da matriz de confusão e das demais métricas de desempenho e de equidade entre subgrupos (Acurácia, Acurácia Balanceada, AUPRC, TPR, FNR, FPR, TNR, FDR e FOR) usadas para caracterizar os trabalhos revisados encontram-se na Seção~\ref{sec:metricas_desempenho_equidade}.
+
+Alguns trabalhos também propuseram ou adaptaram estratégias de avaliação de desempenho para obter informações mais realistas sobre o comportamento dos modelos com populações vulneráveis. Alguns destaques são a adaptação da acurácia tradicional com base em um mecanismo de recompensa \cite{alday2022age}, a utilização do Matthews Correlation Coefficient como métrica de desempenho em problemas com desbalanceamento significativo \cite{afrose2022subpopulation}, o uso de extensões multigrupo do framework xAUC (métrica de ranqueamento cruzado) \cite{pfohl2021empirical}, o cálculo do delta de paridade \cite{burlina2021addressing}, a utilização de limiares de calibração local \cite{foryciarz2022evaluating} e a modelagem de erro a nível individual \cite{estiri2022objective}. O cenário encontrado no conjunto de artigos selecionado corrobora as limitações das métricas de desempenho globais para aferição de justiça, reforçando a necessidade tanto de métricas mais qualificadas quanto de abordagens holísticas na avaliação dos modelos.
+
+Poucos trabalhos usaram métricas específicas de justiça para detecção de viés, com as mais frequentes sendo a  Igualdade de Oportunidades (\emph{Equal Opportunity}) e a Igualdade de Probabilidades (\emph{Equalized Odds}). Dos 56 artigos selecionados, 40 (71\%) detectaram preconceito algorítmico através da avaliação de desempenho entre subpopulações, usando as métricas de desempenho como indicadores de justiça. Considerando que a maioria dos trabalhos usou AUROC, que tende a mascarar as desigualdades de desempenho, é possível que as disparidades encontradas estejam subestimadas por um viés de agregação.
+
+Foram identificados principalmente vieses raciais, de gênero e relacionados à faixa etária, apontados em 41, 37 e 27 trabalhos, respectivamente. Embora estes quantitativos revelem que vários dos 56 estudos indicaram a presença de preconceito algorítmico envolvendo dois ou mais atributos sensíveis, apenas 2 dos 27 trabalhos que apresentaram propostas de mitigação de viés integraram alguma abordagem interseccional. \citet{alday2022age} retreinaram um modelo adicionando uma restrição capaz de reduzir simultaneamente as diferenças de desempenho entre sexo, raça e idade, enquanto \citet{foryciarz2022evaluating} avaliaram a recalibração do modelo para subgrupos interseccionais. Os demais trabalhos propondo estratégias de mitigação de viés trataram os atributos sensíveis de forma isolada, confirmando a abordagem interseccional como uma importante lacuna, identificada anteriormente, na etapa de \textbf{Formulação do Problema}.
+
+Ao avaliar as estratégias de mitigação de vieses aplicadas durante o processamento, na etapa de \textbf{Criação do Modelo}, a regularização foi a abordagem mais usada nos artigos selecionados. Uma lacuna identificada neste tipo de abordagem é o uso frequente de penalizações associadas a fatores estáticos na função de perda. Este uso exige buscas manuais exaustivas, que são pouco eficientes e impactam a complexidade computacional dos modelos \cite{alday2022age,mosteiro2022bias,pfohl2021empirical}. Outra estratégia de destaque é o treinamento adversarial, com objetivo de separar o aprendizado do atributo alvo do aprendizado dos atributos sensíveis \cite{zhao2020training,adeli2021representation}.
+
+Um problema em potencial é o desacordo entre o modelo e as diretrizes clínicas estabelecidas induzida pela estratégia de mitigação de viés, devido à compensação inevitável entre desempenho e justiça. O trabalho de Foryciarz et al. (\citeyear{foryciarz2022evaluating}) avaliou a compatibilidade entre aplicar estratégias de mitigação de viés social e obedecer às diretrizes clínicas para prevenção primária da doença cardiovascular aterosclerótica. A imposição de uma restrição para igualdade de probabilidades (\textit{equalized odds}) induziu uma descalibração do modelo, que perdeu a consonância com as diretrizes existentes. Ao mesmo tempo, a recalibração do modelo separadamente para cada grupo aumentou a compatibilidade com as diretrizes, mas simultaneamente aumentou as diferenças intergrupais nas taxas de erro.
+
+Por fim, \citet{pfohl2021empirical} enfatizam que as análises de equidade algorítmica na área da saúde carecem do contexto e da consciência causal necessários para refletir sobre os mecanismos que levam às disparidades em saúde. Os autores incentivam o engajamento crítico dos desenvolvedores com o contexto sociotécnico mais amplo que envolve o uso de aprendizado de máquina na área da saúde, e recomendam a adoção de práticas como o design participativo. O impacto desta lacuna é potencializado pela pouca difusão das técnicas de interpretabilidade e explicabilidade entre os trabalhos selecionados. Dificuldades ou limitações na interpretação das predições dos modelos podem facilitar ou até mesmo induzir a introdução de vieses na etapa de \textbf{Pós-processamento e Uso}, especialmente em contextos de conhecimento limitado sobre o problema clínico e sua relação com as disparidades sociais \cite{chandak2020using}.
+
+As técnicas de interpretabilidade e explicabilidade podem ser especialmente úteis neste contexto. Elas são capazes de explicitar como os modelos aprendem e tomam decisões,  conectando a explicação da tomada de decisão algorítmica à avaliação de confiabilidade. Se um modelo usar atributos protegidos como os principais preditores na tomada de decisão, por exemplo, isso pode ser um forte indicativo da presença de viés. Apesar disso, apenas cerca de um terço dos artigos encontrados usou alguma destas técnicas, incluindo SHapley Additive exPlanations (SHAP), Local Interpretable Model-Agnostic Explanations (LIME), mapas de calor Grad-CAM, mapas de saliência e funções nativas do classificador para cálculo de importância de atributos.
+
+Meng et al. (\citeyear{meng2022interpretability}) se destacaram ao demonstrar o sucesso de métodos de interpretabilidade na identificação de preditores de mortalidade em diversos modelos. O estudo também apontou a dependência de atributos sensíveis nas predições através destes métodos, estabelecendo conexões concretas entre interpretabilidade e equidade. Os autores agregaram importantes referências em suas análises, mostrando a existência de compensações também entre interpretabilidade e justiça \cite{jabbari2020empirical}.
+
+Em especial, eles citam o estudo de \citet{wang2020pursuit}, que traz discussões relevantes para esta proposta. No trabalho, os autores afirmam que as técnicas de imposição de equidade muitas vezes exigem uma transformação não interpretável que não pode ser posteriormente corrigida. Eles também argumentam que as abordagens de imposição de equidade no pré-processamento frequentemente destroem o significado natural dos dados ao realizar transformações complexas das características de entrada, enquanto as abordagens pós-processamento em geral realizam correções de equidade que também não são interpretáveis. Eles concluem apontando que as abordagens para modificar as funções de perda de treinamento são as mais promissoras, porém exigem novos algoritmos capazes de otimizar o modelo para restrições de equidade e interpretabilidade. Esta proposta se aproxima deste objetivo.
+
+A revisão da literatura permitiu compreender que o viés algorítmico em saúde não é uma condição isolada, mas sim o resultado de uma cadeia de decisões interdependentes e falhas estruturais que permeiam todo o ciclo de vida dos modelos. Os métodos atuais são capazes de entregar certo nível de mitigação destes efeitos negativos, mas mostram-se insuficientes para gerenciar a complexidade encontrada no domínio da saúde. Em relação a estratégias de mitigação, a análise das diversas lacunas encontradas aponta para algumas limitações especialmente severas. A predominância de abordagens estáticas e manuais força o desenvolvedor a fazer escolhas arbitrárias entre desempenho e equidade, frequentemente em contextos onde as predições têm interpretabilidade limitada ou inexistente, e onde os efeitos sobre grupos vulneráveis (em especial os interseccionais) podem se tornar imprevisíveis ou de difícil auditoria. Além de fragilizar o suporte à decisão clínica, este cenário configura uma barreira ética para a adoção dessas ferramentas.
+
+Como principal conclusão, identificamos a necessidade de desenvolver uma metodologia capaz de navegar por estes conflitos de forma dinâmica. A definição e imposição de um único ponto de equilíbrio torna-se uma solução muito arriscada em um contexto no qual satisfazer todos os critérios de confiabilidade simultaneamente é uma impossibilidade matemática. Portanto, definimos uma proposta metodológica inicial baseada em explicitar as compensações e prover ao usuário a capacidade de tomar decisões informadas. Na Subseção \ref{sec:otimizacao_interseccional}, avaliamos o estado da arte no contexto específico desta proposta, mostrando as contribuições possíveis para a área na atualidade.
+
+\section{Otimização multi-objetivo para promoção da justiça interseccional} \label{sec:otimizacao_interseccional}
+
+O contexto de pesquisa em justiça algorítmica conta com vários objetivos conflitantes. Conforme demonstrado, as métricas de justiça possuem conflitos irreconciliáveis entre si e também com as métricas de desempenho. Considerando que a maior parte das bases de dados que contemplam informações sociodemográficas possuem múltiplos atributos sensíveis, a melhora de desempenho para uma população vulnerável pode resultar na degradação de desempenho para outra, resultando em impactos inevitáveis para estas populações, que se tornam cumulativos para os grupos interseccionais.
+
+% [MOVIDO PARA FUNDAMENTAÇÃO TEÓRICA — Seção "Otimização Multiobjetivo e Fronteira de Pareto", \label{sec:moop_pareto}]
+% Bloco original: definição formal de otimização multiobjetivo, dominância de Pareto, conjunto
+% Pareto-ótimo e Fronteira de Pareto (Eqs. 3.11–3.16 e discussão associada).
+A formalização do problema de otimização multiobjetivo, do conceito de dominância e eficiência de Pareto, e da Fronteira de Pareto resultante, encontra-se na Seção~\ref{sec:moop_pareto}.
+
+A literatura já conta com diversas abordagens consolidadas na integração da otimização multiobjetivo ao pipeline do AM. Para encontrar o estado da arte nesta categoria de soluções, nós realizamos uma busca complementar na literatura usando a ferramenta Asta Allen \cite{asta}. Entendemos que encontrar o estado da arte relacionada a esta categoria de problemas demandava atualizar o conjunto de trabalhos avaliados e expandir o escopo das aplicações para além do domínio da saúde, para encontrar as lacunas computacionais específicas nas abordagens existentes.
+
+Considerando que a revisão original de literatura abrangia apenas o período de 2020-2022, estendemos o período de publicação da busca para 2020-2025. Ao mesmo tempo, uma vez que já avaliamos o cenário geral de justiça algorítmica na área da saúde, adicionamos outras restrições à query de busca, limitando os resultados a trabalhos revisados por pares abordando diretamente justiça interseccional via otimização multiobjetivo em aplicações envolvendo dados estruturados, com objetivo de aproximar e navegar a Fronteira de Pareto de soluções. A query completa utilizada no Asta Allen está disponível em repositório público \footnote{Disponível em: \url{https://chasquebox.ufrgs.br/public/1f355f}}.
+
+Em síntese, a query de busca visava encontrar trabalhos que contemplassem:
+\begin{itemize}
+    \item Justiça interseccional em modelos de AM;
+    \item Otimização Multiobjetivo para justiça;
+    \item Ajuste automático do equilíbrio entre justiça e acurácia;
+    \item Dados tabulares / estruturados.
+\end{itemize}
+
+A ferramenta retornou 53 papers, apontando 11 deles como mais relevantes. Além disso, apenas 11 dos 53 trabalhos contemplavam todos os quatro tópicos da query, não sendo exatamente o mesmo conjunto apontado como mais relevante pela ferramenta. Realizamos a triagem a partir da leitura de título e abstract, seguido pela extração de informações do artigo completo, feita com ajuda da IA Gemini. Priorizamos apenas trabalhos revisados por pares, em periódicos ou conferências, desconsiderando os preprints nesta etapa. Ao todo, 23 trabalhos foram selecionados.
+
+Os trabalhos selecionados usam majoritariamente estratégias de mitigação de viés em-processamento, o que fortalece a argumentação de \citet{wang2020pursuit} em favor desta categoria de abordagens. Alguns trabalhos também apresentam abordagens híbridas, combinando estratégias aplicadas em mais de uma etapa do pipeline. Ao todo, os 23 trabalhos somam 4 estratégias de pré-processamento, 6 de pós-processamento e 16 de em-processamento. Modelos de AM tradicional predominam, aparecendo em 21 dos 23 trabalhos, sendo a Regressão Logística e o Perceptron Multicamada os mais usados (11 trabalhos cada). Aprendizado Profundo e Processamento de Linguagem Natural são usados em respectivamente 6 e 4 artigos, com os modelos Resnet (5 estudos) e BERT (3 estudos) sendo os mais frequentes em cada paradigma.
+
+Os principais conjuntos de dados usados pelos trabalhos são \textit{benchmarks}, conjuntos referência na avaliação de justiça. Os mais utilizados foram o Adult (12 trabalhos), o COMPAS (9 trabalhos) e o CelebA (5 trabalhos). Outros datasets apareceram em números bem menos expressivos. Dentre as métricas de desempenho, a acurácia geral ainda é a mais usada, aparecendo em 11 dos 23 trabalhos. Ela é  seguida pela AUROC e pela acurácia balanceada, usadas respectivamente 6 e 3 vezes. O F1-score é mencionado em 2 trabalhos, e outras métricas específicas são utilizadas de forma isolada.
+
+Avaliamos as principais potencialidades e limitações dos trabalhos selecionados, com objetivo de mapear as lacunas de pesquisa em aplicações de AM abordando justiça interseccional com estratégias de otimização. Analisamos os trabalhos focando na complexidade demográfica considerada pelos modelos e nas abordagens de otimização empregadas, para embasar a compilação dos principais desafios e limitações encontrados.
+
+\subsection{Complexidade Demográfica}
+
+A representação dos atributos demográficos está passando por transformações nas aplicações de AM, com iniciativas que visam tentar capturar com mais exatidão a complexidade das desigualdades sociais e seus efeitos. Adotamos uma taxonomia com base na arquitetura e na avaliação dos modelos, agrupando os trabalhos em três categorias de complexidade demográfica: abordagens unidimensionais, multidimensionais e interseccionais. Mesmo selecionando os trabalhos mais recentes a partir de critérios de busca com forte ênfase em aplicações interseccionais, 14 dos 22 estudos relevantes concentram-se na mitigação \textbf{unidimensional}, considerando apenas um atributo sensível de forma isolada (como apenas "Gênero" ou apenas "Raça", por exemplo) em todo o pipeline de processamento.
+
+Dentre os estudos com abordagens de justiça unidimensional, alguns buscam corrigir problemas específicos dentro da área de equidade algorítmica, como ruído dependente do grupo nos rótulos ou ausência de dados de forma não aleatória, e eles em geral assumem que o grupo protegido é uma variável escalar e discreta, limitando suas validações empíricas a partições unidimensionais. Em termos de variável alvo, a esmagadora maioria traz abordagens focadas em saídas binárias \cite{abernethy2020active,almuzaini2022abcinml,rolf2020balancing,yazdani2024fair,pang2024fairness,jeong2022fairness,jang2022group,shui2022learning,delaney2024oxonfair,hsu2022pushing,wang2022understanding}. São exceções únicas os estudos com tarefas de regressão, voltadas a ranqueamento \cite{dinh2024learning}, otimização via técnicas geométricas para análise exploratória \cite{zhou2023fair} e suporte a multiclasse \cite{cho2020fair}.
+
+Uma alternativa mais sofisticada é o cenário multidimensional, onde os algoritmos abordam mais de uma característica sensível simultaneamente, mas o fazem de forma marginal, sem avaliar ou garantir a equidade para o subgrupo gerado pela intersecção dessas características \cite{geden2021fair,buyl2022optimal}. São trabalhos capazes de otimizar resultados para "Mulheres" e para "Pessoas Negras", mas não para "Mulheres Negras", por exemplo. Embora flexíveis, essas abordagens podem falhar em proteger populações que sofrem discriminação combinada, ocultando as vulnerabilidades que só existem no cruzamento de identidades.
+
+Como demonstrado no trabalho clássico de \citet{kearns2018preventing}, abordagens unidimensionais e multidimensionais marginais sofrem do chamado efeito de \textit{gerrymandering} de justiça, quando a equidade observada para atributos isolados mascara a injustiça em pequenos subgrupos sobrepostos (Seção \ref{sec:panorama}). Em termos de arquitetura, as soluções interseccionais encontradas atualmente dividem-se em duas vertentes:
+\begin{itemize}
+    \item Interseccionalidade por achatamento: Extensão de aplicações uni ou multidimensionais para o domínio interseccional por meio da combinação manual de atributos, achatando-os em uma única variável categórica. Em geral, cruzam-se os atributos sensíveis criando novos subgrupos (por exemplo, Mulheres Negras e Homens Brancos), tratando-os sob a mesma formulação unidimensional original. Isso permite avaliar e otimizar restrições de justiça tradicionais sobre as intersecções. Estas abordagens perdem informações sobre correlação e a estrutura compartilhada entre os subgrupos ao tratá-los como entidades desconexas, além de lidarem com limitações relacionadas a tamanho de amostra e complexidade computacional (Seção \ref{sec:desafios_otim}). Esta categoria contempla o único trabalho com abordagem interseccional multiclasse dentre os selecionados \cite{martinez2020minimax}, prevalecendo abordagens de classificação binária \cite{wang2021fair,wang2022towards,gardner2023cross,lahoti2020fairness}.
+    \item  Interseccionalidade Estrutural ou Nativa: Uso de estruturas de dependência entre as identidades, permitindo explorar características compartilhadas com foco no melhor gerenciamento da escassez amostral e da explosão combinatória. \citet{hu2024sequentially} propõem um mecanismo sequencial baseado em baricentros de Wasserstein, que garante o alcance progressivo da paridade demográfica para múltiplos atributos, mantendo a interpretabilidade da dependência entre os atributos sensíveis. Outro trabalho selecionado com interseccionalidade nativa é apresentado por \citet{deng2024multi}, que estruturam os grupos interseccionais em uma topologia hierárquica. Eles usam árvores de decisão que resolvem de forma determinística o compromisso entre usar um preditor de um subgrupo mais genérico (com maior tamanho amostral) ou um preditor mais específico. Esta categoria de soluções compõe o estado da arte em promoção da equidade algorítmica.
+\end{itemize}
+
+Além de haver poucas abordagens com interseccionalidade nativa, as métricas de justiça usadas são majoritariamente focadas no contexto unidimensional e binário. Estas métricas tradicionalmente comparam as estatísticas entre grupos privilegiados e não-privilegiados, ficando restritas a números relativamente pequenos de restrições ou objetivos de otimização. Essa característica torna a avaliação inerentemente limitada em relação à complexidade das estruturas e relações sociais refletidas nos dados e aprendidas pelos modelos.
+
+%Incluir fórmulas das métricas introduzidas nos trabalhos do Asta na seção de Trab Relacionados:
+%"Quando você citar a transição da justiça unidimensional para a interseccional, coloque as equações da Diferença de Paridade Demográfica (DP), Diferença de Igualdade de Oportunidades (EOp) e, crucialmente, a fórmula do AUC Gap Interseccional (Gardner et al., 2023) e do Tau de Kendall (Wang et al., 2022). Isso dará um peso exato ao seu argumento de "explosão combinatória".NLM
+
+\subsection{Abordagens de Otimização}
+A adição de objetivos de equidade transforma o treinamento de modelos de AM em um complexo desafio de otimização. Os primeiros trabalhos na área frequentemente recorriam a penalizações escalares, mas a literatura recente tem se direcionado a formulações avançadas com base em diferentes arcabouços matemáticos.
+
+A \textbf{Otimização Multiobjetivo} (MOOP) é o paradigma mais direto para observar a gerenciar as compensações entre desempenho e justiça, buscando encontrar soluções na Fronteira de Pareto, onde não é possível melhorar os resultados para um objetivo sem degradar o outro. Dentre as estratégias de mitigação de viés em-processamento, \citet{martinez2020minimax} utilizam o MOOP para formalizar a justiça de maneira interseccional e multiclasse, colocando o risco de cada grupo sensível como um objetivo independente. Os autores introduzem o conceito de Justiça de Pareto Minimax, um critério de equidade que busca encontrar um classificador com menor risco máximo, focando em minimizar o risco do grupo com o pior desempenho sem causar danos desnecessários à performance dos demais grupos.
+%Para aplicação prática, o trabalho propõe o algoritmo APStar, um método de otimização focado em redes neurais profundas, que atualiza iterativamente os pesos das funções de perda via gradiente descendente-estocástico, conseguindo atingir esse equilíbrio ótimo sem exigir que os atributos demográficos sensíveis estejam disponíveis durante a fase de inferência (teste) do modelo.
+
+Para contornar o custo computacional quando o número de grupos ou objetivos cresce,
+%"Modelos de árvore (XGBoost, Random Forest) são imensamente superiores em dados tabulares, mas não são diferenciáveis. Algoritmos Evolutivos (NSGA-II/III) não dependem de gradientes. Logo, eles são a "ponte" perfeita para otimizar métricas de justiça (que são inerentemente descontínuas/degraus) em modelos de árvore, sem precisar de funções substitutas (surrogates) complexas."NLM
+\citet{geden2021fair} aplicam Otimização Multiobjetivo Evolutiva (EMOO) a algoritmos de contratação. Os algoritmos EMOO modificam a definição de dominância, os objetivos que estão sendo otimizados e os mecanismos de busca para melhorar o processo de exploração e criar níveis menores de dominância. Além de gerenciar a otimização de múltiplos objetivos, eles oferecem como vantagens a geração de uma fronteira de Pareto aproximada, permitindo a tomada de decisão com intervenção humana, e a capacidade de otimizar funções de perda não diferenciáveis.
+%Embora abranjam muitas abordagens diversas, a maioria dos métodos EMOO utiliza quatro operadores genéticos para a criação de soluções: amostragem, cruzamento, mutação e reparo. Amostragem: O operador de amostragem inicializa a primeira geração de algoritmos. Uma abordagem comumente usada para problemas com restrições de soma fixa linear é realizar amostragem uniforme aleatória ou amostragem de hipercubo latino (LHS) e, em seguida, reparar as soluções geradas (Chiam, Tan e Mamum 2008). Essas abordagens resultam em amostragem não uniforme no espaço restrito e podem degradar a convergência. Propomos a amostragem a partir de uma distribuição de Dirichlet usando uma distribuição a priori uniforme como alternativa. \cite{geden2021fair}"
+Neste estudo, os autores usam algoritmos como NSGA-III e SPEA2-SDE com operadores genéticos baseados em Dirichlet para otimizar os pesos de uma combinação linear ponderada, gerando uma fronteira de Pareto que equilibra simultaneamente a acurácia preditiva na seleção de candidatos e múltiplas métricas de justiça.
+%Os autores obtiveram resultados superiores a algoritmos evolutivos tradicionais e capazes de superar de forma consistente especialistas humanos em termos de justiça e eficácia.
+
+As demais abordagens MOOP foram aplicadas a estratégias pós-processamento, que prevaleceram nesta categoria. \citet{delaney2024oxonfair} desenvolvem a ferramenta OxonFair,
+focada no ajuste de limiares específicos por grupo. A otimização conjunta de objetivos de desempenho e justiça é feita por meio de um \textit{grid search} eficiente, otimizado matematicamente por meio de somas cumulativas para reduzir a complexidade temporal, usando métricas baseadas na matriz de confusão para traçar uma fronteira de Pareto.
+%O trabalho oferece suporte tanto a dados tabulares quanto não-tabulares, incluindo visão computacional e processamento de linguagem natural, e permite customizar virtualmente qualquer restrição baseada na matriz de confusão. A ferramenta aborda justiça de forma unidimensional, com suporte teórico a interseccionalidade, embora os autores enfatizem a limitação imposta pelo aumento da complexidade e optem por tentar resolver eventuais vieses interseccionais por meio do uso de  métricas condicionais\todo{incluir métricas condicionais nos conceitos}.
+
+Na mesma linha, \citet{jang2022group} apresentam um método de pós-processamento focado em otimizar múltiplas restrições de equidade com baixo custo computacional. Ele aproxima a distribuição de probabilidade da saída do modelo e utiliza a matriz de confusão para quantificar a acurácia e a justiça em relação aos limiares de classificação para cada grupo, adaptando-os por meio da otimização de Gauss-Newton em mínimos quadrados não lineares
+%\todo{como avaliar a aproximação do limite teórico?}.
+%"métodos como Programação Linear Inteira Mista (MILP) de Hsu et al. (2022) encontram a fronteira de Pareto exata (o limite teórico global), mas sofrem de escalabilidade. Já os métodos evolutivos mapeiam uma Fronteira de Pareto Empírica, cuja qualidade é medida através de métricas de hipervolume (como em Geden & Andrews, 2021) em relação a um baseline irrestrito."NLM
+%GSTAR
+%As principais vantagens do método são a possibilidade de integração de diferentes noções de justiça em uma função objetivo unificada e a aplicabilidade agnóstica a modelo com baixo custo computacional. Por não interagir com os dados ou a estrutura do modelo, também trata-se de uma técnica capaz de atender a requisitos rigorosos de privacidade. Os autores demonstraram resultados superiores na fronteira de Pareto em comparação a outras técnicas, aproximando-se do limite teórico de equilíbrio entre desempenho e equidade.
+Já \citet{rolf2020balancing} mapeiam uma Fronteira de Pareto empírica a partir de políticas baseadas em escores. Em vez de buscar otimização de justiça de forma direta, os autores pretendem balancear um objetivo privado (ex: lucro) e um objetivo público (ex: bem-estar social), algo extensível para promoção da equidade em modelos clínicos.
+%\citet{rolf2020balancing} apresentam um trabalho relacionado à justiça que parte do conflito entre interesses privados (como desempenho ou lucro) e objetivos públicos (como o bem-estar social e a justiça). Os autores abordam a compensação como um problema de otimização multiobjetivo, incluindo também a robustez na avaliação do modelo. Eles analisaram uma classe de políticas baseadas em pontuações preditivas que geram uma fronteira de Pareto empírica, avaliando o comportamento do modelo perante dados ruidosos ou limitados. A pesquisa demonstrou que a otimização multiobjetivo é matematicamente equivalente a políticas tradicionais de maximização de lucro sujeitas a restrições de justiça e equidade (fairness constraints).
+
+Ainda usando MOOP, \citet{hsu2022pushing} reformula o problema de otimizar múltiplas métricas de equidade simultaneamente como uma Programação Linear Inteira Mista (MILP), desafiando o teorema da impossibilidade para encontrar uma transformação de escores globalmente ótima no pós-processamento. Além de superar o ótimo local de métodos concorrentes, a estrutura proposta é útil para seleção de modelos e explicabilidade da equidade, e se mostra capaz de melhorar a equidade em diferentes definições simultaneamente  com redução mínima no desempenho do modelo.
+%Para contornar a complexidade matemática desse problema \todo{não-convexidade, adicionar referencias e discussão específica relacionada à Fronteira de Pareto}, que se torna não-convexo devido aos termos bilineares introduzidos pela restrição de paridade de taxa preditiva, eles apresentam uma reformulação baseada em Programação Linear Inteira Mista (MILP), com a garantia soluções globalmente ótimas. Entre suas principais vantagens, o método pode ser aplicado de forma modular sobre qualquer classificador binário que produza pontuações contínuas, oferece soluções interpretáveis por meio de matrizes de transição de pontuação e permite que os desenvolvedores tracem e analisem de forma explícita uma fronteira de Pareto explorando as compensações entre o desempenho e as múltiplas definições de justiça.
+%%diferentemente da Paridade Demográfica e da Igualdade de Oportunidades (que são lineares), a métrica de Paridade de Taxa Preditiva gera termos fracionários/bilineares, o que transforma o problema em uma otimização não-convexa (especificamente um QCQP - Quadratically Constrained Quadratic Program) [ver referencias]
+%A reformulação para MILP permite obter o ótimo global. Com isso, eles conseguem gerar uma "fronteira eficiente de soluções" variando os parâmetros de tolerância de erro (ϵ) para as três métricas de justiça em um grid search, obtendo um conjunto de pontos não-dominados (Fronteira de Pareto) [mais detalhes no artigo]
+
+Contudo, a MOOP pode ter limitações em dinâmicas hierárquicas ou de oposição, comuns na promoção de equidade interseccional. O balanceamento de múltiplos  objetivos tende a tornar o espaço de Pareto gradativamente maior e mais difícil de representar, degradando a classificação não dominada, pois a maioria das soluções pertence à fronteira de Pareto. Os operadores genéticos também podem ficar ineficientes, e a avaliação de métricas de diversidade e desempenho pode tornar-se computacionalmente cara \cite{wagner2007pareto}. Nestes casos, muitos trabalhos recorrem a \textbf{Otimização em Dois Níveis (Bilevel)} ou a ferramentas da \textbf{Teoria dos Jogos}.
+
+\citet{yazdani2024fair} modelam esse conflito através do Equilíbrio de Stackelberg no FairBiNN, modelo desenvolvido para redes neurais e baseado em gradientes. Os autores se diferenciam das abordagens clássicas de regularização, que unem desempenho e justiça em uma única função de perda ponderada, ao estruturar o problema como um jogo hierárquico de "líder-seguidor", no qual conjuntos separados de parâmetros e camadas otimizam a acurácia (líder, nível superior) e a equidade (seguidor, nível inferior) de forma interdependente, provando matematicamente que esse equilíbrio converge para uma solução ótima de Pareto.
+
+\citet{shui2022learning} também propõem uma solução de otimização em dois níveis no algoritmo FAMS. No nível inferior, o modelo aprende distribuições preditivas específicas para cada subgrupo utilizando os dados limitados disponíveis guiados por um preditor justo, que atua como uma informação prévia. No nível superior, esse preditor justo é atualizado iterativamente para minimizar a divergência em relação às distribuições de todos os subgrupos.
+
+\citet{lahoti2020fairness} propõem o Aprendizado Adversarialmente Reponderado (ARL), usando um jogo min-max de soma zero em que um preditor compete contra um adversário que repondera amostras, maximizando a utilidade do grupo em pior situação. Enquanto o preditor tenta minimizar a perda esperada, o adversário aponta regiões de erro computacionalmente identificáveis e atribui pesos maiores a esses exemplos, induzindo o aprendiz a melhorar seu desempenho nas instâncias mais difíceis.
+
+Já \citet{gardner2023cross} avaliam estratégias de transferência e ensembling interinstitucional, investigando os impactos do aprendizado por transferência entre instituições de ensino na predição da retenção estudantil, em um contexto no qual restrições de privacidade impedem o compartilhamento direto dos dados de treinamento. Os autores avaliam três abordagens de transferência de modelos — \textit{direct transfer}, \textit{voting transfer} e \textit{stacked transfer} — utilizando modelos treinados localmente como referência. Para avaliar a equidade entre subgrupos, propõem uma métrica de foco interseccional denominada \textit{AUC Gap}, definida como a maior diferença absoluta entre os valores de AUC observados nos diferentes subgrupos:
+
+\begin{equation}
+\operatorname{AUCGap}(f,\mathcal{G})
+=
+\max_{g,g' \in \mathcal{G}}
+\left|
+\operatorname{AUC}(f,D_{k,g})
+-
+\operatorname{AUC}(f,D_{k,g'})
+\right|.
+\label{eq:auc-gap}
+\end{equation}
+
+A métrica permite, assim, quantificar o pior caso de disparidade de desempenho entre as subpopulações consideradas. Os resultados mostram que o \textit{zero-shot voting transfer}, baseado na agregação ponderada das predições de modelos treinados em outras instituições, alcança desempenho estatisticamente indistinguível daquele obtido por modelos treinados localmente, sem evidências de prejuízo à equidade interseccional avaliada via AUC Gap. Dessa forma, o estudo fornece evidências de que a transferência interinstitucional de modelos pode viabilizar o compartilhamento de capacidade preditiva sob restrições de compartilhamento de dados, sem comprometer o desempenho e a equidade nas condições avaliadas.
+
+Outra abordagem presente no estado da arte em regularização matemática da justiça é o uso de conceitos de \textbf{Geometria e Transporte}.  \citet{zhou2023fair} propõem a Análise de Correlação Canônica Justa (F-CCA), uma abordagem unidimensional voltada para a análise exploratória estatística que busca minimizar o erro de disparidade de correlação. O algoritmo proposto aprende matrizes de projeção globais a partir de todos os pontos de dados, garantindo que elas produzam uma quantidade de correlação semelhante às matrizes de projeção específicas de cada grupo.
+%resolvendo um problema de otimização mono ou multiobjetivo diretamente sobre uma variedade Riemanniana.
+%A abordagem de otimização multiobjetivo (MOO) usa um algoritmo de gradiente-descendente em uma variedade de Stiefel generalizada, garantindo convergência não-assintótica para um ponto estacionário de Pareto.
+
+Já \citet{buyl2022optimal} formulam a otimização como o Transporte Ótimo para a Equidade em uma aplicação em-processamento com justiça multidimensional. O método quantifica a violação das restrições de equidade como o menor custo de Transporte Ótimo entre a pontuação de um classificador probabilístico e qualquer função de pontuação que satisfaça essas restrições, usando suavização entrópica para tornar a otimização diferenciável. Eles apresentam a estratégia como uma alternativa crítica aos métodos tradicionais de justiça algorítmica, que se baseiam em forçar as predições dos classificadores a ter propriedades estatísticas semelhantes para pessoas de diferentes grupos demográficos.
+
+\citet{hu2024sequentially} também utilizam a teoria do transporte ótimo para propor uma metodologia interseccional pós-processamento baseado em uma transformação analítica da predição do modelo base. Essa transformação usa os baricentros de Wasserstein multi-marginais,
+%\todo{artigo traz as fontes sobre os baricentros de Wasserstein Agueh and Carlier (2011), Santambrogio (2015) e Villani (2021)},
+com uma estrutura sequencial que promove ajustes progressivos das predições do modelo já treinado em direção à equidade para diversos atributos. Como vantagens, essa abordagem permite a priorização de atributos específicos durante a correção de viés (por exemplo, corrigir primeiro a raça e depois o gênero), além de manter a interpretabilidade dos impactos gerados pelas restrições de equidade.
+
+A \textbf{Amostragem Ativa} e as \textbf{Funções de Influência} constituem outra categoria de abordagens, embora com um foco um pouco diferente. Em vez de navegar na Fronteira de Pareto, estas estratégias tentam deslocá-la para um ponto superior na compensação entre objetivos.
+\citet{pang2024fairness} propõe um método de pré-processamento, argumentando que adquirir mais dados pode mover a fronteira em direção a menores disparidades e menos erros simultaneamente. Eles propõem uma otimização via algoritmo de amostragem ativa chamado Amostragem de Influência Justa (FIS) guiado pelo cálculo da influência de cada amostra na justiça e na acurácia  usando o conjunto de dados de validação.
+%O algoritmo avalia a influência de cada amostra na equidade e na acurácia, através da comparação do gradiente da amostra com o derivado de todo o conjunto, quantificando a mudança hipotética na métrica de equidade ao adicionar a amostra ao conjunto de treinamento. Em seguida, ele seleciona amostras para complementar o conjunto de treinamento, usando a derivação do gradiente como uma restrição de equidade para medir a disparidade de equidade de grupo.
+
+O uso de Funções de Influência também é a base da otimização proposta por \citet{wang2022understanding}, uma estratégia de justiça unidimensional que envolve as etapas pré e em-processamento. A proposta dos autores caracteriza o impacto de uma amostra de treinamento no modelo alvo e seu desempenho preditivo.
+%os autores estudam a função de influência diante da imposição de restrições de equidade, e
+Sob certas suposições, essa função de influência pode ser decomposta em uma combinação kernelizada de amostras de treinamento,
+%que aproxima o impacto das restrições de justiça a nível de instância através do Kernel Tangente Neural (NTK),
+permitindo a poda iterativa ou a reponderação do dataset original com base em escores de influência em um espaço convexo.
+%Como aplicação direta, eles apontam que as pontuações de influência das restrições de equidade podem ser usadas para podar as amostras menos influentes e mitigar a violação de equidade. Este trabalho também trata de uma abordagem de justiça simples (unidimensional).
+
+O trabalho de \citet{abernethy2020active} propõe o uso de estratégias de amostragem ativa e reponderação focadas na otimização da justiça \textit{min-max}, que prioriza a melhoria do desempenho para o grupo demográfico com a pior métrica de perda a cada iteração. O framework oferece garantias matemáticas de taxa de convergência para problemas de aprendizado convexo, como a regressão linear e logística. Para cenários de aprendizado não-convexos, como o treinamento de Redes Neurais Profundas, o método ainda pode ser aplicado com eficácia empírica, embora perca suas garantias teóricas de convergência.
+%Outra vantagem da ferramenta é a sua eficiência computacional: ela pode ser aplicada a qualquer modelo treinado por minimização de perda através de passos simples de otimização estocástica, sem exigir retreinamento completo a cada iteração.
+
+\citet{almuzaini2022abcinml} estende o foco da reponderação para o domínio temporal, propondo o método de Correção de Viés Antecipatório (ABC), que ajusta iterativamente os pesos dos dados para antecipar e mitigar disparidades em distribuições de lotes futuros. Eles usam uma abordagem de reponderação usando previsões sobre as distribuições relativas de subgrupos da população, para garantir a equidade mesmo diante de mudanças nos dados ao longo do tempo. Ao mesmo tempo, \citet{wang2022towards} traz um contraponto crítico a essas manipulações amostrais, alertando sobre os limites de aplicar técnicas padrão de tratamento de desbalanceamento (como reamostragem) na busca por otimização de grupos interseccionais. Eles apresentam uma proposta híbrida com abordagens pré-processamento e em-processamento para justiça interseccional, e trazem valiosas considerações sobre os desafios próprios e adaptações necessárias a este tipo de abordagem (detalhadas na Seção \ref{sec:desafios_otim}).
+
+%"Na página 43 e 44 você trata de funções substitutas e MIP, mas o termo "Otimização de estruturas descontínuas" não apareceu em negrito como as outras categorias. Sugiro criar o título em negrito "Diferenciabilidade, Funções Substitutas e Estruturas Discretas" para englobar os parágrafos que falam de Cho, Dinh, Wang e Deng, mantendo a consistência visual com os tópicos anteriores."NLM
+O último grupo de métodos concentra-se em resolver a barreira de otimização causada pela não-diferenciabilidade das métricas de justiça ou das arquiteturas base. A principal vantagem em vencer essa barreira e \textbf{estabelecer funções diferenciáveis} é viabilizar o uso de otimização via gradiente descendente padrão
+%\todo{aqui concentram-se métodos que adaptam a função de perda, como a nossa proposta; penso ser o ideal comparar com elas e superá-las na Tese}.
+A literatura prévia em geral usa proxies fracos (como a covariância) ou treinamentos adversariais frequentemente instáveis. Para abordar o problema, \citet{cho2020fair} apresentam uma abordagem baseada na Estimativa de Densidade de Kernel, visando aproximar a distribuição de probabilidade das predições e formular as medidas de equidade de forma direta, convertendo-as em funções matematicamente diferenciáveis. Como resultado, as restrições de justiça podem ser incorporadas como termos de regularização na função de perda, e otimizadas via gradiente-descendente.
+%A comparação empírica com outros paradigmas da literatura mostrou um equilíbrio (trade-off) superior entre desempenho e justiça em relação ao uso de funções relaxadas.
+Além de um bom equilíbro na compensação entre desempenho e justiça, o método demonstrou uma estabilidade de treinamento significativamente maior em comparação às abordagens de aprendizado adversarial.
+%, que frequentemente sofrem com problemas de convergência devido à natureza de sua otimização \textit{min-max}.
+
+Outro exemplo foi proposto por \citet{dinh2024learning} para lidar com a otimização em sistemas de ranqueamento, como motores de busca e sistemas de recomendação por exemplo. O objetivo é equilibrar justiça de exposição, utilidade para o usuário e eficiência de tempo de execução. O método calcula subgradientes a partir de um framework de Médias Ponderadas Ordenadas (OWA) empregando uma função de perda SPO+ (Smart Predict-Then-Optimize) para retropropagar o erro da otimização das restrições em uma rede neural. %O estudo faz uma contribuição técnica significativa ao apresentar uma forma de calcular a retropropagação de otimizações restritas de objetivos OWA, permitindo seu uso em modelos integrados de previsão e decisão.
+
+Já trabalho de \citet{wang2021fair} foca no treinamento de classificadores justos diante da presença de erros de anotação nos dados de treinamento. Os autores começam mostrando de forma teórica e empírica que a imposição de restrições de justiça sobre dados com este tipo de ruído pode levar ao colapso da otimização padrão e acabar agravando a disparidade enquanto piora a acurácia, potencialmente trazendo mais riscos do que benefícios. Para mitigar o problema, os autores substituem as perdas clássicas por Funções de Perda Substitutas (Peer Loss) em seu problema de Minimização de Risco Empírico (ERM) com restrições
+%\todo{surrogate, ver se é interessante de agregar ou comparar}.
+As funções substitutas modificam a função original de tal forma que o custo de classificar incorretamente um dado com o rótulo verdadeiro seja matematicamente equivalente ao valor esperado da perda ao usar o rótulo ruidoso, de forma a corrigir o ruído no momento do treinamento.
+%, garantindo que o modelo treinado nos dados ruidosos minimize a perda como se estivesse usando os dados limpos.
+%2. Referências: Para essa técnica de surrogate loss, o trabalho clássico é Natarajan et al. (2013).
+
+Ainda, alguns trabalhos se dedicaram a otimização de abordagens estruturais, pensando em preditores não contínuos. \citet{jeong2022fairness} usam um ensemble de árvores de decisão, formulando o treinamento como um problema de programação inteira mista (MIP), permitindo a otimização direta e ponta-a-ponta de uma função objetivo regularizada por equidade. O objetivo é evoluir a prática atual de imputação de dados na etapa de pré-treinamento, mitigando eventuais vieses relacionados a ausência não aleatória de dados. O estudo supera métodos concorrentes, além de oferecer a vantagem de realizar o tratamento de valores faltantes durante o processo de aprendizado, sem exigir a imputação explícita.
+
+Já \citet{deng2024multi} utilizam uma busca estrutural hierárquica na árvore (MGL-Tree) que decide algoritmicamente o ponto de poda da folha para minimizar a variância da função de perda nos subgrupos, alcançando complexidade de amostra e erro quase ótimos. Trata-se de uma abordagem para interseccionalidade nativa e interpretável, por meio do aprendizado multigrupo, que permite formalizar preditores para generalizar bem em múltiplos subgrupos de interesse possivelmente sobrepostos. O método decide entre usar um preditor de um grupo mais abrangente (com muitos dados, mas menos específico) ou um preditor de um subgrupo granular (mais específico, mas com menos dados e maior variância), só adotando o preditor do subgrupo se ele provar ser estatisticamente muito superior ao do grupo pai.
+
+Por fim, cabe ressaltar que a etapa de ajuste de hiperparâmetros desempenha um papel crítico e muitas vezes subestimado na operacionalização da justiça algorítmica. A literatura frequentemente usa a busca de hiperparâmetros para navegar pela Fronteira de Pareto do conjunto de modelos, calibrando parâmetros de regularização que controlam a força das restrições de justiça na função objetivo \cite{dinh2024learning, yazdani2024fair, zhou2023fair}. Para lidar com a disparidade de escala entre as métricas preditivas e as violações de equidade durante essa busca, abordagens como a de \citet{wang2022towards} otimizam os hiperparâmetros com base em funções de avaliação compostas, como a média geométrica entre a acurácia e a diferença máxima da métrica de justiça. Contudo, análises empíricas de larga escala levantam questões importantes sobre a sensibilidade e a eficácia desses ajustes.
+
+Avaliações recentes demonstram que algoritmos sofisticados de justiça e otimização robusta são extremamente sensíveis às configurações de hiperparâmetros e métricas utilizadas, enquanto preditores baseados em árvores (como XGBoost e LightGBM) alcançam robustez natural de subgrupo exigindo um esforço de sintonia significativamente menor \cite{gardner2022subgroup}. Adicionalmente, investigações sobre otimizações estruturais genéricas revelam que a simples variação de parâmetros clássicos, como a força da regularização L2, falha em reduzir sistematicamente a lacuna de disparidade de desempenho entre subgrupos interseccionais, tendendo a afetar o modelo apenas sob a ótica global do compromisso viés-variância \cite{gardner2023cross}.
+
+\begin{landscape}
+
+\begin{table}[p]
+\centering
+\footnotesize
+\caption{Comparação dos trabalhos segundo tipo de justiça, saída, abordagem de otimização, etapa e avaliação.}
+\setlength{\tabcolsep}{4pt}
+\begin{adjustbox}{max width=\linewidth}
+\begin{tabular}{
+l|
+c c c|
+c c c|
+c c c c c|
+c c c|
+c c c
+}
+
+\hline % --- Linha superior adicionada ---
+
+\textit{Trabalho}
+& \multicolumn{3}{c|}{\textit{Justiça}}
+& \multicolumn{3}{c|}{\textit{Saída}}
+& \multicolumn{5}{c|}{\textit{Otimização}}
+& \multicolumn{3}{c|}{\textit{Etapa}}
+& \multicolumn{3}{c}{\textit{Avaliação}} \\ % Tirado o | do final
+
+&
+\rotatebox{90}{\textit{Unidimensional}} &
+\rotatebox{90}{\textit{Multidimensional}} &
+\rotatebox{90}{\textit{Interseccional}} &
+\rotatebox{90}{\textit{Multiclasse}} &
+
+\rotatebox{90}{\textit{Binário}} &
+\rotatebox{90}{\textit{Contínuo}} &
+\rotatebox{90}{\textit{MOOP}} &
+
+\rotatebox{90}{\textit{Bilevel / Jogos}} &
+\rotatebox{90}{\textit{Geometria e Transporte}} &
+\rotatebox{90}{\textit{Am. Ativa e Funç. de Influência}} &
+\rotatebox{90}{\textit{Outros}} &
+
+\rotatebox{90}{\textit{Pré-processamento}} &
+\rotatebox{90}{\textit{Em-processamento}} &
+\rotatebox{90}{\textit{Pós-processamento}} &
+
+\rotatebox{90}{\textit{Curva de compensação}} &
+\rotatebox{90}{\textit{Fronteira de Pareto}} &
+\rotatebox{90}{\textit{Outros}} \\
+
+\hline % --- Linha divisória de cabeçalho ---
+
+\citet{rolf2020balancing}      & X&&& & X&&X &&&&&& &X&&X& \\
+\citet{delaney2024oxonfair}    & X&&& & X&&X &&&&&& &X&&X& \\
+\citet{jang2022group}          & X&&& & X&&X &&&&&& &X&&X& \\
+\citet{hsu2022pushing}         & X&&& & X&&X &&&&&& &X&&X& \\
+\citet{shui2022learning}       & X&&& & X&&& X&&&&& X&&&&X \\
+\citet{yazdani2024fair}        & X&&& & X&&& X&&&&& X&&&X& \\
+\citet{abernethy2020active}    & X&&& & X&&& &&X&&& X&&X&& \\
+\citet{wang2022understanding}  & X&&& & X&&& &&X&&  X&X&&&X&\\
+\citet{pang2024fairness}       & X&&& & X&&& &&X&&X &&&&X& \\
+\citet{almuzaini2022abcinml}   & X&&& & X&&& &&&X&X &&&&&X \\
+\citet{jeong2022fairness}      & X&&& & X&&& &&&X&& X&&X&& \\
+\citet{dinh2024learning}       & X&&& & &X&& &&&X&& X&&X&& \\
+\citet{zhou2023fair}           & X&&& & &&&& X&&&&X &&&X& \\
+\citet{cho2020fair}            & &X&& X &&&& &&&X&& X&&X&& \\
+\citet{geden2021fair}          & &X&& & &X&X &&&&&& X&&&X& \\
+\citet{buyl2022optimal}        & &X&& & X&&& &X&&&& X&&X&& \\
+\citet{martinez2020minimax}    & &&X& X &&&X &&&&&& X&&&X& \\
+\citet{lahoti2020fairness}     & &&X& & X&&& X&&&&& X&&&&X \\
+\citet{deng2024multi}          & &&X& & X&&& &&&X&& X&&&&X \\
+\citet{wang2021fair}           & &&X& & X&&& &&&X&& X&&X&& \\
+\citet{wang2022towards}        & &&X& & X&&& &&&X&X &X&&&&X \\
+\citet{gardner2023cross}       & &&X& & X&&& &&&X&& X&X&&&X \\
+\citet{hu2024sequentially}     & &&X& & X&&& &X&&&& &X&&&X \\
+
+\hline % --- Linha inferior ---
+
+\multicolumn{18}{l}{\small Fonte: Elaborado pela autora.} \\ % Rodapé da fonte
+
+\end{tabular}
+\end{adjustbox}
+
+\label{tab:fairness_comparison}
+
+\end{table}
+
+\end{landscape}
+
+\subsection{Desafios e limitações}\label{sec:desafios_otim}
+
+Apesar dos avanços na literatura recente, limitações estruturais, computacionais e de qualidade ainda permeiam a promoção de equidade em modelos de AM. A análise dos trabalhos selecionados mostra ao menos cinco grandes lacunas, apresentadas a seguir.
+
+A primeira é a \textbf{dependência de dados ideais} e a  \textbf{sensibilidade a ruídos}. Erros nas anotações de dados são uma realidade comum, e conforme mostrado em nossa taxonomia, podem inclusive ser uma fonte de viés social. Contudo, uma parcela considerável dos métodos de otimização para promoção da equidade encontrados na literatura assumem o uso de bases de dados limpas com rótulos perfeitamente confiáveis. Mesmo abordagens sofisticadas de reponderação ou amostragem ativa sofrem degradação de desempenho quando expostas a ruídos \cite{pang2024fairness}. Modelar o ruído como sendo dependente do grupo mitiga parte do problema, mas depende de estimativas precisas e do uso de funções de perda substitutas que adicionam complexidade analítica ao treinamento \cite{wang2021fair}. Na mesma linha, abordagens que dispensam atributos demográficos (como o aprendizado adversarialmente reponderado) são importantes na integração de requisitos de privacidade, mas perdem eficácia se os rótulos observados estiverem corrompidos \cite{lahoti2020fairness}. As amostras alocadas no conjunto de validação tem especial impacto no resultado final, com relação tanto à presença de ruídos quanto a decisões de projeto, como tamanho e critérios de particionamento \cite{abernethy2020active}.
+
+Além disso, também há a existência de \textbf{barreiras arquiteturais e relacionadas à diferenciabilidade}. Muitos métodos de justiça in-processing exigem a otimização de funções contínuas e diferenciáveis, o que impõe restrições severas às arquiteturas que podem ser utilizadas. \citet{gardner2022subgroup} demonstram que as intervenções robustas baseadas em perda (como DRO) são incompatíveis com modelos baseados em árvores (como XGBoost e Random Forest), que são não-diferenciáveis, apesar de paradoxalmente as árvores entregarem uma robustez de subgrupo muitas vezes superior às redes neurais em dados tabulares. Além disso, métodos baseados em Estimativa de Densidade de Kernel (KDE) são altamente adaptados para classificadores binários, e sua extensão para ambientes multiclasse acarreta estimativas imprecisas e piora na compensação entre acurácia e justiça \cite{cho2020fair}.
+
+Mais profundamente, garantias teóricas de convergência podem depender de propriedades como a continuidade de Lipschitz; no entanto, mecanismos amplamente utilizados no estado da arte, como a função de ativação Softmax e as camadas de Atenção, não são estritamente contínuas de Lipschitz. As limitações implicadas por este cenário incluem restrições de aplicabilidade de estratégias de promoção da equidade a classificação multiclasse ou processamento de linguagem natural, por exemplo. A adequação destes mecanismos à otimização de dois níveis ou de teoria dos jogos pode exigir modificações arquiteturais, como a normalização de Lipschitz \cite{yazdani2024fair}.
+
+A terceira lacuna é composta pelo \textbf{reducionismo demográfico} e pela \textbf{escassez amostral} que emergem em aplicações interseccionais, por elas exigirem uma maior segmentação nos grupos. Considerando um conjunto de dados com dois atributos sensíveis binários (por exemplo, raça e gênero), uma abordagem de justiça unidimensional consideraria apenas dois grupos na formulação do problema, considerando um como privilegiado (por exemplo, brancos e homens) e outro como não-privilegiado (não-brancos e mulheres). Já a abordagem interseccional demandaria a divisão em pelo menos quatro subgrupos para o mesmo banco de dados: homens brancos, homens não-brancos, mulheres brancas e mulheres não-brancas. Caso a formulação do problema fosse multiclasse, considerando etnias diversas e gêneros não-binários, o número de subgrupos seguiria aumentando exponencialmente. Este contexto acarreta dois desafios inevitáveis: a diminuição no número de amostras por grupo e o crescimento da complexidade computacional.
+
+Alguns trabalhos citados na Seção \ref{sec:panorama} já introduzem evidências de problemas relacionados a estes desafios. \citet{amir2021impact} demonstrou que tamanhos de amostra reduzidos podem exacerbar instabilidades e gerar impactos nas compensações entre desempenho e justiça nos resultados obtidos. \citet{seyyed2021underdiagnosis}, ao adotar a estratégia de adoção de limiares customizados em um contexto interseccional, demonstrou que a  redução do tamanho de amostras pode gerar um alto grau de incerteza. O mesmo trabalho mostrou que a interseccionalidade demandou o cálculo de um número de limiares que cresce exponencialmente com o número de atributos protegidos, a ponto de  inviabilizar seu uso em determinados contextos.
+
+Outra estratégia comum para estender abordagens unidimensionais para o contexto interseccional é o achatamento usando categorias discretas ou binárias (ex: "Branco" vs. "Não-Branco"), incluindo o uso de rótulos demográficos muito amplos ou de categorias residuais (como "Outros"). Essa prática mascara heterogeneidades importantes e perde nuances de outras formas de desigualdade interseccional, podendo ser insuficiente para o ajuste fino da estratégia de mitigação de viés, bem como dificultar a interpretação do efeito dessa estratégia. Agrupar as informações de um conjunto de variáveis sensíveis em um único atributo também implica a atribuição de pesos iguais a todas essas variáveis, tornando a priorização e a análise de efeitos combinados inviáveis.
+
+Ao mesmo tempo, quando os métodos tentam incorporar uma granularidade maior, eles também esbarram no problema da escassez amostral. Soluções clássicas de reamostragem ou geração de dados sintéticos para tratar classes minoritárias interseccionais muitas vezes trazem preocupações normativas ou dependem de conhecimentos perfeitos do domínio, correndo o risco de reificar hierarquias de disparidade \cite{wang2022towards}. Além disso, a baixa disponibilidade de dados sobre grupos vulneráveis específicos impede fundamentalmente a detecção e correção algorítmica de injustiças para essas populações \cite{delaney2024oxonfair}.
+
+\citet{wang2022towards} fornecem várias reflexões e recomendações específicas para os desafios da interseccionalidade. Sobre o problema da redução do tamanho de amostra, os autores observam diversos impactos em todo o pipeline de desenvolvimento dos modelos. Da Formulação do Problema ao Pré-processamento, quando são tomadas as decisões que resultam no conjunto de rótulos de identidade que serão considerados posteriormente, também há um cenário de compensações, no qual escolher muitos pode ser  computacionalmente inviável, mas escolher poucos pode levar à perda de informação relevante. Na Criação do modelo, é necessário tomar decisões técnicas para lidar com o número progressivamente menor de indivíduos em cada grupo, que resulta também em identidades e eixos adicionais na avaliação, aumentando a complexidade da análise de equidade. Estender as abordagens do cenário unidimensional e binário para um cenário multigrupo não é suficiente para gerenciar as diferenças substanciais do cenário interseccional.
+
+As recomendações dos autores podem ser resumidas em:
+\begin{enumerate}
+    \item Selecionar as identidades interseccionais no nível mais granular disponível no conjunto de dados, mas considerando também experimentos com resultados empíricos na hora da escolha, pois diferentes algoritmos se beneficiam do treinamento em diferentes níveis de granularidade;
+    %"você pode propor que seu framework evolutivo otimize primeiro um atributo (ex: raça) e, na geração seguinte, os grupos cruzados (raça + sexo), lidando com a escassez amostral aos poucos."NLM
+    \item Para lidar com a redução progressiva no tamanho de amostra por grupo, evitar o uso de técnicas para lidar com desequilíbrio de dados (como geração de dados sintéticos) devido a possibilidade de reprodução de vieses por meio destas técnicas. Os autores sugerem o aprendizado de padrões estatísticos compartilhados entre subgrupos interseccionais;
+    \item Para a etapa de avaliação de grupos interseccionais, os autores apontam que as comparações pareadas frequentemente usadas na análise de equidade tradicional podem obscurecer informações importantes quando extrapoladas e aplicadas a um número maior de subgrupos. É necessário desenvolver tipos adicionais de avaliação que meçam considerações como a reificação de hierarquias existentes entre subgrupos.
+    %Os autores argumentam que a equidade não é necessariamente um problema puramente algorítmico que possa ser tratado sem considerar o quadro sociotécnico\todo{adicionar referencias}, bem como que as avaliações quantitativas inevitavelmente forçam uma homogeneização dos grupos, constituindo uma limitação difícil de superar sem avaliações qualitativas, especialmente em abordagens de justiça interseccional. Eles sugerem que as comparações pareadas podem ser feitas mas de forma mais criteriosa, incluindo a atenção a complexidades que vão além de apenas conceituar a interseccionalidade como justiça multiatributo.
+\end{enumerate}
+
+O aumento inerente da complexidade computacional também acarreta \textbf{limites de escalabilidade}. Considerar todos os subgrupos possíveis gerados por intersecções entre múltiplos atributos sensíveis gera um número exponencialmente grande de subgrupos. Com base neste contexto, \citet{deng2024multi} argumenta a favor da importância de se obter taxas de complexidade de amostra quase ótimas que sejam logarítmicas em relação ao número total de subgrupos.%\todo{ponto de avaliação importante}.
+
+Além do ganho de complexidade próprio da maior segmentação dos grupos amostrais no contexto interseccional, a inserção de garantias formais de justiça frequentemente acarreta um custo computacional proibitivo, inviabilizando escalar certos modelos para grandes conjuntos de dados. O uso de Transporte Ótimo (OTF), por exemplo, exige uma complexidade de memória e tempo de $\mathcal{O}(n(n + d_F))$, onde $n$ é o tamanho do conjunto amostral \cite{buyl2022optimal}. Em abordagens post-hoc, a tentativa de resolver múltiplas restrições de justiça simultaneamente via Programação Linear Inteira Mista (MILP) sofre de explosão combinatória, sendo altamente sensível à granularidade dos intervalos de pontuação adotados \cite{hsu2022pushing}.
+
+Por fim, também persiste a lacuna relacionada a \textbf{compensações normativas e incompatibilidade de métricas}. Os trabalhos selecionados confirmam e reforçam a literatura prévia, que destaca a impossibilidade matemática e prática de satisfazer múltiplas restrições de justiça simultaneamente, e vários estudos apresentam exemplos práticos e específicos de como as compensações se manifestam. \citet{shui2022learning} mostram que garantir o critério de Suficiência de Grupo frequentemente causa a degradação da Paridade Demográfica e da Igualdade de Oportunidades. Da mesma forma, em cenários de aprendizado por transferência, constata-se que modelos locais e generalistas podem perder garantias de justiça ao serem aplicados a instituições ou domínios com populações estatisticamente diferentes das de origem \cite{gardner2023cross}.
+
+Além disso, as estratégias de avaliação tradicionais em geral usam métricas derivadas da matriz de confusão, projetadas para garantir estatísticas semelhantes entre dois grupos distintos. Dentre os trabalhos selecionados, as noções de justiça tradicionais ainda foram as mais usadas, com Paridade Demográfica (DP), Igualdade de Chances (EOd) e Igualdades de Oportunidades (EOp) aparecendo respectivamente em 9, 6 e 5 dos 23 trabalhos. Outras noções de justiça foram empregadas em quantidades menores de estudos. Na prática, isso impõe uma limitação ao uso de único atributo sensível, para o qual a população é dividida em dois grupos, onde um é considerado privilegiado e o outro é definido como não-privilegiado, caracterizando um contexto focado em justiça unidimensional e binária.
+
+Na literatura, é comum tentar estender estas métricas para o contexto multidimensional através de versões generalizadas, extrapolando métricas clássicas para o pior caso combinatório, usando diferença máxima, a razão de uma métrica de desempenho entre dois grupos ou, ainda, entre um grupo e o conjunto de todos os outros. Porém, abordagens interseccionais exigem métricas capazes de capturar padrões mais amplos. A avaliação da equidade algorítmica em contextos interseccionais impõe desafios estruturais às métricas tradicionais, que frequentemente falham ao serem simplesmente extrapoladas. Além disso, métricas de avaliação comuns baseadas na diferença máxima pareada (como a disparidade máxima da taxa de verdadeiros positivos) tornam-se insuficientes à medida que o número de grupos cruzados cresce, pois consideram apenas os dois grupos extremos e ignoram o impacto sobre todos os demais.
+%Conforme a análise crítica apresentada por \citet{wang2022towards}, o cumprimento cego dessas métricas clássicas pode ocultar a reificação de hierarquias de disparidade: mesmo que um modelo satisfaça a restrição matemática do limite de equidade, ele pode continuar classificando grupos interseccionais minoritários sistematicamente abaixo de grupos dominantes, consolidando a discriminação estrutural subjacente.
+
+Boa parte dos estudos selecionados adapta matematicamente métricas tradicionais para contemplar múltiplos subgrupos. Dentre eles, três se destacam por propor, adaptar ou problematizar métricas voltadas especificamente à avaliação da justiça no contexto de grupos interseccionais. O primeiro é o já mencionado \citet{wang2022towards}, que, além de apresentar importantes considerações críticas sobre a avaliação da equidade interseccional, propõe complementar as métricas tradicionais de justiça com uma medida de correlação entre os ranqueamentos dos grupos demográficos.
+
+Para isso, os autores utilizam o Tau de Kendall, comparando o ranqueamento das taxas de base dos rótulos positivos observadas nos diferentes subgrupos interseccionais com o ranqueamento das Taxas de Verdadeiros Positivos (TPR) produzidas pelo modelo após a aplicação dos algoritmos de justiça. Dessa forma, a métrica permite avaliar em que medida a ordenação dos grupos segundo seus resultados positivos no conjunto de dados é preservada na ordenação de suas TPRs. Valores elevados de correlação indicam maior correspondência entre esses dois ranqueamentos e, segundo os autores, podem sinalizar a reificação ou o reforço de hierarquias subjacentes entre os subgrupos, mesmo quando métricas tradicionais, como a diferença máxima entre TPRs, indicam melhora na equidade. Os autores ressaltam, contudo, que essa correlação deve ser interpretada como uma informação adicional sobre o comportamento do modelo, não como uma medida direta das causas sociais das desigualdades.
+
+\citet{gardner2023cross} formalizam e utilizam a métrica AUC Gap Interseccional para medir Equidade de Performance Preditiva Interseccional. Eles calculam a AUROC não apenas para grupos marginais, mas também para as intersecções, e quantificam a injustiça como a distância absoluta máxima na performance preditiva entre qualquer par desses subgrupos sobrepostos. Os autores demonstram empiricamente que avaliações marginais clássicas mascaram disparidades enormes de performance que só aparecem na análise do AUC Gap com grupos cruzados.
+
+Já \citet{hu2024sequentially} transpõe a métrica de Paridade Demográfica para o uso do Transporte Ótimo via baricentros de Wasserstein. Eles tem como objetivo avaliar a justiça de forma que múltiplos atributos sensíveis sejam avaliados de forma coletiva e aditiva, permitindo avaliar não apenas se o modelo é justo em todas as interseções, mas permitindo acompanhar o ganho de justiça passo a passo caso o desenvolvedor precise flexibilizar a paridade para determinados atributos interseccionais. O grau global de injustiça do modelo preditivo sobre uma cadeia de múltiplos atributos é a soma simples da medida de injustiça de cada atributo sensível.
+
+Diante dessas limitações combinadas, torna-se evidente a necessidade de um framework flexível, que trate o conflito entre desempenho e equidade não como uma penalização estática, mas como uma busca global adaptativa. Esta proposta visa atender esta necessidade, simultaneamente permitindo e qualificando a supervisáo humana no processo decisório. % Ao empregar Otimização Multiobjetivo Evolutiva (via NSGA-II), esta tese propõe aproximar a Fronteira de Pareto empírica em espaços descontínuos, mitigando disparidades interseccionais estruturais sem incorrer nos custos proibitivos ou nas limitações arquiteturais apontadas pela literatura.

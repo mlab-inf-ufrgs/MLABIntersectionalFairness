@@ -153,6 +153,27 @@ def global_metrics_row(dataset_key, cfg):
     return row.iloc[0] if not row.empty else None
 
 
+def fairmlp_baseline_subgroup_table(dataset_key, cfg):
+    """Quebra por subgrupo do baseline de rede neural (FairMLP, λ=0,0 — sem mitigação)."""
+    sub = all_sub[
+        (all_sub["dataset"] == dataset_key)
+        & (all_sub["attrs"] == cfg["attrs"])
+        & (all_sub["model"] == "FairMLP")
+        & (all_sub["lambda_fairness"] == 0.0)
+    ]
+    if sub.empty:
+        return None
+    agg = sub.groupby("subgroup").agg(
+        n_mean=("n", "mean"),
+        favorable_rate=("favorable_rate", "mean"),
+        post_di=("post_di", "mean"),
+        tpr=("tpr", "mean"),
+        fpr=("fpr", "mean"),
+        aaod=("aaod", "mean"),
+    ).reset_index()
+    return agg.sort_values("favorable_rate", ascending=False).reset_index(drop=True)
+
+
 def lambda_sweep_table(dataset_key, cfg):
     sub = all_agg[
         (all_agg["dataset"] == dataset_key)
@@ -252,7 +273,7 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
                              "CI": m["CI"], "DI": m["DI"], "KL": m["KL"], "KS": m["KS"]})
             st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
 
-            with st.expander("Auditoria de Gerrymandering (todos os pares)"):
+            with st.expander("Auditoria de Gerrymandering (todos os pares)", expanded=True):
                 gerry = pairwise_gerrymandering_audit(
                     df, cfg["dynamic_attrs"], cfg["target_col"], cfg["favorable_val"]
                 )
@@ -267,7 +288,7 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
                     width='stretch', hide_index=True,
                 )
 
-            with st.expander("Matriz de CDDL (Disparidade Condicionada por Proxy)"):
+            with st.expander("Matriz de CDDL (Disparidade Condicionada por Proxy)", expanded=True):
                 cddl_parts = []
                 for prot_attr in cfg["dynamic_attrs"]:
                     dyn = calculate_dynamic_metrics(df, prot_attr, cfg["target_col"], cfg["favorable_val"])
@@ -332,22 +353,51 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
         st.divider()
         st.subheader("C. Mitigação por Rede Neural Artificial (FairMLP: Variação de λ)")
 
+        mlp_base_df = fairmlp_baseline_subgroup_table(dataset_key, cfg)
+        if mlp_base_df is not None:
+            st.markdown("**Baseline de rede neural sem mitigação (MLP, λ = 0,0) — quebra por subgrupo**")
+            show_mlp_base = mlp_base_df[["subgroup", "n_mean", "favorable_rate", "post_di", "tpr", "fpr", "aaod"]].rename(columns={
+                "subgroup": "Subgrupo", "n_mean": "N (média/fold)", "favorable_rate": "Taxa Favorável",
+                "post_di": "Post-DI", "tpr": "TPR", "fpr": "FPR", "aaod": "AAOD",
+            })
+
+            def _highlight_worst_mlp(row):
+                is_worst = row["AAOD"] == show_mlp_base["AAOD"].max()
+                return ["font-weight: bold" if is_worst else "" for _ in row]
+
+            st.dataframe(
+                show_mlp_base.style.format({
+                    "N (média/fold)": "{:.0f}", "Taxa Favorável": "{:.3f}", "Post-DI": "{:.3f}",
+                    "TPR": "{:.3f}", "FPR": "{:.3f}", "AAOD": "{:.3f}",
+                }).apply(_highlight_worst_mlp, axis=1),
+                width='stretch', hide_index=True,
+            )
+            st.caption(
+                "Referência para comparar com o melhor baseline de árvore (Seção B) — antes de qualquer "
+                "penalização de equidade ($\\lambda = 0$)."
+            )
+
         sweep_df = lambda_sweep_table(dataset_key, cfg)
         if sweep_df is None:
             st.info("Sem resultados de lambda sweep salvos para esta combinação ainda.")
         else:
-            show_sweep = sweep_df[["Configuração", "accuracy_mean", "roc_auc_mean", "pr_auc_mean",
-                                    "max_aaod_mean", "sensitivity_gap_mean"]].rename(columns={
-                "accuracy_mean": "Acurácia", "roc_auc_mean": "ROC-AUC", "pr_auc_mean": "PR-AUC",
-                "max_aaod_mean": "Max AAOD", "sensitivity_gap_mean": "Sensitivity Gap",
+            def _mean_std(mean_col, std_col, fmt="{:.4f}"):
+                return sweep_df.apply(
+                    lambda r: f"{fmt.format(r[mean_col])} ± {fmt.format(r[std_col])}"
+                    if not pd.isna(r.get(std_col, float('nan'))) else fmt.format(r[mean_col]),
+                    axis=1,
+                )
+
+            show_sweep = pd.DataFrame({
+                "Configuração": sweep_df["Configuração"],
+                "Acurácia": _mean_std("accuracy_mean", "accuracy_std"),
+                "ROC-AUC": _mean_std("roc_auc_mean", "roc_auc_std"),
+                "PR-AUC": _mean_std("pr_auc_mean", "pr_auc_std"),
+                "Max AAOD": _mean_std("max_aaod_mean", "max_aaod_std"),
+                "Sensitivity Gap": _mean_std("sensitivity_gap_mean", "sensitivity_gap_std"),
             })
-            st.dataframe(
-                show_sweep.style.format({
-                    "Acurácia": "{:.4f}", "ROC-AUC": "{:.4f}", "PR-AUC": "{:.4f}",
-                    "Max AAOD": "{:.4f}", "Sensitivity Gap": "{:.4f}",
-                }),
-                width='stretch', hide_index=True,
-            )
+            st.dataframe(show_sweep, width='stretch', hide_index=True)
+            st.caption("Valores no formato média ± desvio-padrão entre folds/execuções.")
             st.markdown("**Trade-off entre equidade e λ**")
             st.altair_chart(render_lambda_chart(sweep_df), width='stretch')
             st.caption(
