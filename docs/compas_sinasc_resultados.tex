@@ -1,0 +1,263 @@
+\subsection{COMPAS}
+
+O dataset COMPAS manteve 6.688 (93\%) dos 7.214 registros originais após o pré-processamento. Diferentemente do Adult, a variável-alvo (\texttt{two\_year\_recid}) é relativamente balanceada, com $54,04\%$ das instâncias correspondendo à classe favorável (não reincidência em dois anos). Para avaliação de equidade em nível de dados, adotamos o mesmo critério dinâmico já descrito: os grupos com maior taxa de sucesso (não reincidência) são atribuídos como privilegiados, e aqueles com menor taxa, como desprivilegiados.
+
+\begin{table}[H]
+    \centering
+    \caption{Métricas dinâmicas de viés (Fairness) avaliadas por atributo sensível para o dataset COMPAS.}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ll|cccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Atributo}} & \textit{Privilegiado} & \textit{Desprivilegiado} & \textit{CI} & \textit{DI} & \textit{KL} & \textit{KS} \\
+        \hline
+        sex        & female   & male             & -0.61 & 0.81 & 0.028 & 0.118 \\
+        race       & hispanic & african-american & -0.71 & 0.76 & 0.045 & 0.150 \\
+        age\_group & senior   & young            & -0.67 & 0.68 & 0.101 & 0.223 \\
+        \hline
+        \multicolumn{7}{l}{\small \textbf{CI}: Class Imbalance | \textbf{DI}: Disparate Impact | \textbf{KL}: Kullback-Leibler | \textbf{KS}: Kolmogorov-Smirnov}
+    \end{tabular}
+    }
+    \label{tab:compas_dynamic_bias_metrics}
+\end{table}
+
+O COMPAS não possui, na configuração adotada neste trabalho, proxies socioeconômicos análogos à educação ou ao tipo de relacionamento do Adult -- as variáveis não protegidas disponíveis (gravidade da acusação e número de condenações prévias, Tabela~\ref{tab:compas-info}) referem-se ao histórico criminal do réu, e não foram tratadas como proxies de privilégio nesta análise. A avaliação em nível de dados concentra-se, portanto, nos três atributos sensíveis.
+
+O CI negativo em todos os três atributos indica que os grupos desprivilegiados (homens, negros e jovens) são numericamente majoritários no conjunto de dados -- padrão oposto ao observado no Adult, em que os grupos privilegiados dominavam a amostra. O DI, por sua vez, mostra disparidades mais moderadas do que no Adult: sexo ($DI=0,81$) fica acima do limiar de $0,80$ da regra dos 80\%, enquanto raça ($DI=0,76$) e faixa etária ($DI=0,68$) ficam abaixo. Em termos de taxas brutas, mulheres não reincidem em $63,5\%$ dos casos contra $51,7\%$ dos homens; hispânicos não reincidem em $63,4\%$ dos casos, seguidos por brancos ($60,2\%$) e negros ($48,4\%$, o grupo com menor taxa de sucesso); e idosos ($70,0\%$) superam adultos de meia-idade ($62,1\%$) e jovens ($47,7\%$, novamente o grupo com menor taxa). A divergência KL e a distância KS confirmam esse padrão, sendo mais pronunciadas para faixa etária do que para sexo ou raça.
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados da auditoria de viés interseccional oculto em pares de atributos sensíveis (COMPAS).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|cc|ccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Par de Intersecção}} & \textit{Gap A} & \textit{Gap B} & \textit{Esperado} & \textit{Real} & \textit{Oculto} \\
+        \hline
+        sex $\times$ age\_group  & 11.78\% & 22.27\% & 22.27\% & 35.01\% & +12.75\% \\
+        race $\times$ age\_group & 14.96\% & 22.27\% & 22.27\% & 30.57\% & +8.31\%  \\
+        sex $\times$ race        & 11.78\% & 14.96\% & 14.96\% & 22.12\% & +7.16\%  \\
+        \hline
+        \multicolumn{6}{l}{\small * \textit{Gap Esperado} é o valor máximo entre Gap A e Gap B.} \\
+    \end{tabular}
+    }
+    \label{tab:compas_gerrymandering_audit}
+\end{table}
+
+Ainda que os gaps marginais do COMPAS sejam, em termos absolutos, menores que os do Adult, o viés oculto está presente nos três pares possíveis de atributos sensíveis, sendo mais acentuado no cruzamento entre sexo e faixa etária ($+12,75$ pontos percentuais). Isso indica que, mesmo em um conjunto de dados com disparidades marginais relativamente contidas, a combinação de atributos sensíveis segue produzindo uma disparidade real superior à esperada pela análise unidimensional.
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Matriz completa de CDDL para o dataset COMPAS, por atributo sensível $\times$ variável condicionante, em ordem decrescente.}
+    \vspace{2mm}
+    \begin{tabular}{lll|c}
+        \hline
+        \multicolumn{1}{c}{\textit{Atributo Protegido}} & \textit{Grupo Desprivilegiado} & \textit{Variável condicionante} & \textit{CDDL} \\
+        \hline
+        age\_group & Young             & sex        & 0,1595 \\
+        age\_group & Young             & race       & 0,1419 \\
+        race       & African-American  & sex        & 0,1187 \\
+        race       & African-American  & age\_group & 0,0975 \\
+        sex        & Male              & age\_group & 0,0752 \\
+        sex        & Male              & race       & 0,0704 \\
+        \hline
+        \multicolumn{4}{p{0.85\textwidth}}{\footnotesize Cada linha mede a disparidade condicional sofrida pelo grupo desprivilegiado (col. 2), segmentando os rótulos pelos estratos da variável condicionante (col. 3).}
+    \end{tabular}
+    \label{tab:compas_cddl}
+\end{table}
+
+A CDDL confirma o padrão observado na auditoria de \textit{gerrymandering}: a faixa etária jovem concentra as maiores disparidades condicionais, tanto quando estratificada por sexo ($0,1595$) quanto por raça ($0,1419$), seguida pelo grupo racial negro estratificado por sexo ($0,1187$). Assim como no Adult, o padrão sugere que os efeitos de idade e raça se compõem de forma superior à soma de seus efeitos isolados.
+
+Avaliamos, a seguir, como essas disparidades se manifestam nas predições dos modelos treinados. Diferentemente do Adult, o atributo raça no COMPAS possui três categorias (\textit{African-American}, \textit{Caucasian}, \textit{Hispanic}), de forma que o cruzamento sexo $\times$ raça produz seis subgrupos interseccionais, e não quatro:
+
+\begin{itemize}
+    \item \textbf{Female \& Hispanic} ($N = 102$): $67,65\%$ possuem desfecho favorável (grupo de referência, $\text{Pre-DI} = 1,000$).
+    \item \textbf{Female \& Caucasian} ($N = 562$): $64,59\%$ ($\text{Pre-DI} = 0,955$; $\text{Pre-SPD} = -3,06\%$).
+    \item \textbf{Male \& Hispanic} ($N = 526$): $62,55\%$ ($\text{Pre-DI} = 0,925$; $\text{Pre-SPD} = -5,10\%$).
+    \item \textbf{Female \& African-American} ($N = 646$): $61,92\%$ ($\text{Pre-DI} = 0,915$; $\text{Pre-SPD} = -5,73\%$).
+    \item \textbf{Male \& Caucasian} ($N = 1.832$): $58,84\%$ ($\text{Pre-DI} = 0,870$; $\text{Pre-SPD} = -8,80\%$).
+    \item \textbf{Male \& African-American} ($N = 3.020$): apenas $45,53\%$ possuem desfecho favorável ($\text{Pre-DI} = 0,673$; $\text{Pre-SPD} = -22,12\%$).
+\end{itemize}
+
+O subgrupo Male \& African-American, além de ser o maior em tamanho amostral (quase metade da base), é também o mais desfavorecido, com uma taxa de não reincidência quase 22 pontos percentuais abaixo do grupo de referência -- disparidade maior do que qualquer um dos gaps marginais individuais de sexo ou raça isoladamente (Tabela~\ref{tab:compas_dynamic_bias_metrics}), reforçando novamente o efeito de composição interseccional.
+
+O melhor \textit{baseline} em termos de desempenho foi o Gradient Boosting otimizado por AUROC, atingindo acurácia de $64,1\%$, AUROC de $0,691$ e AUPRC de $0,697$ -- desempenho consideravelmente mais modesto do que o observado no Adult, refletindo a dificuldade inerente da tarefa de predição de reincidência.
+
+\begin{table}[H]
+    \centering
+    \caption{Métricas de equidade interseccional pós-treino por subgrupo (COMPAS, GradientBoosting, melhor baseline), média entre 3 folds externos.}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|cccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Subgrupo}} & \textit{N (teste/fold)} & \textit{Taxa Favorável} & \textit{Post-DI} & \textit{TPR} & \textit{FPR} & \textit{AAOD} \\
+        \hline
+        Female \& Hispanic & 34 & 0,724 & 0,962 & 0,822 & 0,478 & 0,072 \\
+        Female \& Caucasian & 187 & 0,710 & 0,950 & 0,804 & 0,548 & 0,033 \\
+        Male \& Hispanic & 175 & 0,657 & 0,879 & 0,736 & 0,522 & 0,079 \\
+        Male \& Caucasian & 611 & 0,634 & 0,849 & 0,733 & 0,494 & 0,091 \\
+        Female \& African-American & 215 & 0,567 & 0,759 & 0,671 & 0,399 & 0,170 \\
+        \textbf{Male \& African-American} & \textbf{1.007} & \textbf{0,437} & \textbf{0,583} & \textbf{0,573} & \textbf{0,323} & \textbf{0,256} \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:compas_subgroup_posttrain}
+\end{table}
+
+O padrão pós-treino agrava a disparidade já presente nos dados: o subgrupo Male \& African-American, que já era o mais desfavorecido no pré-treino (Pre-DI $=0,673$), tem seu Post-DI reduzido ainda mais, para $0,583$, com o maior AAOD entre os três datasets analisados neste capítulo ($0,256$) -- cerca de três vezes o pior valor observado no Adult ($0,0845$, Tabela~\ref{tab:adult_subgroup_posttrain}). A TPR deste subgrupo ($57,3\%$) é a mais baixa entre os seis subgrupos, indicando que réus negros do sexo masculino têm suas chances de reincidência futura subestimadas com menor frequência relativa correta do que os demais grupos -- um padrão de risco documentado na literatura sobre o COMPAS desde a investigação original da ProPublica \citep{angwin2016machine}.
+
+Analisamos também a MLP sem mitigação ($\lambda = 0,0$) como \textit{baseline} de rede neural. Para o mesmo subgrupo mais vulnerável, a MLP apresentou Post-DI $= 0,605$, TPR $= 0,615$ e AAOD $= 0,265$ -- desempenho preditivo ligeiramente superior ao do Gradient Boosting para este subgrupo específico (maior taxa favorável e maior TPR), porém com AAOD também mais alto, indicando uma equidade marginalmente pior apesar do ganho de sensibilidade.
+
+\begin{table}[H]
+    \centering
+    \caption{COMPAS: Efeito da penalização de viés na FairMLP (lambda sweep).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Configuração}} & \textit{Acurácia} & \textit{ROC-AUC} & \textit{PR-AUC} & \textit{Max AAOD} $\downarrow$ & \textit{Sens. Gap} $\downarrow$ \\
+        \hline
+        \textbf{MLP sem mitigação} ($\lambda = 0,0$) & 0,6361 $\pm$ 0,0080 & 0,6902 $\pm$ 0,0062 & 0,6972 $\pm$ 0,0110 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+        FairMLP ($\lambda = 0,5$) & 0,6361 $\pm$ 0,0080 & 0,6902 $\pm$ 0,0061 & 0,6972 $\pm$ 0,0109 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+        FairMLP ($\lambda = 1,0$) & 0,6361 $\pm$ 0,0080 & 0,6901 $\pm$ 0,0062 & 0,6968 $\pm$ 0,0114 & 0,2649 $\pm$ 0,0548 & 0,2298 $\pm$ 0,0288 \\
+        FairMLP ($\lambda = 2,0$) & 0,6343 $\pm$ 0,0065 & 0,6888 $\pm$ 0,0078 & 0,6952 $\pm$ 0,0142 & 0,2666 $\pm$ 0,0532 & 0,2233 $\pm$ 0,0230 \\
+        FairMLP ($\lambda = 4,0$) & 0,6346 $\pm$ 0,0069 & 0,6882 $\pm$ 0,0058 & 0,6938 $\pm$ 0,0103 & \textbf{0,2284} $\pm$ 0,0130 & \textbf{0,1972} $\pm$ 0,0349 \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:compas_lambda_sweep}
+\end{table}
+
+O comportamento da penalização no COMPAS difere substancialmente do observado no Adult. Entre $\lambda = 0,0$ e $\lambda = 1,0$, o Max AAOD e o Sensitivity Gap permanecem \textbf{praticamente inalterados} ($0,2649$ e $0,2298$, respectivamente, em todas as três configurações) -- a penalização de Paridade Demográfica não produz efeito perceptível de mitigação nesse intervalo. Em $\lambda = 2,0$, o Max AAOD chega a piorar ligeiramente ($0,2666$), ainda que o Sensitivity Gap melhore de forma marginal. Apenas em $\lambda = 4,0$ observa-se uma redução consistente de ambas as métricas (Max AAOD $0,2284$; Sensitivity Gap $0,1972$), a um custo de desempenho comparativamente pequeno (acurácia $0,6346$ contra $0,6361$ do baseline). Esse padrão de \textbf{resistência estrutural} à mitigação em baixas intensidades de penalização -- em contraste com a resposta mais gradual observada no Adult -- sugere que a eficácia da penalização escalar depende fortemente das características do conjunto de dados, reforçando a necessidade de uma exploração mais ampla do espaço de compromissos (como a proporcionada pela Fronteira de Pareto) em vez de um único valor de $\lambda$ fixado a priori.
+
+Em síntese, os resultados do COMPAS mostram que (i) apesar de disparidades marginais mais moderadas que as do Adult, o viés interseccional oculto está presente em todos os pares de atributos sensíveis avaliados; (ii) o subgrupo Male \& African-American apresenta o pior desempenho pós-treino entre os três datasets analisados, tanto em termos de Post-DI quanto de AAOD; e (iii) a penalização escalar de equidade exibe uma resposta não linear e amplamente resistente em baixas intensidades, só produzindo mitigação perceptível em $\lambda = 4,0$ -- um comportamento distinto do observado no Adult, que reforça a necessidade de explorar o espaço de compromissos de forma adaptativa ao invés de assumir uma relação uniforme entre $\lambda$ e a equidade resultante entre diferentes contextos de aplicação.
+
+\subsection{Sistema de Informações sobre Nascidos Vivos (SINASC/SUS)}
+
+O dataset SINASC manteve 2.474.535 (97\%) dos 2.561.922 registros originais após o pré-processamento (Tabela~\ref{tab:sinasc_characteristics}). Diferentemente do Adult e do COMPAS, a variável-alvo apresenta um desbalanceamento extremo: apenas $9,4\%$ dos nascimentos são classificados como ``Baixo Peso'' (classe desfavorável), enquanto $90,6\%$ correspondem a peso normal ao nascer (classe favorável).
+
+\begin{table}[H]
+    \centering
+    \caption{Métricas dinâmicas de viés (Fairness) avaliadas por atributo sensível/proxy para o dataset SINASC.}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ll|cccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Atributo}} & \textit{Privilegiado} & \textit{Desprivilegiado} & \textit{CI} & \textit{DI} & \textit{KL} & \textit{KS} \\
+        \hline
+        raca\_cor\_mae     & parda      & preta               & 0.77  & 0.98 & 0.001 & 0.017 \\
+        idade\_mae         & adulta (20--34) & madura ($>$34) & 0.60  & 0.97 & 0.003 & 0.023 \\
+        escolaridade\_mae  & superior   & nenhuma             & 0.97  & 0.95 & 0.012 & 0.050 \\
+        uf                 & MA         & MG                  & -0.43 & 0.97 & 0.004 & 0.025 \\
+        \hline
+        \multicolumn{7}{l}{\small \textbf{CI}: Class Imbalance | \textbf{DI}: Disparate Impact | \textbf{KL}: Kullback-Leibler | \textbf{KS}: Kolmogorov-Smirnov}
+    \end{tabular}
+    }
+    \label{tab:sinasc_dynamic_bias_metrics}
+\end{table}
+
+Ao contrário do Adult e do COMPAS, as métricas unidimensionais do SINASC mostram disparidades marginais muito próximas da paridade estatística: todos os valores de DI situam-se entre $0,95$ e $0,98$, muito acima do limiar de $0,80$ da regra dos 80\%, e as divergências KL e KS são residuais (KL $\leq 0,012$; KS $\leq 0,050$). Em termos de taxas brutas, a proporção de nascimentos com peso normal varia pouco entre categorias de raça/cor (entre $89,0\%$ para mães pretas e $90,7\%$ para mães pardas ou brancas), faixa etária (entre $88,9\%$ para mães maduras e $91,2\%$ para mães adultas) e escolaridade (entre $86,1\%$ para mães sem escolaridade e $91,0\%$ para mães com ensino superior). Isolada e superficialmente, essa aparente homogeneidade poderia sugerir a ausência de viés relevante em nível de dados -- conclusão que a análise interseccional a seguir contradiz de forma direta.
+
+\begin{table}[H]
+    \centering
+    \caption{Resultados da auditoria de viés interseccional oculto em pares de atributos sensíveis/proxies (SINASC).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|cc|ccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Par de Intersecção}} & \textit{Gap A} & \textit{Gap B} & \textit{Esperado} & \textit{Real} & \textit{Oculto} \\
+        \hline
+        escolaridade\_mae $\times$ uf         & 4.96\% & 2.49\% & 4.96\% & 16.30\% & +11.34\% \\
+        raca\_cor\_mae $\times$ uf             & 1.65\% & 2.49\% & 2.49\% & 9.24\%  & +6.75\%  \\
+        idade\_mae $\times$ uf                 & 2.33\% & 2.49\% & 2.49\% & 5.39\%  & +2.90\%  \\
+        idade\_mae $\times$ escolaridade\_mae  & 2.33\% & 4.96\% & 4.96\% & 7.56\%  & +2.60\%  \\
+        raca\_cor\_mae $\times$ idade\_mae     & 1.65\% & 2.33\% & 2.33\% & 4.57\%  & +2.24\%  \\
+        raca\_cor\_mae $\times$ escolaridade\_mae & 1.65\% & 4.96\% & 4.96\% & 7.07\%  & +2.11\%  \\
+        \hline
+        \multicolumn{6}{l}{\small * \textit{Gap Esperado} é o valor máximo entre Gap A e Gap B.} \\
+    \end{tabular}
+    }
+    \label{tab:sinasc_gerrymandering_audit}
+\end{table}
+
+O resultado mais expressivo da auditoria de \textit{gerrymandering} no SINASC é justamente o cruzamento entre os dois proxies (escolaridade e UF): enquanto os gaps marginais de cada variável isoladamente são pequenos ($4,96\%$ e $2,49\%$), o gap real observado ao cruzá-las atinge $16,30\%$ -- mais de três vezes o gap esperado, revelando um viés oculto de $+11,34$ pontos percentuais. Trata-se, entre os três conjuntos de dados analisados, do caso em que a desproporção relativa entre a disparidade marginal e a interseccional é mais acentuada: exatamente o cenário que a análise unidimensional, isoladamente, seria incapaz de identificar.
+
+\begin{table}[H]
+    \centering
+    \small
+    \caption{Matriz completa de CDDL para o dataset SINASC, por atributo sensível/proxy $\times$ variável condicionante, em ordem decrescente.}
+    \vspace{2mm}
+    \begin{tabular}{lll|c}
+        \hline
+        \multicolumn{1}{c}{\textit{Atributo Protegido}} & \textit{Grupo Desprivilegiado} & \textit{Variável condicionante} & \textit{CDDL} \\
+        \hline
+        idade\_mae        & Madura ($>$34) & escolaridade\_mae & 0,0353 \\
+        idade\_mae        & Madura ($>$34) & raca\_cor\_mae    & 0,0346 \\
+        idade\_mae        & Madura ($>$34) & uf                & 0,0319 \\
+        raca\_cor\_mae    & Preta          & idade\_mae        & 0,0135 \\
+        raca\_cor\_mae    & Preta          & escolaridade\_mae & 0,0127 \\
+        raca\_cor\_mae    & Preta          & uf                & 0,0107 \\
+        uf                & MG             & escolaridade\_mae & 0,0102 \\
+        uf                & MG             & idade\_mae        & 0,0095 \\
+        uf                & MG             & raca\_cor\_mae    & 0,0088 \\
+        escolaridade\_mae & Nenhuma        & uf                & 0,0020 \\
+        escolaridade\_mae & Nenhuma        & raca\_cor\_mae    & 0,0017 \\
+        escolaridade\_mae & Nenhuma        & idade\_mae        & 0,0015 \\
+        \hline
+        \multicolumn{4}{p{0.85\textwidth}}{\footnotesize Cada linha mede a disparidade condicional sofrida pelo grupo desprivilegiado (col. 2), segmentando os rótulos pelos estratos da variável condicionante (col. 3).}
+    \end{tabular}
+    \label{tab:sinasc_cddl}
+\end{table}
+
+Os valores de CDDL do SINASC são substancialmente menores, em magnitude absoluta, do que os observados no Adult (máximo de $0,0353$ contra $0,3106$), consistente com a menor disparidade marginal já discutida. Ainda assim, o padrão estrutural se repete: a faixa etária materna madura ($>$34 anos) concentra as maiores disparidades condicionais, independentemente da variável de estratificação utilizada -- sugerindo que, mesmo em um contexto de disparidades marginais pequenas, a combinação com outros atributos preserva uma estrutura de desvantagem relativa consistente.
+
+Diferentemente do Adult e do COMPAS, a caracterização interseccional pré-treino do SINASC (segundo os atributos protegidos raça/cor e faixa etária da mãe, conforme configurado para as demais análises deste capítulo) produz $15$ subgrupos, e não $4$ ou $6$, dado que raça/cor possui cinco categorias e faixa etária, três. Os extremos ilustram a mesma tendência: o subgrupo de referência é \textbf{Indígena \& Adulta (20-34)} ($N=16.311$; $91,66\%$ de nascimentos com peso normal; $\text{Pre-DI}=1,000$), e o subgrupo mais desfavorecido é \textbf{Preta \& Madura ($>$34)} ($N=31.961$; $87,09\%$; $\text{Pre-DI}=0,950$; $\text{Pre-SPD}=-4,57\%$) -- uma disparidade relativa pequena, mas que, dado o volume populacional do SINASC, corresponde a milhares de nascimentos adicionais classificados como baixo peso a cada ano nesse subgrupo específico, se a proporção do grupo de referência fosse aplicada.
+
+O melhor \textit{baseline} em termos de desempenho -- Gradient Boosting otimizado por AUPRC -- atingiu acurácia de $90,57\%$ e AUPRC de $0,914$. Esse resultado, à primeira vista favorável, esconde um problema crítico: a acurácia de $90,57\%$ \textbf{coincide exatamente} com a proporção da classe majoritária no conjunto de dados ($90,6\%$), e o AUROC correspondente é de apenas $0,533$ -- marginalmente acima do nível do acaso ($0,5$). Isso indica que o modelo colapsou para prever sistematicamente a classe majoritária (``peso normal'') para toda e qualquer instância, independentemente dos atributos de entrada.
+
+\begin{table}[H]
+    \centering
+    \caption{Métricas de equidade interseccional pós-treino por subgrupo (SINASC, GradientBoosting, melhor baseline) -- amostra de subgrupos selecionados, média entre 3 folds externos.}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|cccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Subgrupo}} & \textit{N (teste/fold)} & \textit{Taxa Favorável} & \textit{Post-DI} & \textit{TPR} & \textit{FPR} & \textit{AAOD} \\
+        \hline
+        Branca \& Adulta (20-34) & 196.285 & 1,000 & 1,000 & 1,000 & 1,000 & 0,000 \\
+        Parda \& Adulta (20-34) & 330.601 & 1,000 & 1,000 & 1,000 & 1,000 & 0,000 \\
+        Preta \& Madura ($>$34) & 10.654 & 1,000 & 1,000 & 1,000 & 1,000 & 0,000 \\
+        Indígena \& Jovem ($<$20) & 2.379 & 1,000 & 1,000 & 1,000 & 1,000 & 0,000 \\
+        \hline
+        \multicolumn{7}{p{0.9\textwidth}}{\footnotesize Os 15 subgrupos interseccionais avaliados apresentam, sem exceção, os mesmos valores (Taxa Favorável = Post-DI = TPR = FPR = 1,000; AAOD = 0,000), refletindo o colapso total do modelo para a classe majoritária.}
+    \end{tabular}
+    }
+    \label{tab:sinasc_subgroup_posttrain}
+\end{table}
+
+O padrão de colapso se confirma de forma absoluta: os quinze subgrupos interseccionais avaliados apresentam, sem nenhuma exceção, Taxa Favorável, Post-DI, TPR e FPR iguais a $1,000$, e AAOD igual a $0,000$. O modelo prediz a classe favorável para $100\%$ das instâncias de teste, em todo e qualquer subgrupo, produzindo métricas de equidade interseccional trivialmente perfeitas -- não porque o modelo seja justo, mas porque ele não realiza nenhuma discriminação real entre as classes. A MLP sem mitigação ($\lambda=0,0$) apresenta exatamente o mesmo padrão de colapso total, com Taxa Favorável, Post-DI e TPR iguais a $1,000$ e AAOD igual a $0,000$ em todos os quinze subgrupos.
+
+\begin{table}[H]
+    \centering
+    \caption{SINASC: Efeito da penalização de viés na FairMLP (lambda sweep).}
+    \vspace{2mm}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{l|ccccc}
+        \hline
+        \multicolumn{1}{c|}{\textit{Configuração}} & \textit{Acurácia} & \textit{ROC-AUC} & \textit{PR-AUC} & \textit{Max AAOD} $\downarrow$ & \textit{Sens. Gap} $\downarrow$ \\
+        \hline
+        \textbf{MLP sem mitigação} ($\lambda = 0,0$) & 0,9057 $\pm$ 0,0000 & 0,5326 $\pm$ 0,0006 & 0,9138 $\pm$ 0,0002 & 0,0000 $\pm$ 0,0000 & 0,0000 $\pm$ 0,0000 \\
+        FairMLP ($\lambda = 0,5$) & 0,9057 $\pm$ 0,0000 & 0,5323 $\pm$ 0,0008 & 0,9137 $\pm$ 0,0002 & 0,0000 $\pm$ 0,0000 & 0,0000 $\pm$ 0,0000 \\
+        FairMLP ($\lambda = 1,0$) & 0,9057 $\pm$ 0,0000 & 0,5326 $\pm$ 0,0006 & 0,9138 $\pm$ 0,0002 & 0,0000 $\pm$ 0,0000 & 0,0000 $\pm$ 0,0000 \\
+        FairMLP ($\lambda = 2,0$) & 0,9057 $\pm$ 0,0000 & 0,5324 $\pm$ 0,0009 & 0,9138 $\pm$ 0,0002 & 0,0000 $\pm$ 0,0000 & 0,0000 $\pm$ 0,0000 \\
+        FairMLP ($\lambda = 4,0$) & 0,9057 $\pm$ 0,0000 & 0,5323 $\pm$ 0,0010 & 0,9137 $\pm$ 0,0003 & 0,0000 $\pm$ 0,0000 & 0,0000 $\pm$ 0,0000 \\
+        \hline
+    \end{tabular}
+    }
+    \label{tab:sinasc_lambda_sweep}
+\end{table}
+
+O \textit{sweep} de $\lambda$ no SINASC ilustra o limite mais severo da abordagem de penalização escalar: a acurácia permanece idêntica ($0,9057$, com desvio-padrão nulo) e as métricas de equidade permanecem em zero absoluto para \textbf{todos} os valores de $\lambda$ testados, incluindo $\lambda = 4,0$. Isso ocorre porque a penalização de Paridade Demográfica mede o desvio entre a taxa de aprovação de cada subgrupo e a taxa média global; quando o modelo já converge para uma solução degenerada em que todas as taxas são idênticas (sempre positivas), esse termo já está em seu valor mínimo possível, e não fornece gradiente de correção algum, por maior que seja $\lambda$. A penalização escalar de equidade é, portanto, estruturalmente incapaz de reverter um colapso preditivo causado por desbalanceamento extremo de classes -- ela pressupõe um modelo que já produz alguma variação em suas predições para poder equalizá-la entre grupos.
+
+Em síntese, os resultados do SINASC revelam um modo de falha qualitativamente distinto dos observados no Adult e no COMPAS: (i) as disparidades marginais em nível de dados são pequenas, mas a auditoria interseccional revela viés oculto substancial, especialmente no cruzamento entre escolaridade e unidade federativa; (ii) diante do desbalanceamento extremo de classes ($9,4\%$ de casos desfavoráveis), tanto os \textit{baselines} de árvore quanto a MLP -- com ou sem penalização de equidade -- colapsam para prever sistematicamente a classe majoritária, produzindo métricas de equidade interseccional triviais e enganosamente perfeitas; e (iii) a penalização escalar de Paridade Demográfica é incapaz de escapar desse colapso em qualquer intensidade testada, evidenciando que o problema do desbalanceamento de classes precisa ser tratado como uma condição prévia -- e não apenas como um objetivo concorrente -- à mitigação de viés interseccional na arquitetura proposta para a tese (Capítulo~\ref{chap:proposta}).

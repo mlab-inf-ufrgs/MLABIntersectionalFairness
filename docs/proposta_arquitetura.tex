@@ -1,0 +1,84 @@
+\chapter{Arquitetura Proposta: Otimização Multiobjetivo com \textit{Debiasing} Adversarial}\label{chap:proposta}
+
+\section{Visão Geral e Motivação}
+
+Os resultados preliminares apresentados no Capítulo~\ref{sec:resultados} demonstraram, empiricamente, o limite central discutido na Seção~\ref{subsec:teoremas_impossibilidade}: a penalização escalar de Paridade Demográfica na FairMLP reduz o Max AAOD até $\lambda = 2,0$, mas piora o Sensitivity Gap de forma praticamente monotônica no mesmo intervalo. Não existe, para o dataset Adult, um único valor de $\lambda$ que otimize simultaneamente as duas métricas de equidade consideradas. Este capítulo propõe uma arquitetura que responde diretamente a essa limitação, substituindo a escolha implícita de um único ponto de equilíbrio por uma busca explícita ao longo da Fronteira de Pareto (Seção~\ref{sec:moop_pareto}), com dois componentes centrais:
+
+\begin{enumerate}
+    \item \textbf{Otimização Multiobjetivo Evolutiva} via NSGA-II \citep{deb2002fast}, que substitui a busca manual por um único hiperparâmetro de penalização por uma exploração sistemática do espaço de compromissos entre desempenho e equidade, devolvendo ao pesquisador (e, em última instância, à supervisão humana discutida na Seção~\ref{sec:supervisao_humana}) um conjunto de soluções não dominadas entre as quais escolher, em vez de uma única solução pré-determinada.
+    \item \textbf{Debiasing adversarial via \textit{Gradient Reversal Layer} (GRL)} \citep{ganin2015unsupervised}, que substitui o termo de penalização direta na função de perda (Seção~\ref{subsec:modelos_protocolo}) por um mecanismo adversarial: um classificador auxiliar tenta prever o atributo sensível a partir da representação aprendida pela rede, enquanto a camada de reversão de gradiente força o extrator de características a dificultar essa predição. Esta arquitetura instancia, com uma implementação distinta, o paradigma de \textit{Adversarial Debiasing} já sistematizado em trabalho anterior \citep{zhang2018adversarial,deconstruindo}, substituindo a alternância explícita entre preditor e adversário por uma única passagem de treinamento com gradiente invertido.
+\end{enumerate}
+
+A combinação dos dois componentes -- múltiplos adversários controlados por múltiplas intensidades de reversão de gradiente, avaliados sob múltiplos objetivos de equidade -- transforma a escolha de hiperparâmetro único ($\lambda$ na FairMLP) em um vetor de decisão multidimensional, diretamente otimizável por um algoritmo evolutivo.
+
+\section{Formalização da Arquitetura}\label{sec:formalizacao_arquitetura}
+
+Seja $\mathcal{A} = \{S_1, \ldots, S_N\}$ o conjunto de $N$ atributos sensíveis considerados para um dado conjunto de dados (Seção~\ref{subsec:justica_interseccional}). A arquitetura proposta consiste em uma rede neural com um extrator de características compartilhado $\phi_\theta(x)$, do qual derivam $N+1$ ramos:
+
+\begin{itemize}
+    \item Uma \textbf{cabeça de tarefa} $f_\theta(\phi_\theta(x))$, que prediz o desfecho-alvo $\hat{y}$;
+    \item $N$ \textbf{cabeças adversariais} $a_{\theta_i}(\text{GRL}_{\lambda_i}(\phi_\theta(x)))$, uma para cada atributo sensível $S_i \in \mathcal{A}$, em que $\text{GRL}_{\lambda_i}$ aplica a identidade no \textit{forward pass} e multiplica o gradiente por $-\lambda_i$ no \textit{backward pass}, invertendo o sinal de aprendizado do adversário antes que ele alcance o extrator compartilhado.
+\end{itemize}
+
+O treinamento minimiza a soma das perdas de entropia cruzada binária de todas as cabeças (peso $1,0$ para cada uma), sendo a força da pressão de equidade por atributo controlada inteiramente pelo vetor $\boldsymbol{\lambda} = (\lambda_1, \ldots, \lambda_N)$ embutido nas camadas GRL, e não por pesos na função de perda.
+
+Instanciando a formulação geral da Seção~\ref{sec:moop_pareto} ($\max_{x \in X} (D(x), -I_{g_1}(x), \ldots, -I_{g_m}(x))$), o espaço de decisão passa a ser $X = [0, \lambda_{\max}]^N$, cada solução candidata é o próprio vetor $\boldsymbol{\lambda}$, e o vetor de objetivos é:
+
+\begin{equation}
+    \mathbf{f}(\boldsymbol{\lambda}) = \left( D(\boldsymbol{\lambda}),\ -I_{S_1}(\boldsymbol{\lambda}),\ \ldots,\ -I_{S_N}(\boldsymbol{\lambda}) \right),
+\end{equation}
+
+em que $D(\boldsymbol{\lambda})$ é o desempenho preditivo (AUPRC) do modelo treinado com aquele vetor de intensidades adversariais, e $I_{S_i}(\boldsymbol{\lambda})$ é uma métrica de injustiça associada ao atributo $S_i$. O NSGA-II \citep{deb2002fast} evolui uma população de vetores $\boldsymbol{\lambda}$ por seleção, cruzamento e mutação, aproximando iterativamente o conjunto Pareto-ótimo $\mathcal{P}$ (Seção~\ref{sec:moop_pareto}) sem exigir que o gradiente da injustiça seja diferenciável em relação a $\boldsymbol{\lambda}$ -- vantagem relevante frente a métodos baseados em gradiente contínuo, já que a avaliação de $I_{S_i}$ envolve o retreinamento completo da rede a cada consulta.
+
+\subsection*{Sobre a escolha dos objetivos de equidade}
+
+Na formulação inicial, cada $I_{S_i}$ é definido como o \textbf{gap marginal} de Equalized Odds do atributo $S_i$ isolado (soma das diferenças de TPR e FPR entre os grupos daquele atributo) -- e não como uma métrica interseccional (Max AAOD ou Sensitivity Gap, Seção~\ref{subsec:metricas_postreino}). Esta é uma escolha deliberada para a fase inicial da investigação: com $N$ objetivos de equidade marginais mais o desempenho, é possível observar como a Fronteira de Pareto se comporta quando cada atributo sensível é otimizado explicitamente, antes de se decidir se -- e como -- substituir ou complementar esses $N$ objetivos marginais por um número menor de objetivos agregados de natureza interseccional. Esta decisão de projeto tem uma consequência direta discutida na Seção~\ref{sec:generalizacao_avaliacao}: o número de objetivos cresce linearmente com $N$, aproximando o problema de um cenário de otimização \textit{muitos-objetivos} (\textit{many-objective optimization}), no qual a Fronteira de Pareto tende a se tornar maior e mais difícil de representar e de navegar \citep{wagner2007pareto}.
+
+\section{Prova de Conceito Preliminar}\label{sec:prova_conceito}
+
+A viabilidade técnica da arquitetura foi testada em um protótipo implementado para o dataset Adult, com $N=2$ atributos sensíveis (sexo e raça) e, portanto, três objetivos: maximizar AUPRC, minimizar o gap marginal de \textit{Equalized Odds} para sexo e minimizar o gap marginal de \textit{Equalized Odds} para raça. O extrator compartilhado consiste em duas camadas densas (32 e 16 unidades, ReLU); cada cabeça adversarial consiste em uma camada GRL seguida de uma camada densa de 8 unidades e uma saída sigmoide. A otimização foi conduzida com NSGA-II via a biblioteca DEAP \citep{fortin2012deap}: população de 80 indivíduos, 80 descendentes por geração, 35 gerações, cruzamento por mistura (\textit{blend crossover}, $\alpha=0,5$, $p=0,6$) e mutação gaussiana ($\mu=1,5$, $\sigma=0,5$, $p=0,2$ por gene), com cada indivíduo (vetor $\boldsymbol{\lambda} = (\lambda_1, \lambda_2)$) avaliado por meio do retreinamento completo da rede (até 50 épocas, parada antecipada por perda de validação).
+
+Esta prova de conceito \textbf{não é incorporada como resultado da tese}: ela demonstra apenas que a arquitetura treina de forma estável e produz uma frente de soluções não dominadas, servindo de base de implementação para a proposta. Cabe destacar duas diferenças importantes em relação ao restante deste documento, que precisarão ser resolvidas antes de qualquer resultado ser reportado formalmente:
+
+\begin{itemize}
+    \item O pré-processamento do atributo raça neste protótipo binariza a variável diretamente como \textit{White} ($=1$) versus todas as demais categorias ($=0$), sem o filtro prévio para apenas \textit{White}/\textit{Black} adotado em \texttt{data\_module/adult.py} (Seção~\ref{subsec:modelos_protocolo}). Os resultados deste protótipo, portanto, \textbf{não são diretamente comparáveis} aos baselines já estabelecidos no Capítulo~\ref{sec:resultados} (Tabelas~\ref{tab:adult_subgroup_posttrain} e~\ref{tab:adult_lambda_sweep}), e o pré-processamento específico deste protótipo é adotado apenas para esta prova de conceito.
+    \item A avaliação de cada indivíduo utiliza uma única partição fixa de treino/validação/teste, sem validação cruzada aninhada (Seção~\ref{subsec:modelos_protocolo}), dado o custo computacional de retreinar uma rede neural completa a cada avaliação de fitness ($\approx 80 + 35 \times 80 = 2880$ treinamentos no total, apenas para esta configuração com $N=2$).
+\end{itemize}
+
+\section{Plano de Generalização e Avaliação}\label{sec:generalizacao_avaliacao}
+
+A proposta para a tese generaliza esta prova de conceito em três direções:
+
+\begin{enumerate}
+    \item \textbf{Generalização para $N$ atributos sensíveis}, substituindo as duas cabeças adversariais fixas do protótipo por um número arbitrário de cabeças, uma por atributo sensível relevante em cada conjunto de dados (por exemplo, sexo, raça e faixa etária no Adult e no COMPAS; raça/cor e faixa etária da mãe na SINASC). Conforme discutido na Seção~\ref{sec:formalizacao_arquitetura}, esta generalização expõe diretamente a tensão entre riqueza da caracterização demográfica e escalabilidade do espaço de objetivos do NSGA-II, sendo um dos pontos centrais de investigação empírica da tese -- inclusive quanto à possível necessidade de aglutinar os $N$ objetivos marginais em um número menor de objetivos de natureza interseccional (Seção~\ref{subsec:justica_interseccional}).
+    \item \textbf{Reconciliação do pré-processamento} com os módulos já estabelecidos (\texttt{data\_module/}), de forma que os resultados da arquitetura NSGA-II+GRL sejam diretamente comparáveis, subgrupo a subgrupo, aos baselines Random Forest, Gradient Boosting e FairMLP já reportados no Capítulo~\ref{sec:resultados}.
+    \item \textbf{Avaliação nos três conjuntos de dados} (Adult, COMPAS e SINASC), comparando a Fronteira de Pareto obtida por NSGA-II+GRL contra: (i) os baselines sem mitigação; (ii) a FairMLP com penalização escalar de Paridade Demográfica (\textit{sweep} de $\lambda$, Tabela~\ref{tab:adult_lambda_sweep}); e (iii) as métricas de equidade interseccional já formalizadas (Max AAOD e Sensitivity Gap, Seção~\ref{subsec:metricas_postreino}), calculadas \textit{a posteriori} sobre cada solução da frente obtida, mesmo quando os objetivos de otimização do NSGA-II forem marginais -- permitindo avaliar diretamente se a diversidade de soluções na Fronteira de Pareto produz, incidentalmente, melhores resultados interseccionais do que a penalização escalar única.
+\end{enumerate}
+
+\section{Estratégia Computacional}\label{sec:estrategia_computacional}
+
+O custo computacional da avaliação de fitness -- que exige o retreinamento completo de uma rede neural a cada indivíduo avaliado, multiplicado pelo tamanho da população e pelo número de gerações -- é a principal restrição prática da proposta, agravada pela generalização para $N$ atributos e pelo volume de dados do SINASC ($2,47$ milhões de instâncias, Tabela~\ref{tab:sinasc_characteristics}). A estratégia inicial cogitada para viabilizar essa escala é o uso do Parque de Alto Desempenho da UFRGS (PCAD) ou, alternativamente, do Google Colab Pro -- decisão ainda não finalizada, a ser confirmada de acordo com a disponibilidade de recursos e o custo real observado na fase de generalização descrita na Seção~\ref{sec:generalizacao_avaliacao}.
+
+\section{Cronograma}\label{sec:cronograma}
+
+\todo{Preencher com os marcos reais do programa de doutorado: data da qualificação, período de generalização da arquitetura (Seção~\ref{sec:generalizacao_avaliacao}), período de experimentos nos três datasets, prazo para escrita e defesa. Não preenchido automaticamente para evitar datas fictícias no documento.}
+
+\begin{table}[H]
+    \centering
+    \caption{Cronograma proposto para as etapas restantes do doutorado.}
+    \label{tab:cronograma}
+    \begin{tabular}{l|l}
+        \hline
+        \textit{Etapa} & \textit{Período} \\
+        \hline
+        Qualificação & [preencher] \\
+        Generalização da arquitetura para $N$ atributos & [preencher] \\
+        Reconciliação de pré-processamento e infraestrutura (PCAD/Colab) & [preencher] \\
+        Experimentos NSGA-II+GRL -- Adult & [preencher] \\
+        Experimentos NSGA-II+GRL -- COMPAS & [preencher] \\
+        Experimentos NSGA-II+GRL -- SINASC & [preencher] \\
+        Análise comparativa e escrita dos resultados finais & [preencher] \\
+        Defesa & [preencher] \\
+        \hline
+    \end{tabular}
+\end{table}

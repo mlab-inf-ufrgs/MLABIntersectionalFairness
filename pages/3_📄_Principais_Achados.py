@@ -80,7 +80,8 @@ DATASET_CONFIG = {
         "model": "GradientBoosting",
         "opt_metric": "roc_auc",
         "opt_metric_label": "ROC-AUC",
-        "rich_pretrain": False,
+        "rich_pretrain": True,
+        "dynamic_attrs": ["sex", "race", "age_group"],
     },
     "SINASC (DATASUS) 🇧🇷": {
         "parquet": "sinasc_processed.parquet",
@@ -91,7 +92,8 @@ DATASET_CONFIG = {
         "model": "GradientBoosting",
         "opt_metric": "average_precision",
         "opt_metric_label": "PR-AUC",
-        "rich_pretrain": False,
+        "rich_pretrain": True,
+        "dynamic_attrs": ["raca_cor_mae", "idade_mae", "escolaridade_mae", "uf"],
     },
 }
 
