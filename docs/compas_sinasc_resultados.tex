@@ -149,7 +149,6 @@ O dataset SINASC manteve 2.474.535 (97\%) dos 2.561.922 registros originais apó
         raca\_cor\_mae     & parda      & preta               & 0.77  & 0.98 & 0.001 & 0.017 \\
         idade\_mae         & adulta (20--34) & madura ($>$34) & 0.60  & 0.97 & 0.003 & 0.023 \\
         escolaridade\_mae  & superior   & nenhuma             & 0.97  & 0.95 & 0.012 & 0.050 \\
-        uf                 & MA         & MG                  & -0.43 & 0.97 & 0.004 & 0.025 \\
         \hline
         \multicolumn{7}{l}{\small \textbf{CI}: Class Imbalance | \textbf{DI}: Disparate Impact | \textbf{KL}: Kullback-Leibler | \textbf{KS}: Kolmogorov-Smirnov}
     \end{tabular}
@@ -168,9 +167,6 @@ Ao contrário do Adult e do COMPAS, as métricas unidimensionais do SINASC mostr
         \hline
         \multicolumn{1}{c|}{\textit{Par de Intersecção}} & \textit{Gap A} & \textit{Gap B} & \textit{Esperado} & \textit{Real} & \textit{Oculto} \\
         \hline
-        escolaridade\_mae $\times$ uf         & 4.96\% & 2.49\% & 4.96\% & 16.30\% & +11.34\% \\
-        raca\_cor\_mae $\times$ uf             & 1.65\% & 2.49\% & 2.49\% & 9.24\%  & +6.75\%  \\
-        idade\_mae $\times$ uf                 & 2.33\% & 2.49\% & 2.49\% & 5.39\%  & +2.90\%  \\
         idade\_mae $\times$ escolaridade\_mae  & 2.33\% & 4.96\% & 4.96\% & 7.56\%  & +2.60\%  \\
         raca\_cor\_mae $\times$ idade\_mae     & 1.65\% & 2.33\% & 2.33\% & 4.57\%  & +2.24\%  \\
         raca\_cor\_mae $\times$ escolaridade\_mae & 1.65\% & 4.96\% & 4.96\% & 7.07\%  & +2.11\%  \\
@@ -181,7 +177,7 @@ Ao contrário do Adult e do COMPAS, as métricas unidimensionais do SINASC mostr
     \label{tab:sinasc_gerrymandering_audit}
 \end{table}
 
-O resultado mais expressivo da auditoria de \textit{gerrymandering} no SINASC é justamente o cruzamento entre os dois proxies (escolaridade e UF): enquanto os gaps marginais de cada variável isoladamente são pequenos ($4,96\%$ e $2,49\%$), o gap real observado ao cruzá-las atinge $16,30\%$ -- mais de três vezes o gap esperado, revelando um viés oculto de $+11,34$ pontos percentuais. Trata-se, entre os três conjuntos de dados analisados, do caso em que a desproporção relativa entre a disparidade marginal e a interseccional é mais acentuada: exatamente o cenário que a análise unidimensional, isoladamente, seria incapaz de identificar.
+O resultado mais expressivo da auditoria de \textit{gerrymandering} no SINASC é o cruzamento entre faixa etária materna e escolaridade: enquanto os gaps marginais de cada variável isoladamente são pequenos ($2,33\%$ e $4,96\%$), o gap real observado ao cruzá-las atinge $7,56\%$ -- acima do gap esperado, revelando um viés oculto de $+2,60$ pontos percentuais. Ainda que a magnitude absoluta seja substancialmente menor do que a observada no Adult e no COMPAS, o padrão estrutural se repete: a análise unidimensional, isoladamente, não seria capaz de identificar essa disparidade adicional que emerge apenas no cruzamento entre o proxy socioeconômico e o atributo sensível.
 
 \begin{table}[H]
     \centering
@@ -194,14 +190,8 @@ O resultado mais expressivo da auditoria de \textit{gerrymandering} no SINASC é
         \hline
         idade\_mae        & Madura ($>$34) & escolaridade\_mae & 0,0353 \\
         idade\_mae        & Madura ($>$34) & raca\_cor\_mae    & 0,0346 \\
-        idade\_mae        & Madura ($>$34) & uf                & 0,0319 \\
         raca\_cor\_mae    & Preta          & idade\_mae        & 0,0135 \\
         raca\_cor\_mae    & Preta          & escolaridade\_mae & 0,0127 \\
-        raca\_cor\_mae    & Preta          & uf                & 0,0107 \\
-        uf                & MG             & escolaridade\_mae & 0,0102 \\
-        uf                & MG             & idade\_mae        & 0,0095 \\
-        uf                & MG             & raca\_cor\_mae    & 0,0088 \\
-        escolaridade\_mae & Nenhuma        & uf                & 0,0020 \\
         escolaridade\_mae & Nenhuma        & raca\_cor\_mae    & 0,0017 \\
         escolaridade\_mae & Nenhuma        & idade\_mae        & 0,0015 \\
         \hline
@@ -210,15 +200,15 @@ O resultado mais expressivo da auditoria de \textit{gerrymandering} no SINASC é
     \label{tab:sinasc_cddl}
 \end{table}
 
-Os valores de CDDL do SINASC são substancialmente menores, em magnitude absoluta, do que os observados no Adult (máximo de $0,0353$ contra $0,3106$), consistente com a menor disparidade marginal já discutida. Ainda assim, o padrão estrutural se repete: a faixa etária materna madura ($>$34 anos) concentra as maiores disparidades condicionais, independentemente da variável de estratificação utilizada -- sugerindo que, mesmo em um contexto de disparidades marginais pequenas, a combinação com outros atributos preserva uma estrutura de desvantagem relativa consistente.
+Os valores de CDDL do SINASC são substancialmente menores, em magnitude absoluta, do que os observados no Adult (máximo de $0,0353$ contra $0,3106$), consistente com a menor disparidade marginal já discutida. Ainda assim, o padrão estrutural se repete: a faixa etária materna madura ($>$34 anos) concentra as maiores disparidades condicionais, independentemente da variável de estratificação utilizada -- sugerindo que, mesmo em um contexto de disparidades marginais pequenas, a combinação com outros atributos preserva uma estrutura de desvantagem relativa consistente. Cabe ressaltar, contudo, que o desbalanceamento extremo de classes do SINASC ($9,4\%$ de casos desfavoráveis) comprime mecanicamente a amplitude em que essas disparidades absolutas podem se manifestar: como a taxa de desfecho favorável da grande maioria dos subgrupos está concentrada em uma faixa estreita, próxima do teto de $90\%$, o espaço numérico disponível para qualquer gap absoluto -- seja em CI, DI, KL, KS ou CDDL -- é substancialmente menor do que em bases mais balanceadas como o Adult, independentemente da severidade real da disparidade subjacente. Essa característica deve ser levada em conta na interpretação das magnitudes reportadas nesta subseção, e antecipa o problema mais amplo de desbalanceamento discutido a seguir.
 
 Diferentemente do Adult e do COMPAS, a caracterização interseccional pré-treino do SINASC (segundo os atributos protegidos raça/cor e faixa etária da mãe, conforme configurado para as demais análises deste capítulo) produz $15$ subgrupos, e não $4$ ou $6$, dado que raça/cor possui cinco categorias e faixa etária, três. Os extremos ilustram a mesma tendência: o subgrupo de referência é \textbf{Indígena \& Adulta (20-34)} ($N=16.311$; $91,66\%$ de nascimentos com peso normal; $\text{Pre-DI}=1,000$), e o subgrupo mais desfavorecido é \textbf{Preta \& Madura ($>$34)} ($N=31.961$; $87,09\%$; $\text{Pre-DI}=0,950$; $\text{Pre-SPD}=-4,57\%$) -- uma disparidade relativa pequena, mas que, dado o volume populacional do SINASC, corresponde a milhares de nascimentos adicionais classificados como baixo peso a cada ano nesse subgrupo específico, se a proporção do grupo de referência fosse aplicada.
 
-O melhor \textit{baseline} em termos de desempenho -- Gradient Boosting otimizado por AUPRC -- atingiu acurácia de $90,57\%$ e AUPRC de $0,914$. Esse resultado, à primeira vista favorável, esconde um problema crítico: a acurácia de $90,57\%$ \textbf{coincide exatamente} com a proporção da classe majoritária no conjunto de dados ($90,6\%$), e o AUROC correspondente é de apenas $0,533$ -- marginalmente acima do nível do acaso ($0,5$). Isso indica que o modelo colapsou para prever sistematicamente a classe majoritária (``peso normal'') para toda e qualquer instância, independentemente dos atributos de entrada.
+O \textit{baseline} adotado como referência para esta análise -- Gradient Boosting otimizado por AUROC -- atingiu acurácia de $90,57\%$, AUROC de $0,533$ e AUPRC de $0,914$. Cabe registrar que a combinação Gradient Boosting/Random Forest otimizada por AUPRC (\textit{average\_precision}) não produziu resultados válidos em escala completa para o SINASC -- provavelmente por esgotamento de tempo ou memória durante a busca de hiperparâmetros nas $2,47$ milhões de instâncias, já que testes em subamostras de até $300$ mil linhas com a mesma configuração não reproduziram a falha --, e foi por isso excluída desta comparação. Entre as demais configurações válidas, Gradient Boosting e Random Forest exibem desempenho estatisticamente indistinguível entre si (acurácia idêntica de $90,57\%$ em todas elas; AUROC entre $0,530$ e $0,533$; AUPRC entre $0,913$ e $0,914$), de modo que a escolha do Gradient Boosting como referência é apenas uma convenção de apresentação -- consistente com os demais conjuntos de dados deste capítulo -- e não reflete uma vantagem real de um modelo sobre o outro. Esse resultado, à primeira vista favorável, esconde um problema crítico: a acurácia de $90,57\%$ \textbf{coincide exatamente} com a proporção da classe majoritária no conjunto de dados ($90,6\%$), e o AUROC correspondente é de apenas $0,533$ -- marginalmente acima do nível do acaso ($0,5$). Isso indica que o modelo colapsou para prever sistematicamente a classe majoritária (``peso normal'') para toda e qualquer instância, independentemente dos atributos de entrada.
 
 \begin{table}[H]
     \centering
-    \caption{Métricas de equidade interseccional pós-treino por subgrupo (SINASC, GradientBoosting, melhor baseline) -- amostra de subgrupos selecionados, média entre 3 folds externos.}
+    \caption{Métricas de equidade interseccional pós-treino por subgrupo (SINASC, GradientBoosting otimizado por AUROC, modelo de referência) -- amostra de subgrupos selecionados, média entre 3 folds externos.}
     \vspace{2mm}
     \resizebox{\textwidth}{!}{%
     \begin{tabular}{l|cccccc}
@@ -260,4 +250,4 @@ O padrão de colapso se confirma de forma absoluta: os quinze subgrupos intersec
 
 O \textit{sweep} de $\lambda$ no SINASC ilustra o limite mais severo da abordagem de penalização escalar: a acurácia permanece idêntica ($0,9057$, com desvio-padrão nulo) e as métricas de equidade permanecem em zero absoluto para \textbf{todos} os valores de $\lambda$ testados, incluindo $\lambda = 4,0$. Isso ocorre porque a penalização de Paridade Demográfica mede o desvio entre a taxa de aprovação de cada subgrupo e a taxa média global; quando o modelo já converge para uma solução degenerada em que todas as taxas são idênticas (sempre positivas), esse termo já está em seu valor mínimo possível, e não fornece gradiente de correção algum, por maior que seja $\lambda$. A penalização escalar de equidade é, portanto, estruturalmente incapaz de reverter um colapso preditivo causado por desbalanceamento extremo de classes -- ela pressupõe um modelo que já produz alguma variação em suas predições para poder equalizá-la entre grupos.
 
-Em síntese, os resultados do SINASC revelam um modo de falha qualitativamente distinto dos observados no Adult e no COMPAS: (i) as disparidades marginais em nível de dados são pequenas, mas a auditoria interseccional revela viés oculto substancial, especialmente no cruzamento entre escolaridade e unidade federativa; (ii) diante do desbalanceamento extremo de classes ($9,4\%$ de casos desfavoráveis), tanto os \textit{baselines} de árvore quanto a MLP -- com ou sem penalização de equidade -- colapsam para prever sistematicamente a classe majoritária, produzindo métricas de equidade interseccional triviais e enganosamente perfeitas; e (iii) a penalização escalar de Paridade Demográfica é incapaz de escapar desse colapso em qualquer intensidade testada, evidenciando que o problema do desbalanceamento de classes precisa ser tratado como uma condição prévia -- e não apenas como um objetivo concorrente -- à mitigação de viés interseccional na arquitetura proposta para a tese (Capítulo~\ref{chap:proposta}).
+Em síntese, os resultados do SINASC revelam um modo de falha qualitativamente distinto dos observados no Adult e no COMPAS: (i) as disparidades marginais em nível de dados são pequenas, mas a auditoria interseccional revela viés oculto substancial, especialmente no cruzamento entre escolaridade e faixa etária materna; (ii) diante do desbalanceamento extremo de classes ($9,4\%$ de casos desfavoráveis), tanto os \textit{baselines} de árvore quanto a MLP -- com ou sem penalização de equidade -- colapsam para prever sistematicamente a classe majoritária, produzindo métricas de equidade interseccional triviais e enganosamente perfeitas; e (iii) a penalização escalar de Paridade Demográfica é incapaz de escapar desse colapso em qualquer intensidade testada, evidenciando que o problema do desbalanceamento de classes precisa ser tratado como uma condição prévia -- e não apenas como um objetivo concorrente -- à mitigação de viés interseccional na arquitetura proposta para a tese (Capítulo~\ref{chap:proposta}).
