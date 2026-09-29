@@ -193,8 +193,17 @@ def render_figure_distribution(df, metric_left, metric_right, label_left, label_
     leg1 = fig.legend(handles=dataset_handles, title="Dataset", bbox_to_anchor=(1.01, 0.90), loc="upper left", frameon=False, fontsize=9.5, title_fontsize=10.5)
     fig.add_artist(leg1)
 
+    metric_display_map = {
+        "accuracy": "Accuracy",
+        "recall": "Recall",
+        "precision": "Precision",
+        "roc_auc": "AUROC",
+        "pr_auc": "AUPRC",
+        "mcc": "MCC",
+        "specificity": "Specificity",
+    }
     opt_handles = [
-        plt.Line2D([0], [0], marker=opt_markers.get(m, "o"), color="w", label=m,
+        plt.Line2D([0], [0], marker=opt_markers.get(m, "o"), color="w", label=metric_display_map.get(m, m),
                    markerfacecolor="#222222", markeredgecolor="#222222", markersize=8)
         for m in opt_metrics_present
     ]
@@ -249,8 +258,8 @@ with tab_consolidated:
         "accuracy_mean": "Accuracy",
         "recall_mean": "Recall",
         "precision_mean": "Precision",
-        "roc_auc_mean": "ROC-AUC",
-        "pr_auc_mean": "PR-AUC",
+        "roc_auc_mean": "AUROC",
+        "pr_auc_mean": "AUPRC",
         "max_aaod_mean": "Max AAOD (↓ Viés)",
         "sensitivity_gap_mean": "Sensitivity Gap (↓ Viés)",
     }
@@ -306,8 +315,8 @@ with tab_consolidated:
     summary_table.rename(columns={
         "dataset_clean": "Dataset",
         "model_clean": "Modelo",
-        "ROC_AUC": "ROC-AUC",
-        "PR_AUC": "PR-AUC",
+        "ROC_AUC": "AUROC",
+        "PR_AUC": "AUPRC",
         "Max_AAOD": "Max AAOD (↓)",
         "Sens_Gap": "Sens. Gap (↓)",
     }, inplace=True)
@@ -380,9 +389,9 @@ with tab_detailed:
     c1.metric("Accuracy", f"{r['accuracy_mean']:.3f}", f"±{r['accuracy_std']:.3f}")
     c2.metric("Recall", f"{r['recall_mean']:.3f}", f"±{r['recall_std']:.3f}")
     c3.metric("Precision", f"{r['precision_mean']:.3f}", f"±{r['precision_std']:.3f}")
-    c4.metric("ROC-AUC", f"{r['roc_auc_mean']:.3f}" if not np.isnan(r['roc_auc_mean']) else "N/A",
+    c4.metric("AUROC", f"{r['roc_auc_mean']:.3f}" if not np.isnan(r['roc_auc_mean']) else "N/A",
               f"±{r['roc_auc_std']:.3f}" if not np.isnan(r['roc_auc_std']) else None)
-    c5.metric("PR-AUC", f"{r['pr_auc_mean']:.3f}" if not np.isnan(r['pr_auc_mean']) else "N/A",
+    c5.metric("AUPRC", f"{r['pr_auc_mean']:.3f}" if not np.isnan(r['pr_auc_mean']) else "N/A",
               f"±{r['pr_auc_std']:.3f}" if not np.isnan(r['pr_auc_std']) else None)
 
     f1, f2 = st.columns(2)
@@ -554,15 +563,15 @@ with tab_detailed:
             "accuracy": "Accuracy",
             "recall": "Recall",
             "precision": "Precision",
-            "roc_auc": "ROC-AUC",
-            "average_precision": "PR-AUC",
+            "roc_auc": "AUROC",
+            "average_precision": "AUPRC",
         }
         rank_avg["opt_metric_label"] = rank_avg["opt_metric"].map(metric_label_map).fillna(rank_avg["opt_metric"])
 
         hm_base = alt.Chart(rank_avg).encode(
             x=alt.X("subgroup:N", title="", axis=alt.Axis(labelAngle=-30, labelLimit=200)),
             y=alt.Y("opt_metric_label:N", title=t("opt_metric_legend"),
-                    sort=["Accuracy", "Recall", "Precision", "ROC-AUC", "PR-AUC"]),
+                    sort=["Accuracy", "Recall", "Precision", "AUROC", "AUPRC"]),
         )
 
         hm_rect = hm_base.mark_rect().encode(

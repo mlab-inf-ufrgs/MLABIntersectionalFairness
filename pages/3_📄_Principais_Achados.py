@@ -67,7 +67,7 @@ DATASET_CONFIG = {
         "group_cols": ["sex", "race"],
         "model": "GradientBoosting",
         "opt_metric": "average_precision",
-        "opt_metric_label": "PR-AUC",
+        "opt_metric_label": "AUPRC",
         "rich_pretrain": True,
         "dynamic_attrs": ["sex", "race", "age_group", "education_group", "relationship"],
     },
@@ -79,7 +79,7 @@ DATASET_CONFIG = {
         "group_cols": ["sex", "race"],
         "model": "GradientBoosting",
         "opt_metric": "roc_auc",
-        "opt_metric_label": "ROC-AUC",
+        "opt_metric_label": "AUROC",
         "rich_pretrain": True,
         "dynamic_attrs": ["sex", "race", "age_group"],
     },
@@ -91,7 +91,7 @@ DATASET_CONFIG = {
         "group_cols": ["raca_cor_mae", "idade_mae"],
         "model": "GradientBoosting",
         "opt_metric": "average_precision",
-        "opt_metric_label": "PR-AUC",
+        "opt_metric_label": "AUPRC",
         "rich_pretrain": True,
         "dynamic_attrs": ["raca_cor_mae", "idade_mae", "escolaridade_mae", "uf"],
     },
@@ -324,7 +324,7 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
             c1, c2, c3, c4 = st.columns(4)
             c1.metric("Modelo — Config.", f"{cfg['model']}", f"otim. por {cfg['opt_metric_label']}")
             c2.metric("Acurácia", f"{gm['accuracy_mean']:.3f}")
-            c3.metric("ROC-AUC", f"{gm['roc_auc_mean']:.3f}" if not pd.isna(gm['roc_auc_mean']) else "N/A")
+            c3.metric("AUROC", f"{gm['roc_auc_mean']:.3f}" if not pd.isna(gm['roc_auc_mean']) else "N/A")
             c4.metric("Max Intersectional AAOD", f"{gm['max_aaod_mean']:.4f}")
 
             st.markdown("**Métricas de equidade interseccional pós-treino por subgrupo** (média entre folds externos)")
@@ -393,8 +393,8 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
             show_sweep = pd.DataFrame({
                 "Configuração": sweep_df["Configuração"],
                 "Acurácia": _mean_std("accuracy_mean", "accuracy_std"),
-                "ROC-AUC": _mean_std("roc_auc_mean", "roc_auc_std"),
-                "PR-AUC": _mean_std("pr_auc_mean", "pr_auc_std"),
+                "AUROC": _mean_std("roc_auc_mean", "roc_auc_std"),
+                "AUPRC": _mean_std("pr_auc_mean", "pr_auc_std"),
                 "Max AAOD": _mean_std("max_aaod_mean", "max_aaod_std"),
                 "Sensitivity Gap": _mean_std("sensitivity_gap_mean", "sensitivity_gap_std"),
             })

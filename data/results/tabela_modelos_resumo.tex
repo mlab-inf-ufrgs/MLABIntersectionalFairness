@@ -7,15 +7,18 @@
 \label{tab:modelos_resumo}
 \begin{tabular}{llccccc}
 \toprule
-\textbf{Dataset} & \textbf{Modelo} & \textbf{Acurácia} & \textbf{ROC-AUC} & \textbf{PR-AUC} & \textbf{Max AAOD} $\downarrow$ & \textbf{Sens. Gap} $\downarrow$ \\
+\textbf{Dataset} & \textbf{Modelo} & \textbf{Acurácia} & \textbf{AUROC} & \textbf{AUPRC} & \textbf{Max AAOD} $\downarrow$ & \textbf{Sens. Gap} $\downarrow$ \\
 \midrule
-Adult & Gradient Boosting & 0.860 $\pm$ 0.008 & 0.915 $\pm$ 0.009 & 0.813 $\pm$ 0.018 & 0.0936 $\pm$ 0.0260 & 0.1247 $\pm$ 0.0547 \\
- & Random Forest & 0.843 $\pm$ 0.014 & 0.899 $\pm$ 0.010 & 0.778 $\pm$ 0.022 & 0.1155 $\pm$ 0.0196 & 0.1658 $\pm$ 0.0544 \\
+Adult & FairMLP & 0.847 $\pm$ 0.002 & 0.902 $\pm$ 0.003 & 0.776 $\pm$ 0.004 & 0.0779 $\pm$ 0.0108 & 0.1181 $\pm$ 0.0232 \\
+ & Gradient Boosting & 0.860 $\pm$ 0.008 & 0.915 $\pm$ 0.009 & 0.813 $\pm$ 0.018 & 0.0955 $\pm$ 0.0245 & 0.1276 $\pm$ 0.0526 \\
+ & Random Forest & 0.846 $\pm$ 0.013 & 0.901 $\pm$ 0.009 & 0.782 $\pm$ 0.020 & 0.1221 $\pm$ 0.0226 & 0.1758 $\pm$ 0.0521 \\
 \midrule
-COMPAS & Gradient Boosting & 0.638 $\pm$ 0.003 & 0.691 $\pm$ 0.000 & 0.698 $\pm$ 0.000 & 0.2614 $\pm$ 0.0076 & 0.2303 $\pm$ 0.0055 \\
+COMPAS & FairMLP & 0.635 $\pm$ 0.001 & 0.690 $\pm$ 0.001 & 0.696 $\pm$ 0.001 & 0.2580 $\pm$ 0.0165 & 0.2220 $\pm$ 0.0141 \\
+ & Gradient Boosting & 0.638 $\pm$ 0.003 & 0.691 $\pm$ 0.000 & 0.698 $\pm$ 0.000 & 0.2614 $\pm$ 0.0076 & 0.2303 $\pm$ 0.0055 \\
  & Random Forest & 0.641 $\pm$ 0.001 & 0.690 $\pm$ 0.000 & 0.697 $\pm$ 0.000 & 0.2644 $\pm$ 0.0075 & 0.2354 $\pm$ 0.0039 \\
 \midrule
-SINASC & Gradient Boosting & 0.906 $\pm$ 0.000 & 0.532 $\pm$ 0.002 & 0.913 $\pm$ 0.001 & 0.0000 $\pm$ 0.0000 & 0.0000 $\pm$ 0.0000 \\
+SINASC & FairMLP & 0.906 $\pm$ 0.000 & 0.532 $\pm$ 0.000 & 0.914 $\pm$ 0.000 & 0.0000 $\pm$ 0.0000 & 0.0000 $\pm$ 0.0000 \\
+ & Gradient Boosting & 0.906 $\pm$ 0.000 & 0.531 $\pm$ 0.001 & 0.913 $\pm$ 0.000 & 0.0000 $\pm$ 0.0000 & 0.0000 $\pm$ 0.0000 \\
  & Random Forest & 0.906 $\pm$ 0.000 & 0.532 $\pm$ 0.000 & 0.914 $\pm$ 0.000 & 0.0000 $\pm$ 0.0000 & 0.0000 $\pm$ 0.0000 \\
 \bottomrule
 \multicolumn{7}{l}{\footnotesize $\downarrow$ Indica métricas onde valores menores representam maior equidade interseccional.} \\

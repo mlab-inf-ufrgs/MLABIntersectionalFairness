@@ -5,7 +5,7 @@ generate_model_report.py
 
 Gera análise consolidada dos resultados dos modelos de machine learning:
 1. Figura 1 no estilo publicação (Boxplots + Stripplots com cores por Dataset e marcadores por Métrica Otimizada).
-2. Figura 2 de Fairness Interseccional (ROC-AUC vs Max AAOD).
+2. Figura 2 de Fairness Interseccional (AUROC vs Max AAOD).
 3. Tabelas comparativas em LaTeX (booktabs) e Markdown (com médias e desvios padrão).
 4. Relatório executivo impresso no terminal.
 """
@@ -197,8 +197,17 @@ def plot_performance_distribution(df,
     fig.add_artist(leg1)
 
     # Legenda 2: Optimized Metric
+    metric_display_map = {
+        "accuracy": "Accuracy",
+        "recall": "Recall",
+        "precision": "Precision",
+        "roc_auc": "AUROC",
+        "pr_auc": "AUPRC",
+        "mcc": "MCC",
+        "specificity": "Specificity",
+    }
     opt_handles = [
-        plt.Line2D([0], [0], marker=opt_markers.get(m, "o"), color="w", label=m,
+        plt.Line2D([0], [0], marker=opt_markers.get(m, "o"), color="w", label=metric_display_map.get(m, m),
                    markerfacecolor="#222222", markeredgecolor="#222222", markersize=8)
         for m in opt_metrics_present
     ]
@@ -256,7 +265,7 @@ def generate_latex_table(df, save_filename="tabela_modelos_resumo.tex"):
         "\\label{tab:modelos_resumo}",
         "\\begin{tabular}{llccccc}",
         "\\toprule",
-        "\\textbf{Dataset} & \\textbf{Modelo} & \\textbf{Acurácia} & \\textbf{ROC-AUC} & \\textbf{PR-AUC} & \\textbf{Max AAOD} $\\downarrow$ & \\textbf{Sens. Gap} $\\downarrow$ \\\\",
+        "\\textbf{Dataset} & \\textbf{Modelo} & \\textbf{Acurácia} & \\textbf{AUROC} & \\textbf{AUPRC} & \\textbf{Max AAOD} $\\downarrow$ & \\textbf{Sens. Gap} $\\downarrow$ \\\\",
         "\\midrule",
     ]
 
@@ -313,7 +322,7 @@ def generate_markdown_table(df, save_filename="tabela_modelos_resumo.md"):
     }).reset_index()
 
     headers = [
-        "| Dataset | Modelo | Acurácia | ROC-AUC | PR-AUC | Max AAOD (↓) | Sens. Gap (↓) |",
+        "| Dataset | Modelo | Acurácia | AUROC | AUPRC | Max AAOD (↓) | Sens. Gap (↓) |",
         "|:---|:---|:---:|:---:|:---:|:---:|:---:|",
     ]
     rows = []
@@ -358,7 +367,7 @@ def print_executive_summary(df):
         out_buffer.append(f"\n📁 Dataset: {ds} (N={len(sub)} configurações)")
         out_buffer.append(f"  🏆 Maior Acurácia : {best_acc['model_clean']} (opt={best_acc['opt_metric_clean']}) -> {best_acc['accuracy_mean']:.4f}")
         if best_auc is not None and not pd.isna(best_auc['roc_auc_mean']):
-            out_buffer.append(f"  🏆 Maior ROC-AUC  : {best_auc['model_clean']} (opt={best_auc['opt_metric_clean']}) -> {best_auc['roc_auc_mean']:.4f}")
+            out_buffer.append(f"  🏆 Maior AUROC    : {best_auc['model_clean']} (opt={best_auc['opt_metric_clean']}) -> {best_auc['roc_auc_mean']:.4f}")
         if best_fair is not None and not pd.isna(best_fair['max_aaod_mean']):
             out_buffer.append(f"  ⚖️ Mais Equitativo : {best_fair['model_clean']} (opt={best_fair['opt_metric_clean']}) -> Max AAOD = {best_fair['max_aaod_mean']:.4f}")
 
@@ -391,15 +400,15 @@ def main():
         save_filename="fig_overall_performance.png",
     )
 
-    # 2. Gera Figura 2 (Trade-off: ROC-AUC vs Max AAOD)
-    print("\n[2/3] Gerando Figura 2 (Trade-off: ROC-AUC e Max AAOD)...")
+    # 2. Gera Figura 2 (Trade-off: AUROC vs Max AAOD)
+    print("\n[2/3] Gerando Figura 2 (Trade-off: AUROC e Max AAOD)...")
     plot_performance_distribution(
         df,
         metric_left="roc_auc_mean",
         metric_right="max_aaod_mean",
-        title_left="Model ROC-AUC Distribution",
+        title_left="Model AUROC Distribution",
         title_right="Model Intersectional Injustice (Max AAOD)",
-        ylabel_left="ROC-AUC",
+        ylabel_left="AUROC",
         ylabel_right="Max AAOD",
         save_filename="fig_fairness_distribution.png",
     )
