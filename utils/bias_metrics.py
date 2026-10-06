@@ -425,7 +425,7 @@ def calculate_dynamic_metrics(df, attr, target_col, favorable_val):
     """
     groups = df[attr].dropna().unique()
     if len(groups) < 2:
-        return {'CI': 'N/A', 'DI': 'N/A', 'KL': 'N/A', 'KS': 'N/A', 'priv': None, 'unpriv': None}
+        return {'CI': 'N/A', 'DI': 'N/A', 'DI_adv': 'N/A', 'KL': 'N/A', 'KS': 'N/A', 'priv': None, 'unpriv': None}
         
     # Calcular taxas de sucesso
     rates = {}
@@ -471,12 +471,85 @@ def calculate_dynamic_metrics(df, attr, target_col, favorable_val):
     if priv_rate > 0:
         di_val = unpriv_rate / priv_rate
         di_pre_train = f"{di_val:.2f}"
-        
+
+    # DI sobre o desfecho adverso (mesmos grupos): razão entre as taxas desfavoráveis.
+    # Em bases com taxa favorável próxima de 1, o DI favorável tende a 1 por construção,
+    # enquanto a razão adversa preserva a disparidade relativa.
+    di_adverse = _format_ratio(_adverse_ratio(unpriv_rate, priv_rate))
+
     return {
         'CI': ci_metric,
         'DI': di_pre_train,
+        'DI_adv': di_adverse,
         'KL': f"{kl:.3f}",
         'KS': f"{ks:.3f}",
         'priv': priv_group,
         'unpriv': unpriv_group
     }
+
+
+def _adverse_ratio(unpriv_rate, priv_rate):
+    """Razão entre as taxas de desfecho adverso (1 - taxa favorável) do pior e do melhor grupo.
+    Retorna np.inf quando o grupo de referência não tem nenhum desfecho adverso."""
+    unpriv_adv = 1 - unpriv_rate
+    priv_adv = 1 - priv_rate
+    if priv_adv > 0:
+        return unpriv_adv / priv_adv
+    return np.inf if unpriv_adv > 0 else np.nan
+
+
+def _format_ratio(val):
+    if pd.isna(val):
+        return "N/A"
+    if np.isinf(val):
+        return "∞"
+    return f"{val:.2f}"
+
+
+def intersectional_di_comparison(df, attributes, target_col, favorable_val, min_n=100):
+    """
+    Compara, na mesma escala, o DI marginal (atributo isolado) com o DI interseccional
+    (todas as combinações de 2 ou mais atributos).
+
+    Para cada recorte, considera apenas grupos com N >= min_n e calcula:
+    - DI (favorável): menor taxa favorável / maior taxa favorável
+    - DI (adverso): taxa adversa do pior grupo / taxa adversa do melhor grupo
+    Os grupos de referência (pior e melhor) são os mesmos para as duas razões, seguindo
+    a mesma regra dinâmica de `calculate_dynamic_metrics`.
+    """
+    results = []
+    for k in range(1, len(attributes) + 1):
+        for combo in itertools.combinations(attributes, k):
+            stats = df.groupby(list(combo), observed=True)[target_col].agg(
+                rate=lambda x: (x == favorable_val).mean(),
+                n='count'
+            )
+            stats = stats[stats['n'] >= min_n]
+            # Sem variação de taxa (ex.: alvo constante) não há pior/melhor subgrupo a comparar
+            if len(stats) < 2 or stats['rate'].nunique() < 2:
+                continue
+
+            worst = stats['rate'].idxmin()
+            best = stats['rate'].idxmax()
+            worst_rate = stats.loc[worst, 'rate']
+            best_rate = stats.loc[best, 'rate']
+
+            def _label(name):
+                vals = name if isinstance(name, tuple) else (name,)
+                return " & ".join(str(v) for v in vals)
+
+            results.append({
+                'Recorte': " × ".join(combo),
+                'Nível': 'Marginal' if k == 1 else f'Interseccional ({k})',
+                'Subgrupos Viáveis': len(stats),
+                'Pior Subgrupo': _label(worst),
+                'N Pior': int(stats.loc[worst, 'n']),
+                'Taxa Fav. Pior': worst_rate,
+                'Melhor Subgrupo': _label(best),
+                'N Melhor': int(stats.loc[best, 'n']),
+                'Taxa Fav. Melhor': best_rate,
+                'DI (Favorável)': worst_rate / best_rate if best_rate > 0 else np.nan,
+                'DI (Adverso)': _adverse_ratio(worst_rate, best_rate),
+            })
+
+    return pd.DataFrame(results)

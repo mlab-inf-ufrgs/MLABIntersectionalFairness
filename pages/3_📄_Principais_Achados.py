@@ -14,7 +14,7 @@ import numpy as np
 import altair as alt
 
 from data_module import load_local_parquet
-from utils.bias_metrics import calculate_dynamic_metrics, pairwise_gerrymandering_audit, calculate_cddl
+from utils.bias_metrics import calculate_dynamic_metrics, pairwise_gerrymandering_audit, calculate_cddl, intersectional_di_comparison, _format_ratio
 
 if "lang" not in st.session_state:
     st.session_state.lang = "PT"
@@ -272,8 +272,26 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
             for attr in cfg["dynamic_attrs"]:
                 m = calculate_dynamic_metrics(df, attr, cfg["target_col"], cfg["favorable_val"])
                 rows.append({"Atributo": attr, "Privilegiado": m["priv"], "Desprivilegiado": m["unpriv"],
-                             "CI": m["CI"], "DI": m["DI"], "KL": m["KL"], "KS": m["KS"]})
+                             "CI": m["CI"], "DI": m["DI"], "DI Adverso": m["DI_adv"], "KL": m["KL"], "KS": m["KS"]})
             st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
+
+            with st.expander("DI Marginal vs. Interseccional (mesma escala)", expanded=True):
+                di_cmp = intersectional_di_comparison(
+                    df, cfg["dynamic_attrs"], cfg["target_col"], cfg["favorable_val"], min_n=100
+                )
+                if di_cmp.empty:
+                    st.info("Não há subgrupos viáveis (N ≥ 100) com variação de desfecho para a comparação.")
+                else:
+                    st.dataframe(
+                        di_cmp.style.format({
+                            "Taxa Fav. Pior": "{:.2%}", "Taxa Fav. Melhor": "{:.2%}",
+                            "DI (Favorável)": "{:.3f}", "DI (Adverso)": _format_ratio,
+                        }),
+                        width='stretch', hide_index=True,
+                    )
+                st.caption("Pior e melhor subgrupo viável (N ≥ 100) de cada recorte. DI (Favorável) = taxa favorável "
+                           "pior / melhor; DI (Adverso) = taxa desfavorável pior / melhor. '∞' indica que o melhor "
+                           "subgrupo não possui desfechos adversos.")
 
             with st.expander("Auditoria de Gerrymandering (todos os pares)", expanded=True):
                 gerry = pairwise_gerrymandering_audit(

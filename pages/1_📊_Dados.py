@@ -4,7 +4,7 @@ import pandas as pd
 import numpy as np
 import altair as alt
 from data_module import DATASETS
-from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v, pairwise_gerrymandering_audit, calculate_cddl, calculate_dynamic_metrics
+from utils.bias_metrics import intersectional_audit_metrics, calculate_base_metrics, calculate_cramer_v, pairwise_gerrymandering_audit, calculate_cddl, calculate_dynamic_metrics, intersectional_di_comparison, _format_ratio
 from utils.i18n import t
 
 if "lang" not in st.session_state:
@@ -240,11 +240,12 @@ else:
         st.markdown(f"{t('fairness_metrics_for')} `{uni_attr}`**")
         st.markdown(t("groups_identified").format(dyn_metrics['priv'], dyn_metrics['unpriv']), unsafe_allow_html=True)
         
-        c1, c2, c3, c4 = st.columns(4)
+        c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric(t("ci_metric"), dyn_metrics['CI'])
         c2.metric(t("di_metric"), dyn_metrics['DI'])
-        c3.metric(t("kl_metric"), dyn_metrics['KL'])
-        c4.metric(t("ks_metric"), dyn_metrics['KS'])
+        c3.metric(t("di_adv_metric"), dyn_metrics['DI_adv'])
+        c4.metric(t("kl_metric"), dyn_metrics['KL'])
+        c5.metric(t("ks_metric"), dyn_metrics['KS'])
         
         with st.expander(t("understand_metrics")):
             st.markdown(t("metrics_explanation"))
@@ -466,7 +467,47 @@ else:
             if st.session_state.lang == "PT" else
             "💡 **Audit note:** Considering class imbalance and large sample sizes ($N$), any excess hidden bias above **0.05%** (+0.05%) is highlighted in bold as statistically significant (Justice Gerrymandering)."
         )
-        
+
+        # Comparação marginal vs. interseccional na mesma escala (DI favorável e adverso)
+        st.markdown(f"**{t('di_comparison_title')}**")
+        st.markdown(t("di_comparison_desc"))
+        with st.spinner(t("scanning_pairs")):
+            di_cmp = intersectional_di_comparison(df_mapped, selected_attrs, target_col, favorable_val, min_n=100)
+
+        if di_cmp.empty:
+            st.info(t("di_comparison_empty"))
+        else:
+            def style_di_fav(val):
+                if isinstance(val, (int, float)) and not pd.isna(val) and val < 0.8:
+                    return 'font-weight: bold; color: #cc0000; background-color: #fff0f0;'
+                return ''
+
+            def style_di_adv(val):
+                if isinstance(val, (int, float)) and not pd.isna(val) and val > 1.25:
+                    return 'font-weight: bold; color: #cc0000; background-color: #fff0f0;'
+                return ''
+
+            st.dataframe(
+                di_cmp.style.map(style_di_fav, subset=['DI (Favorável)'])
+                      .map(style_di_adv, subset=['DI (Adverso)'])
+                      .format({
+                          'Taxa Fav. Pior': '{:.2%}',
+                          'Taxa Fav. Melhor': '{:.2%}',
+                          'DI (Favorável)': '{:.3f}',
+                          'DI (Adverso)': _format_ratio,
+                      }),
+                use_container_width=True,
+                hide_index=True
+            )
+            st.caption(t("di_comparison_caption"))
+            st.download_button(
+                label=t("export_csv"),
+                data=di_cmp.to_csv(index=False).encode('utf-8'),
+                file_name=f"{dataset_name}_di_marginal_vs_intersectional.csv",
+                mime="text/csv",
+                key="download_di_comparison"
+            )
+
         # New Stacked Bar Chart for Attribute Pairs Viability
         st.markdown("**Distribuição de Subgrupos por Par de Atributos**" if st.session_state.lang == "PT" else "**Subgroup Distribution by Attribute Pair**")
         

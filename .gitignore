@@ -45,3 +45,6 @@ venv.bak/
 .idea/
 
 !data/processed/*.parquet
+
+# Microdados brutos baixados localmente (compartilhar fora do git)
+data/raw/

@@ -166,8 +166,13 @@ TEXTS = {
         "di_metric": "DI Pré-treino",
         "kl_metric": "Divergência KL",
         "ks_metric": "Estatística KS",
+        "di_adv_metric": "DI Adverso",
+        "di_comparison_title": "DI Marginal vs. Interseccional (mesma escala)",
+        "di_comparison_desc": "Para cada atributo isolado e cada combinação de atributos, compara o pior e o melhor subgrupo viável (N ≥ 100). O **DI (Favorável)** é a razão entre as taxas favoráveis (pior / melhor); o **DI (Adverso)** é a razão entre as taxas de desfecho desfavorável dos mesmos subgrupos (pior / melhor).",
+        "di_comparison_caption": "Destaques: DI (Favorável) < 0,80 ou DI (Adverso) > 1,25 (Regra dos 80%). Em bases com taxa favorável próxima de 1, o DI favorável tende a 1 por construção, enquanto o DI adverso preserva a disparidade relativa. '∞' indica que o melhor subgrupo não possui nenhum desfecho adverso.",
+        "di_comparison_empty": "Não há subgrupos viáveis (N ≥ 100) suficientes para a comparação.",
         "understand_metrics": "ℹ️ Entenda as Métricas",
-        "metrics_explanation": "* **Desbalanceamento de Classe (CI)**: Mede o desbalanceamento demográfico entre os dois grupos extremos listados acima. Varia de -1 (todas as amostras no grupo desprivilegiado) a 1 (todas no privilegiado). Ideal: 0.\n* **DI Pré-treino (Disparate Impact)**: Razão entre a chance do grupo desprivilegiado pertencer à classe alvo favorável e a do grupo privilegiado. Valores < 0.8 ou > 1.2 indicam disparidade (Regra dos 80%).\n* **Divergência KL**: Mede a divergência (distância) entre as distribuições de probabilidade de resultados do grupo privilegiado e desprivilegiado.\n* **Estatística KS (Kolmogorov-Smirnov)**: Mede a distância máxima entre as distribuições acumuladas dos dois grupos. Valores altos indicam desigualdade na distribuição.",
+        "metrics_explanation": "* **Desbalanceamento de Classe (CI)**: Mede o desbalanceamento demográfico entre os dois grupos extremos listados acima. Varia de -1 (todas as amostras no grupo desprivilegiado) a 1 (todas no privilegiado). Ideal: 0.\n* **DI Pré-treino (Disparate Impact)**: Razão entre a chance do grupo desprivilegiado pertencer à classe alvo favorável e a do grupo privilegiado. Valores < 0.8 ou > 1.25 indicam disparidade (Regra dos 80%).\n* **DI Adverso**: Razão entre as taxas de desfecho desfavorável do grupo desprivilegiado e do privilegiado (mesmos grupos do DI). Valores > 1.25 indicam disparidade. Útil em bases desbalanceadas, em que o DI favorável tende a 1 por construção.\n* **Divergência KL**: Mede a divergência (distância) entre as distribuições de probabilidade de resultados do grupo privilegiado e desprivilegiado.\n* **Estatística KS (Kolmogorov-Smirnov)**: Mede a distância máxima entre as distribuições acumuladas dos dois grupos. Valores altos indicam desigualdade na distribuição.",
         
         # Bloco 3
         "b3_header": "3. Viés Interseccional",
@@ -375,8 +380,13 @@ TEXTS = {
         "di_metric": "Pre-training DI",
         "kl_metric": "KL Divergence",
         "ks_metric": "KS Statistic",
+        "di_adv_metric": "Adverse DI",
+        "di_comparison_title": "Marginal vs. Intersectional DI (same scale)",
+        "di_comparison_desc": "For each single attribute and each combination of attributes, compares the worst and best viable subgroups (N ≥ 100). **DI (Favorável)** is the ratio of favorable rates (worst / best); **DI (Adverso)** is the ratio of unfavorable outcome rates for the same subgroups (worst / best).",
+        "di_comparison_caption": "Highlights: DI (Favorável) < 0.80 or DI (Adverso) > 1.25 (80% Rule). When the favorable rate is close to 1, favorable DI tends to 1 by construction, while adverse DI preserves the relative disparity. '∞' means the best subgroup has no adverse outcomes.",
+        "di_comparison_empty": "Not enough viable subgroups (N ≥ 100) for the comparison.",
         "understand_metrics": "ℹ️ Understand the Metrics",
-        "metrics_explanation": "* **Class Imbalance (CI)**: Measures demographic imbalance between the two extreme groups listed above. Varies from -1 (all samples in the unprivileged group) to 1 (all in the privileged group). Ideal: 0.\n* **Pre-training DI (Disparate Impact)**: Ratio between the chance of the unprivileged group belonging to the favorable target class and that of the privileged group. Values < 0.8 or > 1.2 indicate disparity (80% Rule).\n* **KL Divergence**: Measures the divergence (distance) between the probability distributions of outcomes for the privileged and unprivileged groups.\n* **KS Statistic (Kolmogorov-Smirnov)**: Measures the maximum distance between the cumulative distributions of the two groups. High values indicate inequality in the distribution.",
+        "metrics_explanation": "* **Class Imbalance (CI)**: Measures demographic imbalance between the two extreme groups listed above. Varies from -1 (all samples in the unprivileged group) to 1 (all in the privileged group). Ideal: 0.\n* **Pre-training DI (Disparate Impact)**: Ratio between the chance of the unprivileged group belonging to the favorable target class and that of the privileged group. Values < 0.8 or > 1.25 indicate disparity (80% Rule).\n* **Adverse DI**: Ratio between the unfavorable outcome rates of the unprivileged and privileged groups (same groups as DI). Values > 1.25 indicate disparity. Useful for imbalanced datasets, where favorable DI tends to 1 by construction.\n* **KL Divergence**: Measures the divergence (distance) between the probability distributions of outcomes for the privileged and unprivileged groups.\n* **KS Statistic (Kolmogorov-Smirnov)**: Measures the maximum distance between the cumulative distributions of the two groups. High values indicate inequality in the distribution.",
         
         # Bloco 3
         "b3_header": "3. Intersectional Bias",
