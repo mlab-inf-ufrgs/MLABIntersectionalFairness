@@ -425,6 +425,7 @@ else:
         
         with st.spinner(t("scanning_pairs")):
             pair_df = pairwise_gerrymandering_audit(df_mapped, selected_attrs, target_col, favorable_val, threshold=0.0005)
+            pair_df = pair_df.sort_values('Gap Real (Interseccional)', ascending=False).reset_index(drop=True)
 
             # Rename columns
             pair_df = pair_df.rename(columns={
@@ -466,9 +467,10 @@ else:
                       t('tbl_real_gap'): lambda v: f"{v * 100:.2f} p.p.",
                       t('tbl_hidden_bias'): lambda v: f"{v * 100:+.2f} p.p."
                   }),
-            use_container_width=True
+            use_container_width=True,
+            hide_index=True
         )
-        st.caption(t("caption_pairs"))
+        st.caption(f"{t('sort_note_pairs')} {t('caption_pairs')}")
 
         # Comparação marginal vs. interseccional na mesma escala (DI favorável e adverso)
         st.markdown(f"**{t('di_comparison_title')}**")
@@ -560,11 +562,11 @@ else:
         melted_pairs[t('tbl_gap_amplitude')] = melted_pairs[t('tbl_gap_amplitude')] * 100
 
         base = alt.Chart(melted_pairs).encode(
-            x=alt.X(f"{t('tbl_pair')}:N", title='', axis=alt.Axis(labelAngle=-45)),
-            y=alt.Y(f"{t('tbl_gap_amplitude')}:Q", title=f"{t('tbl_gap_amplitude')} (p.p.)", scale=alt.Scale(domain=[0, 100])),
-            color=alt.Color(f"{t('tbl_gap_type')}:N", 
+            x=alt.X(f"{t('tbl_pair')}:N", title='', axis=alt.Axis(labelAngle=-30, labelLimit=250), sort=pair_df[t('tbl_pair')].tolist()),
+            y=alt.Y(f"{t('tbl_gap_amplitude')}:Q", title=t('tbl_gap_amplitude'), scale=alt.Scale(domain=[0, 100])),
+            color=alt.Color(f"{t('tbl_gap_type')}:N",
                 scale=alt.Scale(range=['#4c6b8b', '#002f6c']),
-                legend=alt.Legend(title="", orient="top-left")
+                legend=alt.Legend(title="", orient="top", labelLimit=0)
             )
         )
         
@@ -583,6 +585,7 @@ else:
         )
         
         st.altair_chart((bars + text).properties(height=400), width="stretch")
+        st.caption(t('sort_note_pairs'))
 
 st.divider()
 

@@ -199,6 +199,7 @@ TEXTS = {
         
         "audit_pairs": "Auditoria de Gerrymandering em Pares (Global)",
         "audit_pairs_desc": "Esta visão varre **todos os pares** de atributos selecionados. Aqui o gap é a **amplitude** (maior − menor taxa favorável): **Gap Esperado** é a maior amplitude entre os dois atributos isolados e **Gap Real** é a amplitude entre os subgrupos do par (N ≥ 100). **Viés Oculto** positivo indica que a interseção revela uma disparidade maior do que qualquer um dos atributos isolados. Por usar amplitude, e não distância à taxa global, os valores não são diretamente comparáveis aos da aba de subgrupos.",
+        "sort_note_pairs": "Pares ordenados pelo Gap Real (Interseccional), do maior para o menor, ou seja, pela disparidade observada na interseção, independentemente dos atributos isolados.",
         "caption_pairs": "Valores em pontos percentuais (p.p.). Destaque: Viés Oculto > 0,05 p.p. Trata-se de um limiar descritivo, não de um teste de significância estatística: diferenças pequenas podem refletir ruído amostral, sobretudo em subgrupos com N próximo de 100.",
         "scanning_pairs": "Varrendo pares...",
         "gap_audit_title": "Auditoria de Gap: Disparidade Marginal vs. Interseccional",
@@ -226,7 +227,7 @@ TEXTS = {
         "tbl_gap_a": "Gap Indiv. A",
         "tbl_gap_b": "Gap Indiv. B",
         "tbl_gap_type": "Tipo de Gap",
-        "tbl_gap_amplitude": "Amplitude do Gap (%)"
+        "tbl_gap_amplitude": "Amplitude do Gap (p.p.)"
     },
     "EN": {
         "sidebar_lang": "Idioma / Language",
@@ -416,6 +417,7 @@ TEXTS = {
         
         "audit_pairs": "Pairwise Gerrymandering Audit (Global)",
         "audit_pairs_desc": "This view scans **all pairs** of selected attributes. Here the gap is the **range** (highest − lowest favorable rate): **Expected Gap** is the largest range between the two attributes taken alone and **Real Gap** is the range across the pair's subgroups (N ≥ 100). Positive **Hidden Bias** means the intersection reveals a larger disparity than either attribute alone. Because it uses ranges rather than distance to the global rate, values are not directly comparable to the subgroup tab.",
+        "sort_note_pairs": "Pairs sorted by Real Gap (Intersectional), from largest to smallest, i.e., by the disparity observed at the intersection, regardless of the single attributes.",
         "caption_pairs": "Values in percentage points (p.p.). Highlight: Hidden Bias > 0.05 p.p. This is a descriptive threshold, not a statistical significance test: small differences may reflect sampling noise, especially for subgroups with N close to 100.",
         "scanning_pairs": "Scanning pairs...",
         "gap_audit_title": "Gap Audit: Marginal vs. Intersectional Disparity",
@@ -443,6 +445,6 @@ TEXTS = {
         "tbl_gap_a": "Indiv. Gap A",
         "tbl_gap_b": "Indiv. Gap B",
         "tbl_gap_type": "Gap Type",
-        "tbl_gap_amplitude": "Gap Amplitude (%)"
+        "tbl_gap_amplitude": "Gap Amplitude (p.p.)"
     }
 }
