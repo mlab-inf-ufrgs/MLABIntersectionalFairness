@@ -300,13 +300,17 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
                 gerry = gerry.sort_values("Viés Oculto (Excedente)", ascending=False)
                 st.dataframe(
                     gerry.style.format({
-                        "Gap Indiv. A": "{:.4f}", "Gap Indiv. B": "{:.4f}",
-                        "Gap Esperado (Marginal Máx)": "{:.4f}",
-                        "Gap Real (Interseccional)": "{:.4f}",
-                        "Viés Oculto (Excedente)": "{:.4f}",
+                        "Gap Indiv. A": lambda v: f"{v * 100:.2f} p.p.",
+                        "Gap Indiv. B": lambda v: f"{v * 100:.2f} p.p.",
+                        "Gap Esperado (Marginal Máx)": lambda v: f"{v * 100:.2f} p.p.",
+                        "Gap Real (Interseccional)": lambda v: f"{v * 100:.2f} p.p.",
+                        "Viés Oculto (Excedente)": lambda v: f"{v * 100:+.2f} p.p.",
                     }),
                     width='stretch', hide_index=True,
                 )
+                st.caption("Gap = amplitude (maior − menor taxa favorável), em pontos percentuais. Viés Oculto "
+                           "positivo indica que a interseção revela disparidade maior do que qualquer atributo "
+                           "isolado. O limiar de 0,05 p.p. é descritivo, não um teste de significância.")
 
             with st.expander("Matriz de CDDL (Disparidade Condicionada por Proxy)", expanded=True):
                 cddl_parts = []

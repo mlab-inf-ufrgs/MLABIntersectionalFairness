@@ -71,14 +71,15 @@ def intersectional_audit_metrics(df, sensitive_attrs, target_col, favorable_val=
         
         real_gap = subgroup_rate - global_rate
         
-        # Expected Gap: worst marginal gap among the intersecting identities
+        # Expected Gap: gap da pior identidade marginal do subgrupo. Há viés oculto quando
+        # o subgrupo fica abaixo do que sua identidade mais desfavorecida, isolada, sugere.
         marginal_gaps = []
         for attr, val in zip(sensitive_attrs, vals):
             m_rate = marginal_rates[attr].get(val, global_rate)
             marginal_gaps.append(m_rate - global_rate)
-            
-        expected_gap = min(marginal_gaps) if real_gap < 0 else max(marginal_gaps)
-        
+
+        expected_gap = min(marginal_gaps)
+
         hidden_bias = real_gap - expected_gap
         priority_score = hidden_bias * n
         
@@ -100,7 +101,7 @@ def intersectional_audit_metrics(df, sensitive_attrs, target_col, favorable_val=
             'N': n,
             'Taxa Favorável': subgroup_rate,
             'Gap Real (Interseccional)': real_gap,
-            'Gap Esperado (Marginal Máx)': expected_gap,
+            'Gap Esperado (Pior Marginal)': expected_gap,
             'Viés Oculto (Excedente)': hidden_bias,
             'Score de Prioridade': priority_score,
             'DI Pré-treinamento': di,
@@ -178,7 +179,8 @@ def pairwise_gerrymandering_audit(df, attributes, target_col, favorable_val, thr
     """
     Varre todos os pares de atributos selecionados e compara a disparidade máxima marginal
     com a disparidade máxima interseccional.
-    Limiar padrão de viés oculto (gerrymandering): 0.05% (0.0005), sensível a bases desbalanceadas.
+    Limiar padrão de viés oculto (gerrymandering): 0,05 p.p. (0.0005). É um limiar descritivo,
+    não um teste de significância estatística.
     """
     results = []
     

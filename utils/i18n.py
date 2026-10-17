@@ -187,7 +187,8 @@ TEXTS = {
         
         "audit_gerry_3": "Auditoria de Justice Gerrymandering (3+ Atributos)",
         "calc_gerry": "Calculando métricas de Gerrymandering...",
-        "caption_inviable": "Subgrupos com N < 100 são marcados como 'Inviável'. DI pré-treinamento indica Pre-training Disparate Impact contra a média global.",
+        "audit_gerry_3_desc": "Cada linha é um subgrupo interseccional. **Gap Real** = taxa favorável do subgrupo − taxa global. **Gap Esperado** = gap da identidade marginal mais desfavorecida do subgrupo (ex.: para Mulher & Negro & Jovem, o menor entre os gaps de Mulher, Negro e Jovem). **Viés Oculto** = Gap Real − Gap Esperado: valores negativos indicam que o subgrupo está pior do que sua identidade mais desfavorecida, isolada, sugeriria.",
+        "caption_inviable": "Valores em pontos percentuais (p.p.). Vereditos: **Alto Viés Oculto** = Viés Oculto < −0,05 p.p.; **Alto Viés Direto** = Gap Real < −5 p.p., sem viés oculto; **Inviável** = N < 100 (estimativa instável). O limiar de 0,05 p.p. é descritivo, não um teste de significância estatística.",
         "export_csv": "📥 Exportar Dados (CSV Longo Consolidado)",
         
         "cddl_header": "Disparidade Demográfica Condicional (CDDL)",
@@ -197,7 +198,8 @@ TEXTS = {
         "warn_metadata": "Metadados incompletos para definir grupo privilegiado/desprivilegiado principal.",
         
         "audit_pairs": "Auditoria de Gerrymandering em Pares (Global)",
-        "audit_pairs_desc": "Esta visão varre **todos os pares possíveis** entre os atributos selecionados para encontrar a disparidade máxima na margem versus na interseção.",
+        "audit_pairs_desc": "Esta visão varre **todos os pares** de atributos selecionados. Aqui o gap é a **amplitude** (maior − menor taxa favorável): **Gap Esperado** é a maior amplitude entre os dois atributos isolados e **Gap Real** é a amplitude entre os subgrupos do par (N ≥ 100). **Viés Oculto** positivo indica que a interseção revela uma disparidade maior do que qualquer um dos atributos isolados. Por usar amplitude, e não distância à taxa global, os valores não são diretamente comparáveis aos da aba de subgrupos.",
+        "caption_pairs": "Valores em pontos percentuais (p.p.). Destaque: Viés Oculto > 0,05 p.p. Trata-se de um limiar descritivo, não de um teste de significância estatística: diferenças pequenas podem refletir ruído amostral, sobretudo em subgrupos com N próximo de 100.",
         "scanning_pairs": "Varrendo pares...",
         "gap_audit_title": "Auditoria de Gap: Disparidade Marginal vs. Interseccional",
         
@@ -213,6 +215,7 @@ TEXTS = {
         "tbl_fav_rate": "Taxa Favorável",
         "tbl_real_gap": "Gap Real (Interseccional)",
         "tbl_exp_gap": "Gap Esperado (Marginal Máx)",
+        "tbl_exp_gap_worst": "Gap Esperado (Pior Marginal)",
         "tbl_hidden_bias": "Viés Oculto (Excedente)",
         "tbl_prio_score": "Score de Prioridade",
         "tbl_pre_di": "DI Pré-treinamento",
@@ -229,7 +232,7 @@ TEXTS = {
         "sidebar_lang": "Idioma / Language",
         "home_page_title": "Intersectional Bias Diagnosis",
         "home_title": "Cumulative impact analysis of social bias",
-        "home_nav": "**Navigation:**\n- **Data**: Pre-training diagnosis and Exploratory Data Analysis (EDA). Evaluates inherent data bias and Gerrymandering audit.\n- **Models**: (Coming Soon) Post-training evaluation of disparities and algorithmic fairness trade-offs.\n\nSelect the desired tab in the sidebar.",
+        "home_nav": "**Navigation:**\n- **Data**: Pre-training diagnosis and Exploratory Data Analysis (EDA). Evaluates inherent data bias and Gerrymandering audit.\n- **Models**: Post-training evaluation of disparities and algorithmic fairness trade-offs.\n\nSelect the desired tab in the sidebar.",
         "models_page_title": "Models",
         "models_title": "Post-Training Evaluation — Intersectional Fairness",
         "models_info": "",
@@ -401,7 +404,8 @@ TEXTS = {
         
         "audit_gerry_3": "Justice Gerrymandering Audit (3+ Attributes)",
         "calc_gerry": "Calculating Gerrymandering metrics...",
-        "caption_inviable": "Subgroups with N < 100 are marked as 'Inviable'. Pre-training DI indicates Pre-training Disparate Impact against the global mean.",
+        "audit_gerry_3_desc": "Each row is an intersectional subgroup. **Real Gap** = subgroup favorable rate − global rate. **Expected Gap** = gap of the subgroup's most disadvantaged marginal identity (e.g., for Woman & Black & Young, the lowest among the gaps of Woman, Black and Young). **Hidden Bias** = Real Gap − Expected Gap: negative values mean the subgroup is worse off than its most disadvantaged identity alone would suggest.",
+        "caption_inviable": "Values in percentage points (p.p.). Verdicts: **High Hidden Bias** = Hidden Bias < −0.05 p.p.; **High Direct Bias** = Real Gap < −5 p.p., without hidden bias; **Inviable** = N < 100 (unstable estimate). The 0.05 p.p. threshold is descriptive, not a statistical significance test.",
         "export_csv": "📥 Export Data (Long Consolidated CSV)",
         
         "cddl_header": "Conditional Demographic Disparity in Labels (CDDL)",
@@ -411,7 +415,8 @@ TEXTS = {
         "warn_metadata": "Incomplete metadata to define primary privileged/unprivileged group.",
         
         "audit_pairs": "Pairwise Gerrymandering Audit (Global)",
-        "audit_pairs_desc": "This view scans **all possible pairs** between selected attributes to find the maximum disparity in the margin versus the intersection.",
+        "audit_pairs_desc": "This view scans **all pairs** of selected attributes. Here the gap is the **range** (highest − lowest favorable rate): **Expected Gap** is the largest range between the two attributes taken alone and **Real Gap** is the range across the pair's subgroups (N ≥ 100). Positive **Hidden Bias** means the intersection reveals a larger disparity than either attribute alone. Because it uses ranges rather than distance to the global rate, values are not directly comparable to the subgroup tab.",
+        "caption_pairs": "Values in percentage points (p.p.). Highlight: Hidden Bias > 0.05 p.p. This is a descriptive threshold, not a statistical significance test: small differences may reflect sampling noise, especially for subgroups with N close to 100.",
         "scanning_pairs": "Scanning pairs...",
         "gap_audit_title": "Gap Audit: Marginal vs. Intersectional Disparity",
         
@@ -427,6 +432,7 @@ TEXTS = {
         "tbl_fav_rate": "Favorable Rate",
         "tbl_real_gap": "Real Gap (Intersectional)",
         "tbl_exp_gap": "Expected Gap (Max Marginal)",
+        "tbl_exp_gap_worst": "Expected Gap (Worst Marginal)",
         "tbl_hidden_bias": "Hidden Bias (Surplus)",
         "tbl_prio_score": "Priority Score",
         "tbl_pre_di": "Pre-training DI",

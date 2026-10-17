@@ -297,7 +297,8 @@ else:
         
         else:
             st.subheader(t("audit_gerry_3"))
-            
+            st.markdown(t("audit_gerry_3_desc"))
+
             with st.spinner(t("calc_gerry")):
                 audit_df = intersectional_audit_metrics(df_mapped, selected_attrs, target_col, favorable_val)
             
@@ -309,7 +310,7 @@ else:
                     'Subgrupo': t('tbl_subgroup'),
                     'Taxa Favorável': t('tbl_fav_rate'),
                     'Gap Real (Interseccional)': t('tbl_real_gap'),
-                    'Gap Esperado (Marginal Máx)': t('tbl_exp_gap'),
+                    'Gap Esperado (Pior Marginal)': t('tbl_exp_gap_worst'),
                     'Viés Oculto (Excedente)': t('tbl_hidden_bias'),
                     'Score de Prioridade': t('tbl_prio_score'),
                     'DI Pré-treinamento': t('tbl_pre_di'),
@@ -321,6 +322,7 @@ else:
                     verdict_map = {
                         "Inviável (N<100)": "Inviable (N<100)",
                         "Alto Viés Oculto": "High Hidden Bias",
+                        "Alto Viés Direto": "High Direct Bias",
                         "GERRYMANDERING": "GERRYMANDERING",
                         "Viés Marginal Predominante": "Predominant Marginal Bias",
                         "Ok": "Ok"
@@ -338,9 +340,16 @@ else:
                         return 'font-weight: bold; color: #cc0000; background-color: #fff0f0;'
                     return ''
                     
+                # Gaps são diferenças de proporções: exibidos em pontos percentuais (dados brutos inalterados)
+                pp_signed = lambda v: f"{v * 100:+.2f} p.p."
                 st.dataframe(
                     audit_df.style.map(color_verdict, subset=[t('tbl_audit_verdict')])
-                                  .map(style_audit_hidden_bias, subset=[t('tbl_hidden_bias')]),
+                                  .map(style_audit_hidden_bias, subset=[t('tbl_hidden_bias')])
+                                  .format({
+                                      t('tbl_real_gap'): pp_signed,
+                                      t('tbl_exp_gap_worst'): pp_signed,
+                                      t('tbl_hidden_bias'): pp_signed,
+                                  }),
                     column_config={
                         t('tbl_subgroup'): st.column_config.TextColumn(t('tbl_subgroup'), width="large"),
                         'N': st.column_config.NumberColumn('N', format="%d"),
@@ -350,9 +359,6 @@ else:
                             min_value=0,
                             max_value=1,
                         ),
-                        t('tbl_real_gap'): st.column_config.NumberColumn(t('tbl_real_gap'), format="%.4f"),
-                        t('tbl_exp_gap'): st.column_config.NumberColumn(t('tbl_exp_gap'), format="%.4f"),
-                        t('tbl_hidden_bias'): st.column_config.NumberColumn(t('tbl_hidden_bias'), format="%.4f"),
                         t('tbl_prio_score'): None, # Ocultar para simplificar
                         t('tbl_pre_di'): None, # Ocultar para simplificar
                     },
@@ -364,7 +370,7 @@ else:
                 
                 # Exportação Long CSV
                 long_csv = audit_df.melt(id_vars=[t('tbl_subgroup'), 'N'], 
-                                         value_vars=[t('tbl_fav_rate'), t('tbl_real_gap'), t('tbl_exp_gap'), t('tbl_hidden_bias'), t('tbl_prio_score'), t('tbl_pre_di')],
+                                         value_vars=[t('tbl_fav_rate'), t('tbl_real_gap'), t('tbl_exp_gap_worst'), t('tbl_hidden_bias'), t('tbl_prio_score'), t('tbl_pre_di')],
                                          var_name=t('tbl_metric'), value_name=t('tbl_value'))
                 long_csv.insert(0, 'Dataset', dataset_name)
                 
@@ -454,19 +460,15 @@ else:
             pair_df.style.map(color_pair_verdict, subset=[t('tbl_audit_verdict')])
                   .map(style_pair_hidden_bias, subset=[t('tbl_hidden_bias')])
                   .format({
-                      t('tbl_gap_a'): '{:.2%}',
-                      t('tbl_gap_b'): '{:.2%}',
-                      t('tbl_exp_gap'): '{:.2%}',
-                      t('tbl_real_gap'): '{:.2%}',
-                      t('tbl_hidden_bias'): '{:+.2%}'
+                      t('tbl_gap_a'): lambda v: f"{v * 100:.2f} p.p.",
+                      t('tbl_gap_b'): lambda v: f"{v * 100:.2f} p.p.",
+                      t('tbl_exp_gap'): lambda v: f"{v * 100:.2f} p.p.",
+                      t('tbl_real_gap'): lambda v: f"{v * 100:.2f} p.p.",
+                      t('tbl_hidden_bias'): lambda v: f"{v * 100:+.2f} p.p."
                   }),
             use_container_width=True
         )
-        st.caption(
-            "💡 **Nota de auditoria:** Tendo em vista o desbalanceamento das bases e o alto volume amostral ($N$), qualquer viés oculto excedente acima de **0,05%** (+0.05%) é destacado em negrito como estatisticamente significativo (Justice Gerrymandering)."
-            if st.session_state.lang == "PT" else
-            "💡 **Audit note:** Considering class imbalance and large sample sizes ($N$), any excess hidden bias above **0.05%** (+0.05%) is highlighted in bold as statistically significant (Justice Gerrymandering)."
-        )
+        st.caption(t("caption_pairs"))
 
         # Comparação marginal vs. interseccional na mesma escala (DI favorável e adverso)
         st.markdown(f"**{t('di_comparison_title')}**")
