@@ -330,7 +330,7 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
             "pre_di": "Pre-DI", "pre_spd": "Pre-SPD",
         })
         st.dataframe(
-            show_pre.style.format({"Taxa Favorável": "{:.4f}", "Pre-DI": "{:.3f}", "Pre-SPD": "{:+.2%}"}),
+            show_pre.style.format({"Taxa Favorável": "{:.4f}", "Pre-DI": "{:.3f}", "Pre-SPD": lambda v: f"{v * 100:+.2f} p.p."}),
             width='stretch', hide_index=True,
         )
 

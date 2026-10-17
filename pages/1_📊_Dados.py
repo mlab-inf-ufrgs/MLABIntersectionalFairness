@@ -556,10 +556,12 @@ else:
             var_name=t('tbl_gap_type'),
             value_name=t('tbl_gap_amplitude')
         )
-        
+        # Gaps são diferenças de proporções: exibidos em pontos percentuais, como na tabela
+        melted_pairs[t('tbl_gap_amplitude')] = melted_pairs[t('tbl_gap_amplitude')] * 100
+
         base = alt.Chart(melted_pairs).encode(
             x=alt.X(f"{t('tbl_pair')}:N", title='', axis=alt.Axis(labelAngle=-45)),
-            y=alt.Y(f"{t('tbl_gap_amplitude')}:Q", title=t('tbl_gap_amplitude'), scale=alt.Scale(domain=[0, 1])),
+            y=alt.Y(f"{t('tbl_gap_amplitude')}:Q", title=f"{t('tbl_gap_amplitude')} (p.p.)", scale=alt.Scale(domain=[0, 100])),
             color=alt.Color(f"{t('tbl_gap_type')}:N", 
                 scale=alt.Scale(range=['#4c6b8b', '#002f6c']),
                 legend=alt.Legend(title="", orient="top-left")
@@ -575,7 +577,7 @@ else:
             fontSize=10
         ).encode(
             xOffset=alt.XOffset(f"{t('tbl_gap_type')}:N"),
-            text=alt.Text(f"{t('tbl_gap_amplitude')}:Q", format='.1%')
+            text=alt.Text(f"{t('tbl_gap_amplitude')}:Q", format='.1f')
         ).transform_filter(
             alt.datum[t('tbl_gap_type')] == t('tbl_real_gap')
         )
