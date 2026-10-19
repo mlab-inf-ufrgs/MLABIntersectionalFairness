@@ -15,6 +15,10 @@ import altair as alt
 
 from data_module import load_local_parquet
 from utils.bias_metrics import calculate_dynamic_metrics, pairwise_gerrymandering_audit, calculate_cddl, intersectional_di_comparison, _format_ratio
+from utils.report_tables import (
+    pretrain_subgroup_table as _pretrain_subgroup_table, subgroup_pre_post_table,
+    model_comparison_table, model_comparison_display, latex_model_comparison, latex_subgroup_pre_post,
+)
 
 if "lang" not in st.session_state:
     st.session_state.lang = "PT"
@@ -103,46 +107,14 @@ def load_processed(parquet_name):
     return load_local_parquet(parquet_name)
 
 
-def build_subgroup_key(df, cols):
-    s = df[cols[0]].astype(str)
-    for c in cols[1:]:
-        s = s + " & " + df[c].astype(str)
-    return s
-
-
 def pretrain_subgroup_table(df, cfg):
-    """Réplica das Tabelas 5.X2 / 5.X3: taxa favorável, Pre-DI e Pre-SPD por subgrupo."""
-    target_col, favorable_val = cfg["target_col"], cfg["favorable_val"]
-    g = df.groupby(cfg["group_cols"], observed=True)[target_col].apply(
-        lambda x: (x == favorable_val).mean()
-    ).rename("favorable_rate").reset_index()
-    g["n"] = df.groupby(cfg["group_cols"], observed=True).size().values
-    ref_rate = g["favorable_rate"].max()
-    g["pre_di"] = g["favorable_rate"] / ref_rate
-    g["pre_spd"] = g["favorable_rate"] - ref_rate
-    g["subgroup"] = build_subgroup_key(g, cfg["group_cols"])
-    return g.sort_values("favorable_rate", ascending=False).reset_index(drop=True)
+    """Taxa favorável, Pre-DI e Pre-SPD por subgrupo do par auditado (rótulos da base completa)."""
+    return _pretrain_subgroup_table(df, cfg["group_cols"], cfg["target_col"], cfg["favorable_val"])
 
 
-def posttrain_subgroup_table(dataset_key, cfg):
-    """Réplica das Tabelas 5.Z / 5.Y2: Post-DI, TPR, FPR, AAOD por subgrupo (média entre folds)."""
-    sub = all_sub[
-        (all_sub["dataset"] == dataset_key)
-        & (all_sub["attrs"] == cfg["attrs"])
-        & (all_sub["model"] == cfg["model"])
-        & (all_sub["opt_metric"] == cfg["opt_metric"])
-    ]
-    if sub.empty:
-        return None
-    agg = sub.groupby("subgroup").agg(
-        n_mean=("n", "mean"),
-        favorable_rate=("favorable_rate", "mean"),
-        post_di=("post_di", "mean"),
-        tpr=("tpr", "mean"),
-        fpr=("fpr", "mean"),
-        aaod=("aaod", "mean"),
-    ).reset_index()
-    return agg.sort_values("favorable_rate", ascending=False).reset_index(drop=True)
+def posttrain_subgroup_table(dataset_key, cfg, pre_df):
+    """Post-DI, TPR, FPR e AAOD por subgrupo (média entre folds), com a taxa e o Pre-DI dos dados ao lado."""
+    return subgroup_pre_post_table(all_sub, dataset_key, cfg["attrs"], cfg["model"], cfg["opt_metric"], pre_df)
 
 
 def global_metrics_row(dataset_key, cfg):
@@ -155,25 +127,30 @@ def global_metrics_row(dataset_key, cfg):
     return row.iloc[0] if not row.empty else None
 
 
-def fairmlp_baseline_subgroup_table(dataset_key, cfg):
-    """Quebra por subgrupo do baseline de rede neural (FairMLP, λ=0,0 — sem mitigação)."""
-    sub = all_sub[
-        (all_sub["dataset"] == dataset_key)
-        & (all_sub["attrs"] == cfg["attrs"])
-        & (all_sub["model"] == "FairMLP")
-        & (all_sub["lambda_fairness"] == 0.0)
-    ]
-    if sub.empty:
-        return None
-    agg = sub.groupby("subgroup").agg(
-        n_mean=("n", "mean"),
-        favorable_rate=("favorable_rate", "mean"),
-        post_di=("post_di", "mean"),
-        tpr=("tpr", "mean"),
-        fpr=("fpr", "mean"),
-        aaod=("aaod", "mean"),
-    ).reset_index()
-    return agg.sort_values("favorable_rate", ascending=False).reset_index(drop=True)
+def fairmlp_baseline_subgroup_table(dataset_key, cfg, pre_df):
+    """Quebra por subgrupo do baseline de rede neural (FairMLP, λ=0,0 — sem mitigação), com o Pre-DI ao lado."""
+    return subgroup_pre_post_table(all_sub, dataset_key, cfg["attrs"], "FairMLP", "lambda_0.0", pre_df)
+
+
+POST_COLUMNS = {
+    "subgroup": "Subgrupo", "n_mean": "N (teste/fold)", "data_rate": "Taxa nos dados", "pre_di": "Pre-DI",
+    "pred_rate": "Taxa de predição", "post_di": "Post-DI", "tpr": "TPR", "fpr": "FPR", "aaod": "AAOD",
+}
+
+
+def show_pre_post_table(table):
+    """Tabela por subgrupo com Pre-DI e Post-DI lado a lado; o subgrupo de maior AAOD em negrito."""
+    show = table[list(POST_COLUMNS)].rename(columns=POST_COLUMNS)
+
+    def _highlight_worst(row):
+        is_worst = row["AAOD"] == show["AAOD"].max() and show["AAOD"].max() > 0
+        return ["font-weight: bold" if is_worst else "" for _ in row]
+
+    st.dataframe(
+        show.style.format({c: "{:.3f}" for c in list(POST_COLUMNS.values())[2:]} | {"N (teste/fold)": "{:.0f}"})
+        .apply(_highlight_worst, axis=1),
+        width='stretch', hide_index=True,
+    )
 
 
 def lambda_sweep_table(dataset_key, cfg):
@@ -338,7 +315,18 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
         st.subheader("B. Efeitos do Treinamento nos Baselines Tradicionais")
 
         gm = global_metrics_row(dataset_key, cfg)
-        post_df = posttrain_subgroup_table(dataset_key, cfg)
+        post_df = posttrain_subgroup_table(dataset_key, cfg, pre_df)
+        mlp_base_df = fairmlp_baseline_subgroup_table(dataset_key, cfg, pre_df)
+        comp_df = model_comparison_table(all_agg, dataset_key, cfg["attrs"])
+
+        if not comp_df.empty:
+            st.markdown("**Comparação de desempenho e equidade entre todos os modelos testados**")
+            st.dataframe(model_comparison_display(comp_df), width='stretch', hide_index=True)
+            st.caption(
+                "Média ± desvio-padrão entre os 3 folds externos. Random Forest e Gradient Boosting aparecem em cada "
+                "métrica usada na seleção de hiperparâmetros; a FairMLP, em cada valor de λ. "
+                "↑: maior é melhor; ↓: menor é melhor."
+            )
 
         if gm is None or post_df is None:
             st.info("Sem resultados pós-treino salvos para esta combinação ainda.")
@@ -349,23 +337,11 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
             c3.metric("AUROC", f"{gm['roc_auc_mean']:.3f}" if not pd.isna(gm['roc_auc_mean']) else "N/A")
             c4.metric("Max Intersectional AAOD", f"{gm['max_aaod_mean']:.4f}")
 
-            st.markdown("**Métricas de equidade interseccional pós-treino por subgrupo** (média entre folds externos)")
-            show_post = post_df[["subgroup", "n_mean", "favorable_rate", "post_di", "tpr", "fpr", "aaod"]].rename(columns={
-                "subgroup": "Subgrupo", "n_mean": "N (média/fold)", "favorable_rate": "Taxa Favorável",
-                "post_di": "Post-DI", "tpr": "TPR", "fpr": "FPR", "aaod": "AAOD",
-            })
-
-            def _highlight_worst(row):
-                is_worst = row["AAOD"] == show_post["AAOD"].max()
-                return ["font-weight: bold" if is_worst else "" for _ in row]
-
-            st.dataframe(
-                show_post.style.format({
-                    "N (média/fold)": "{:.0f}", "Taxa Favorável": "{:.3f}", "Post-DI": "{:.3f}",
-                    "TPR": "{:.3f}", "FPR": "{:.3f}", "AAOD": "{:.3f}",
-                }).apply(_highlight_worst, axis=1),
-                width='stretch', hide_index=True,
-            )
+            st.markdown("**Disparate Impact antes e depois do treinamento e métricas de equidade por subgrupo** "
+                        "(média entre folds externos)")
+            show_pre_post_table(post_df)
+            st.caption("Taxa nos dados e Pre-DI: rótulos da base completa. Demais colunas: predições nos folds de "
+                       "teste. Em negrito, o subgrupo com maior AAOD.")
 
             st.markdown("**Amplificação do viés: Disparate Impact antes vs. depois do treinamento**")
             st.altair_chart(render_pre_post_di_chart(pre_df, post_df, cfg["group_cols"]), width='stretch')
@@ -374,28 +350,37 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
                 "da linha do Pré-treino indicam amplificação do viés pelo modelo."
             )
 
+        with st.expander("📄 Código LaTeX das tabelas deste dataset (para a proposta)"):
+            st.markdown("Formato do texto da tese: vírgula decimal e linhas `\\hline`. Requer os pacotes "
+                        "`multirow`, `pdflscape` e `float`.")
+            tex_blocks = []
+            if not comp_df.empty:
+                tex_blocks.append(("Comparação entre todos os modelos",
+                                   latex_model_comparison(comp_df, dataset_key, cfg["attrs"])))
+            if post_df is not None:
+                tex_blocks.append((f"Subgrupos — {cfg['model']} otimizado por {cfg['opt_metric_label']}",
+                                   latex_subgroup_pre_post(post_df, dataset_key, cfg["model"], cfg["opt_metric"])))
+            if mlp_base_df is not None:
+                tex_blocks.append(("Subgrupos — MLP sem mitigação (λ = 0,0)",
+                                   latex_subgroup_pre_post(mlp_base_df, dataset_key, "FairMLP", "lambda_0.0", 0.0)))
+            for title, tex in tex_blocks:
+                st.markdown(f"**{title}**")
+                st.code(tex, language="latex")
+            if tex_blocks:
+                st.download_button(
+                    "📥 Baixar todas as tabelas (.tex)",
+                    data="\n\n".join(tex for _, tex in tex_blocks),
+                    file_name=f"{dataset_key.split()[0].lower()}_tabelas_resultados.tex",
+                    mime="text/plain",
+                    key=f"dl_tex_{dataset_key}",
+                )
+
         st.divider()
         st.subheader("C. Mitigação por Rede Neural Artificial (FairMLP: Variação de λ)")
 
-        mlp_base_df = fairmlp_baseline_subgroup_table(dataset_key, cfg)
         if mlp_base_df is not None:
             st.markdown("**Baseline de rede neural sem mitigação (MLP, λ = 0,0) — quebra por subgrupo**")
-            show_mlp_base = mlp_base_df[["subgroup", "n_mean", "favorable_rate", "post_di", "tpr", "fpr", "aaod"]].rename(columns={
-                "subgroup": "Subgrupo", "n_mean": "N (média/fold)", "favorable_rate": "Taxa Favorável",
-                "post_di": "Post-DI", "tpr": "TPR", "fpr": "FPR", "aaod": "AAOD",
-            })
-
-            def _highlight_worst_mlp(row):
-                is_worst = row["AAOD"] == show_mlp_base["AAOD"].max()
-                return ["font-weight: bold" if is_worst else "" for _ in row]
-
-            st.dataframe(
-                show_mlp_base.style.format({
-                    "N (média/fold)": "{:.0f}", "Taxa Favorável": "{:.3f}", "Post-DI": "{:.3f}",
-                    "TPR": "{:.3f}", "FPR": "{:.3f}", "AAOD": "{:.3f}",
-                }).apply(_highlight_worst_mlp, axis=1),
-                width='stretch', hide_index=True,
-            )
+            show_pre_post_table(mlp_base_df)
             st.caption(
                 "Referência para comparar com o melhor baseline de árvore (Seção B) — antes de qualquer "
                 "penalização de equidade ($\\lambda = 0$)."
@@ -425,6 +410,7 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
             st.markdown("**Trade-off entre equidade e λ**")
             st.altair_chart(render_lambda_chart(sweep_df), width='stretch')
             st.caption(
-                "Uma curva não-decrescente com λ indicaria mitigação monotônica; oscilações ou platôs "
-                "(como no COMPAS e no SINASC) indicam resistência estrutural ou colapso trivial do modelo."
+                "Uma curva decrescente com λ indicaria mitigação monotônica. Platôs indicam que a penalização não "
+                "altera as predições: no COMPAS, porque as poucas combinações de entrada só mudam de classe quando "
+                "cruzam o limiar de decisão; no SINASC, porque o modelo prediz a classe favorável para todas as instâncias."
             )

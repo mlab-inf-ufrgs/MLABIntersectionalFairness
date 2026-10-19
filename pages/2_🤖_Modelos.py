@@ -11,6 +11,11 @@ import numpy as np
 import altair as alt
 import matplotlib.pyplot as plt
 from utils.i18n import t
+from utils.report_tables import (
+    pretrain_subgroup_table, model_comparison_table, model_comparison_display,
+    subgroup_pre_post_table, latex_model_comparison, latex_subgroup_pre_post,
+)
+from data_module import DATASETS
 from scripts.generate_model_report import clean_dataframe, generate_latex_table
 
 if "lang" not in st.session_state:
@@ -100,6 +105,17 @@ try:
 except Exception as e:
     st.error(f"{t('load_error')} {e}")
     st.stop()
+
+
+@st.cache_data(show_spinner=False)
+def load_pretrain_subgroups(dataset_key, attrs):
+    """Pre-DI por subgrupo do par auditado, calculado sobre os rótulos da base completa."""
+    info = DATASETS.get(dataset_key)
+    if info is None:
+        return None
+    loader = getattr(info["loader"], "__wrapped__", info["loader"])
+    df = loader(["Todos"]) if info.get("supports_uf", False) else loader()
+    return pretrain_subgroup_table(df, attrs.split(" & "), info["target"], info["favorable_val"])
 
 # Helper para renderizar a Figura estilo Artigo (Boxplot + Jitter)
 def render_figure_distribution(df, metric_left, metric_right, label_left, label_right):
@@ -364,13 +380,37 @@ with tab_detailed:
     agg_filt = agg_df[(agg_df["dataset"] == sel_dataset) & (agg_df["attrs"] == sel_attrs)].copy()
     sub_filt = sub_df[(sub_df["dataset"] == sel_dataset) & (sub_df["attrs"] == sel_attrs)].copy()
 
+    # Comparação entre todos os modelos e configurações deste dataset
+    st.subheader(t("comparison_header"))
+    st.markdown(t("comparison_desc"))
+    comp_df = model_comparison_table(agg_df, sel_dataset, sel_attrs)
+    if comp_df.empty:
+        st.info(t("no_results_warn"))
+    else:
+        st.dataframe(model_comparison_display(comp_df), use_container_width=True, hide_index=True)
+        st.caption(t("comparison_caption"))
+        with st.expander(t("latex_tables_expander")):
+            st.markdown(t("latex_tables_desc"))
+            tex_comp = latex_model_comparison(comp_df, sel_dataset, sel_attrs)
+            st.code(tex_comp, language="latex")
+            st.download_button(
+                label=t("btn_download_tex"),
+                data=tex_comp,
+                file_name=f"{sel_dataset.split()[0].lower()}_comparacao_modelos.tex",
+                mime="text/plain",
+                key="dl_tex_comparison",
+            )
+
+    st.divider()
+
     models_avail = sorted(agg_filt["model"].unique())
-    metrics_avail = sorted(agg_filt["opt_metric"].unique())
 
     col_m, col_om = st.columns(2)
     with col_m:
         sel_model = st.selectbox(t("select_model"), models_avail, key="detailed_model")
     with col_om:
+        # Só as configurações existentes para o modelo escolhido (FairMLP usa λ; árvores, métricas de otimização)
+        metrics_avail = sorted(agg_filt.loc[agg_filt["model"] == sel_model, "opt_metric"].unique())
         sel_opt = st.selectbox(t("select_opt_metric"), metrics_avail, key="detailed_opt")
 
     # Single combination
@@ -463,23 +503,19 @@ with tab_detailed:
     st.header(t("dumbbell_header"))
     st.markdown(t("dumbbell_desc"))
 
-    dumb_data = sub_filt[
-        (sub_filt["model"] == sel_model) & (sub_filt["opt_metric"] == sel_opt)
-    ].copy()
+    pre_sub = load_pretrain_subgroups(sel_dataset, sel_attrs)
+    dumb_avg = (
+        subgroup_pre_post_table(sub_df, sel_dataset, sel_attrs, sel_model, sel_opt, pre_sub)
+        if pre_sub is not None else None
+    )
 
-    if not dumb_data.empty:
-        dumb_avg = dumb_data.groupby("subgroup").agg(
-            post_di_mean=("post_di", "mean"),
-            post_di_std=("post_di", "std"),
-            tpr_mean=("tpr", "mean"),
-            fpr_mean=("fpr", "mean"),
-            n_mean=("n", "mean"),
-        ).reset_index()
-
-        dumb_avg["di_color"] = np.where(
-            dumb_avg["post_di_mean"] < 0.8, "#d73027",
-            np.where(dumb_avg["post_di_mean"] > 1.25, "#fc8d59", "#4575b4")
-        )
+    if dumb_avg is not None and not dumb_avg.empty:
+        pre_lbl, post_lbl = t("moment_pre"), t("moment_post")
+        long_di = pd.concat([
+            dumb_avg[["subgroup", "pre_di"]].rename(columns={"pre_di": "di"}).assign(momento=pre_lbl),
+            dumb_avg[["subgroup", "post_di"]].rename(columns={"post_di": "di"}).assign(momento=post_lbl),
+        ], ignore_index=True)
+        order = dumb_avg.sort_values("post_di")["subgroup"].tolist()
 
         ref_line = alt.Chart(pd.DataFrame({"di": [1.0]})).mark_rule(
             color="gray", strokeDash=[6, 4], opacity=0.7
@@ -493,31 +529,33 @@ with tab_detailed:
             color="orange", strokeDash=[4, 4], opacity=0.6
         ).encode(x="di:Q")
 
-        dumb_base = alt.Chart(dumb_avg).encode(
-            y=alt.Y("subgroup:N", title="", sort="-x"),
+        y_enc = alt.Y("subgroup:N", title="", sort=order)
+
+        # Segmento ligando o DI dos dados (pré) ao DI das predições (pós) de cada subgrupo
+        dumb_link = alt.Chart(dumb_avg).mark_rule(color="#9ca3af", strokeWidth=2).encode(
+            y=y_enc, x=alt.X("pre_di:Q"), x2="post_di:Q",
         )
 
-        dumb_points = dumb_base.mark_point(size=120, filled=True).encode(
-            x=alt.X("post_di_mean:Q", title=t("post_di_label"), scale=alt.Scale(zero=False)),
-            color=alt.Color("di_color:N", scale=None),
+        dumb_errbar = alt.Chart(dumb_avg).mark_errorbar(color="#eb6834", opacity=0.6).encode(
+            y=y_enc, x=alt.X("post_di:Q"), xError=alt.XError("post_di_std:Q"),
+        )
+
+        dumb_points = alt.Chart(long_di).mark_point(size=130, filled=True, opacity=1).encode(
+            y=y_enc,
+            x=alt.X("di:Q", title="Disparate Impact (DI)", scale=alt.Scale(zero=False)),
+            color=alt.Color(
+                "momento:N",
+                scale=alt.Scale(domain=[pre_lbl, post_lbl], range=["#2a78d6", "#eb6834"]),
+                legend=alt.Legend(title="", orient="top"),
+            ),
             tooltip=[
                 alt.Tooltip("subgroup:N", title=t("tbl_subgroup")),
-                alt.Tooltip("post_di_mean:Q", format=".3f", title=t("post_di_label")),
-                alt.Tooltip("post_di_std:Q", format=".3f", title="±DI"),
-                alt.Tooltip("tpr_mean:Q", format=".3f", title="TPR"),
-                alt.Tooltip("fpr_mean:Q", format=".3f", title="FPR"),
-                alt.Tooltip("n_mean:Q", format=".0f", title="N (média)"),
+                alt.Tooltip("momento:N", title=""),
+                alt.Tooltip("di:Q", format=".3f", title="DI"),
             ],
         )
 
-        dumb_errbar = dumb_base.mark_errorbar().encode(
-            x=alt.X("post_di_mean:Q"),
-            xError=alt.XError("post_di_std:Q"),
-            y=alt.Y("subgroup:N"),
-            color=alt.value("gray"),
-        )
-
-        dumbbell_chart = (ref_line + thresh_80 + thresh_125 + dumb_errbar + dumb_points).properties(
+        dumbbell_chart = (ref_line + thresh_80 + thresh_125 + dumb_link + dumb_errbar + dumb_points).properties(
             height=max(250, len(dumb_avg) * 40)
         )
 
@@ -525,15 +563,31 @@ with tab_detailed:
         st.caption(t("dumbbell_caption"))
 
         with st.expander(t("dumbbell_table_expander")):
+            show_dumb = dumb_avg[["subgroup", "n_mean", "data_rate", "pre_di", "pred_rate", "post_di",
+                                  "post_di_std", "tpr", "fpr", "aaod"]].rename(columns={
+                "subgroup": t("tbl_subgroup"), "n_mean": "N (teste/fold)", "data_rate": t("data_rate_label"),
+                "pre_di": t("pre_di_label"), "pred_rate": t("pred_rate_label"), "post_di": t("post_di_label"),
+                "post_di_std": "± Post-DI", "tpr": "TPR", "fpr": "FPR", "aaod": "AAOD",
+            })
             st.dataframe(
-                dumb_avg.style.format({
-                    "post_di_mean": "{:.3f}",
-                    "post_di_std": "{:.3f}",
-                    "tpr_mean": "{:.3f}",
-                    "fpr_mean": "{:.3f}",
-                    "n_mean": "{:.0f}",
-                }),
-                use_container_width=True,
+                show_dumb.style.format({c: "{:.3f}" for c in show_dumb.columns[2:]} | {"N (teste/fold)": "{:.0f}"}),
+                use_container_width=True, hide_index=True,
+            )
+
+        with st.expander(t("latex_subgroup_expander")):
+            st.markdown(t("latex_tables_desc"))
+            lam = agg_filt.loc[(agg_filt["model"] == sel_model) & (agg_filt["opt_metric"] == sel_opt), "lambda_fairness"]
+            tex_sub = latex_subgroup_pre_post(
+                dumb_avg, sel_dataset, sel_model, sel_opt,
+                lam.iloc[0] if "lambda_fairness" in agg_filt.columns and not lam.empty else np.nan,
+            )
+            st.code(tex_sub, language="latex")
+            st.download_button(
+                label=t("btn_download_tex"),
+                data=tex_sub,
+                file_name=f"{sel_dataset.split()[0].lower()}_subgrupos_{sel_model.lower()}_{sel_opt}.tex",
+                mime="text/plain",
+                key="dl_tex_subgroups",
             )
     else:
         st.info(t("no_subgroup_data"))

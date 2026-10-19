@@ -78,18 +78,39 @@ TEXTS = {
         ),
 
         # Bloco 3 — Dumbbell
-        "dumbbell_header": "3. Disparate Impact Pós-Treinamento por Subgrupo Interseccional",
+        "dumbbell_header": "3. Disparate Impact por Subgrupo Interseccional: Pré vs. Pós-Treinamento",
         "dumbbell_desc": (
-            "Média do **Post-training DI** (± desvio padrão entre folds) para cada subgrupo interseccional. "
-            "A linha cinza em DI=1.0 indica paridade perfeita. "
-            "Linhas laranjas em 0.8 e 1.25 delimitam a Regra dos 80% (zona de disparidade)."
+            "Para cada subgrupo, o **Pre-DI** (calculado sobre os rótulos da base completa) e o **Post-DI** "
+            "(média entre as outer folds, calculado sobre as predições do modelo selecionado). Em ambos, a "
+            "referência é o subgrupo com maior taxa favorável. "
+            "A linha cinza em DI = 1,0 indica paridade; as linhas laranjas em 0,8 e 1,25 delimitam a Regra dos 80%."
         ),
         "post_di_label": "DI Pós-treinamento",
+        "pre_di_label": "DI Pré-treinamento",
+        "moment_pre": "Pré-treino (dados)",
+        "moment_post": "Pós-treino (predições)",
+        "data_rate_label": "Taxa nos dados",
+        "pred_rate_label": "Taxa de predição",
         "dumbbell_caption": (
-            "🔴 DI < 0.8 (subgrupo desfavorecido) | 🟠 DI > 1.25 (superrepresentado) | 🔵 dentro da faixa aceitável. "
-            "Barras de erro = ±1 desvio padrão entre outer folds."
+            "O segmento liga o DI dos dados ao DI das predições. Quando o ponto laranja fica à esquerda do azul, "
+            "o modelo ampliou a disparidade do subgrupo. Barra de erro = ±1 desvio-padrão do Post-DI entre outer folds."
         ),
         "dumbbell_table_expander": "📋 Tabela de dados completa por subgrupo",
+        "latex_subgroup_expander": "📄 Código LaTeX desta tabela por subgrupo",
+
+        # Comparação entre modelos
+        "comparison_header": "Comparação entre Todos os Modelos e Configurações",
+        "comparison_desc": (
+            "Desempenho preditivo e equidade interseccional de cada modelo testado neste dataset: Random Forest e "
+            "Gradient Boosting em cada métrica de otimização da busca de hiperparâmetros, e a FairMLP em cada valor de λ."
+        ),
+        "comparison_caption": "Média ± desvio-padrão entre as 3 outer folds. ↑: maior é melhor; ↓: menor é melhor.",
+        "latex_tables_expander": "📄 Código LaTeX desta tabela",
+        "latex_tables_desc": (
+            "Formato do texto da tese: vírgula decimal e linhas \\hline. Requer os pacotes `multirow` e `pdflscape` "
+            "e a opção de posicionamento `[H]` (pacote `float`)."
+        ),
+        "btn_download_tex": "📥 Baixar .tex",
         "no_subgroup_data": "Dados de subgrupos não disponíveis para esta combinação.",
 
         # Bloco 4 — Ranking
@@ -296,18 +317,39 @@ TEXTS = {
         ),
 
         # Block 3 — Dumbbell
-        "dumbbell_header": "3. Post-Training Disparate Impact by Intersectional Subgroup",
+        "dumbbell_header": "3. Disparate Impact by Intersectional Subgroup: Pre- vs. Post-Training",
         "dumbbell_desc": (
-            "Mean **Post-training DI** (± std across folds) for each intersectional subgroup. "
-            "The gray line at DI=1.0 indicates perfect parity. "
-            "Orange lines at 0.8 and 1.25 delimit the 80% Rule disparity zone."
+            "For each subgroup, the **Pre-DI** (computed on the full dataset labels) and the **Post-DI** "
+            "(mean across outer folds, computed on the selected model's predictions). In both, the reference is "
+            "the subgroup with the highest favorable rate. "
+            "The gray line at DI = 1.0 indicates parity; orange lines at 0.8 and 1.25 delimit the 80% Rule."
         ),
         "post_di_label": "Post-training DI",
+        "pre_di_label": "Pre-training DI",
+        "moment_pre": "Pre-training (data)",
+        "moment_post": "Post-training (predictions)",
+        "data_rate_label": "Rate in data",
+        "pred_rate_label": "Prediction rate",
         "dumbbell_caption": (
-            "🔴 DI < 0.8 (disadvantaged subgroup) | 🟠 DI > 1.25 (overrepresented) | 🔵 within acceptable range. "
-            "Error bars = ±1 standard deviation across outer folds."
+            "The segment links the data DI to the prediction DI. When the orange point lies left of the blue one, "
+            "the model widened the subgroup's disparity. Error bar = ±1 std of Post-DI across outer folds."
         ),
         "dumbbell_table_expander": "📋 Full data table by subgroup",
+        "latex_subgroup_expander": "📄 LaTeX code for this subgroup table",
+
+        # Model comparison
+        "comparison_header": "Comparison Across All Models and Configurations",
+        "comparison_desc": (
+            "Predictive performance and intersectional fairness of every model tested on this dataset: Random Forest "
+            "and Gradient Boosting for each hyperparameter-search optimization metric, and FairMLP for each λ value."
+        ),
+        "comparison_caption": "Mean ± std across the 3 outer folds. ↑: higher is better; ↓: lower is better.",
+        "latex_tables_expander": "📄 LaTeX code for this table",
+        "latex_tables_desc": (
+            "Thesis text format: decimal comma and \\hline rules. Requires the `multirow` and `pdflscape` packages "
+            "and the `[H]` placement option (`float` package)."
+        ),
+        "btn_download_tex": "📥 Download .tex",
         "no_subgroup_data": "Subgroup data not available for this combination.",
 
         # Block 4 — Ranking
