@@ -18,6 +18,7 @@ from utils.bias_metrics import calculate_dynamic_metrics, pairwise_gerrymanderin
 from utils.report_tables import (
     pretrain_subgroup_table as _pretrain_subgroup_table, subgroup_pre_post_table,
     model_comparison_table, model_comparison_display, latex_model_comparison, latex_subgroup_pre_post,
+    MODEL_LABELS,
 )
 
 if "lang" not in st.session_state:
@@ -223,6 +224,175 @@ def render_lambda_chart(sweep_df):
     return chart
 
 
+COLOR_MODELS = {"Random Forest": "#2a78d6", "Gradient Boosting": "#eb6834", "MLP": "#1f9e74"}
+
+
+def _di_rule():
+    """Linha tracejada da Regra dos 80% (DI = 0,80)."""
+    return alt.Chart(pd.DataFrame({"x": [0.8]})).mark_rule(
+        color="gray", strokeDash=[4, 4], opacity=0.7
+    ).encode(x="x:Q")
+
+
+def render_attribute_di_chart(dyn_df):
+    """DI favorável de cada atributo sensível isolado (pior vs. melhor categoria)."""
+    chart = alt.Chart(dyn_df).mark_bar(color=COLOR_PRE).encode(
+        y=alt.Y("Atributo:N", title="", sort="x"),
+        x=alt.X("DI:Q", title="Disparate Impact (DI)", scale=alt.Scale(domain=[0, 1.05])),
+        tooltip=[
+            alt.Tooltip("Atributo:N"), alt.Tooltip("Privilegiado:N"), alt.Tooltip("Desprivilegiado:N"),
+            alt.Tooltip("DI:Q", format=".3f"),
+        ],
+    )
+    return (chart + _di_rule()).properties(height=max(120, 34 * len(dyn_df)))
+
+
+def render_di_cmp_chart(di_cmp):
+    """DI (Favorável) de cada recorte, do marginal ao interseccional; cor = nível do recorte."""
+    data = di_cmp.dropna(subset=["DI (Favorável)"])
+    levels = sorted(data["Nível"].unique(), key=lambda s: (s != "Marginal", s))
+    palette = [COLOR_PRE, COLOR_POST, "#1f9e74", "#9b59b6", "#7f7f7f"]
+    chart = alt.Chart(data).mark_bar().encode(
+        y=alt.Y("Recorte:N", title="", sort="x", axis=alt.Axis(labelLimit=320)),
+        x=alt.X("DI (Favorável):Q", title="DI (pior / melhor subgrupo viável)", scale=alt.Scale(domain=[0, 1.05])),
+        color=alt.Color("Nível:N", scale=alt.Scale(domain=levels, range=palette[:len(levels)]),
+                        legend=alt.Legend(title="", orient="bottom")),
+        tooltip=[
+            alt.Tooltip("Recorte:N"), alt.Tooltip("Nível:N"),
+            alt.Tooltip("Pior Subgrupo:N"), alt.Tooltip("Taxa Fav. Pior:Q", format=".2%"),
+            alt.Tooltip("Melhor Subgrupo:N"), alt.Tooltip("Taxa Fav. Melhor:Q", format=".2%"),
+            alt.Tooltip("DI (Favorável):Q", format=".3f"),
+        ],
+    )
+    return (chart + _di_rule()).properties(height=max(160, 20 * len(data)))
+
+
+def render_gerry_chart(gerry):
+    """Halteres: Gap Esperado (pior marginal) → Gap Real (interseccional), em p.p."""
+    d = gerry.copy()
+    d["esperado"] = d["Gap Esperado (Marginal Máx)"] * 100
+    d["real"] = d["Gap Real (Interseccional)"] * 100
+    d["oculto"] = d["Viés Oculto (Excedente)"] * 100
+    order = d.sort_values("real", ascending=False)["Par de Intersecção"].tolist()
+    y = alt.Y("Par de Intersecção:N", title="", sort=order, axis=alt.Axis(labelLimit=320))
+    tooltip = [
+        alt.Tooltip("Par de Intersecção:N", title="Par"),
+        alt.Tooltip("esperado:Q", format=".2f", title="Gap Esperado (p.p.)"),
+        alt.Tooltip("real:Q", format=".2f", title="Gap Real (p.p.)"),
+        alt.Tooltip("oculto:Q", format="+.2f", title="Viés Oculto (p.p.)"),
+    ]
+    link = alt.Chart(d).mark_rule(color="#b0b0b0", strokeWidth=3).encode(y=y, x="esperado:Q", x2="real:Q")
+    long_df = pd.concat([
+        d.assign(valor=d["esperado"], Gap="Esperado (pior marginal)"),
+        d.assign(valor=d["real"], Gap="Real (interseccional)"),
+    ], ignore_index=True)
+    points = alt.Chart(long_df).mark_circle(size=110, opacity=1).encode(
+        y=y,
+        x=alt.X("valor:Q", title="Gap de taxa favorável (p.p.)"),
+        color=alt.Color("Gap:N", scale=alt.Scale(domain=["Esperado (pior marginal)", "Real (interseccional)"],
+                                                 range=[COLOR_PRE, COLOR_POST]),
+                        legend=alt.Legend(title="", orient="bottom")),
+        tooltip=tooltip,
+    )
+    return (link + points).properties(height=max(160, 30 * len(d)))
+
+
+def render_cddl_chart(cddl_df):
+    """CDDL por atributo protegido × proxy; cor = atributo protegido."""
+    d = cddl_df.copy()
+    d["Combinação"] = d["Atributo Protegido (Vítima)"] + " | " + d["Variável Proxy (Condição)"]
+    chart = alt.Chart(d).mark_bar().encode(
+        y=alt.Y("Combinação:N", title="", sort="-x", axis=alt.Axis(labelLimit=320)),
+        x=alt.X("CDDL:Q", title="CDDL"),
+        color=alt.Color("Atributo Protegido (Vítima):N", legend=alt.Legend(title="Atributo protegido", orient="bottom")),
+        tooltip=[
+            alt.Tooltip("Atributo Protegido (Vítima):N", title="Atributo protegido"),
+            alt.Tooltip("Grupo Desprivilegiado:N"),
+            alt.Tooltip("Variável Proxy (Condição):N", title="Proxy"),
+            alt.Tooltip("CDDL:Q", format=".4f"),
+        ],
+    )
+    zero = alt.Chart(pd.DataFrame({"x": [0]})).mark_rule(color="gray").encode(x="x:Q")
+    return (chart + zero).properties(height=max(160, 22 * len(d)))
+
+
+def render_favorable_rate_chart(pre_df, overall_rate):
+    """Taxa favorável por subgrupo do par auditado, com a taxa global como referência."""
+    d = pre_df.copy()
+    chart = alt.Chart(d).mark_bar(color=COLOR_PRE).encode(
+        y=alt.Y("subgroup:N", title="", sort="-x"),
+        x=alt.X("favorable_rate:Q", title="Taxa favorável nos dados", axis=alt.Axis(format="%"),
+                scale=alt.Scale(domain=[0, 1])),
+        tooltip=[
+            alt.Tooltip("subgroup:N", title="Subgrupo"), alt.Tooltip("n:Q", title="N", format=","),
+            alt.Tooltip("favorable_rate:Q", format=".2%", title="Taxa favorável"),
+            alt.Tooltip("pre_di:Q", format=".3f", title="Pre-DI"),
+        ],
+    )
+    rule = alt.Chart(pd.DataFrame({"x": [overall_rate]})).mark_rule(
+        color="gray", strokeDash=[4, 4], opacity=0.8
+    ).encode(x="x:Q")
+    return (chart + rule).properties(height=max(160, 30 * len(d)))
+
+
+def render_tradeoff_chart(comp_df):
+    """Dispersão desempenho × equidade: cada ponto é um modelo/configuração."""
+    d = comp_df.dropna(subset=["accuracy_mean", "max_aaod_mean"]).copy()
+    domain = [m for m in COLOR_MODELS if m in set(d["Modelo"])]
+    return alt.Chart(d).mark_point(size=120, filled=True, opacity=0.85).encode(
+        x=alt.X("max_aaod_mean:Q", title="Max AAOD (↓ mais equitativo)", scale=alt.Scale(zero=False)),
+        y=alt.Y("accuracy_mean:Q", title="Acurácia (↑)", scale=alt.Scale(zero=False)),
+        color=alt.Color("Modelo:N", scale=alt.Scale(domain=domain, range=[COLOR_MODELS[m] for m in domain]),
+                        legend=alt.Legend(title="", orient="bottom")),
+        shape=alt.Shape("Modelo:N", scale=alt.Scale(domain=domain), legend=None),
+        tooltip=[
+            alt.Tooltip("Modelo:N"), alt.Tooltip("Configuração:N"),
+            alt.Tooltip("accuracy_mean:Q", format=".4f", title="Acurácia"),
+            alt.Tooltip("max_aaod_mean:Q", format=".4f", title="Max AAOD"),
+            alt.Tooltip("sensitivity_gap_mean:Q", format=".4f", title="Sens. Gap"),
+        ],
+    ).properties(height=340)
+
+
+def render_tpr_fpr_chart(post_df):
+    """TPR e FPR por subgrupo (média entre folds): a distância entre subgrupos é o que o AAOD resume."""
+    long_df = pd.concat([
+        post_df[["subgroup", "tpr", "aaod"]].rename(columns={"tpr": "valor"}).assign(Taxa="TPR"),
+        post_df[["subgroup", "fpr", "aaod"]].rename(columns={"fpr": "valor"}).assign(Taxa="FPR"),
+    ], ignore_index=True).dropna(subset=["valor"])
+    order = post_df.sort_values("aaod", ascending=False)["subgroup"].tolist()
+    return alt.Chart(long_df).mark_point(size=110, filled=True).encode(
+        y=alt.Y("subgroup:N", title="", sort=order),
+        x=alt.X("valor:Q", title="Taxa (média entre folds)", scale=alt.Scale(domain=[0, 1])),
+        color=alt.Color("Taxa:N", scale=alt.Scale(domain=["TPR", "FPR"], range=[COLOR_PRE, COLOR_POST]),
+                        legend=alt.Legend(title="", orient="bottom")),
+        tooltip=[
+            alt.Tooltip("subgroup:N", title="Subgrupo"), alt.Tooltip("Taxa:N"),
+            alt.Tooltip("valor:Q", format=".3f", title="Valor"), alt.Tooltip("aaod:Q", format=".3f", title="AAOD"),
+        ],
+    ).properties(height=max(160, 30 * len(order)))
+
+
+def render_lambda_perf_chart(sweep_df):
+    """Desempenho preditivo × λ (eixo sem zero, para tornar visível o custo da penalização)."""
+    cols = {"accuracy_mean": "Acurácia", "roc_auc_mean": "AUROC", "pr_auc_mean": "AUPRC"}
+    long_df = pd.concat([
+        sweep_df[["lambda_fairness", c]].rename(columns={c: "valor"}).assign(métrica=label)
+        for c, label in cols.items() if c in sweep_df
+    ], ignore_index=True).dropna(subset=["valor"])
+    return alt.Chart(long_df).mark_line(point=alt.OverlayMarkDef(size=70)).encode(
+        x=alt.X("lambda_fairness:Q", title="λ (penalização de equidade)"),
+        y=alt.Y("valor:Q", title="Valor da métrica (↑ é melhor)", scale=alt.Scale(zero=False)),
+        color=alt.Color("métrica:N", scale=alt.Scale(domain=list(cols.values()),
+                                                     range=[COLOR_PRE, COLOR_POST, "#1f9e74"]),
+                        legend=alt.Legend(title="")),
+        tooltip=[
+            alt.Tooltip("lambda_fairness:Q", title="λ"), alt.Tooltip("métrica:N", title="Métrica"),
+            alt.Tooltip("valor:Q", format=".4f", title="Valor"),
+        ],
+    ).properties(height=300)
+
+
 def fmt_pct(x):
     return f"{x*100:.2f}%".replace(".", ",")
 
@@ -232,125 +402,218 @@ def fmt3(x):
 
 
 # ---------------------------------------------------------------------------
-# Render por dataset
+# Render por dataset — cada seção (A, B, C, LaTeX) é um bloco expansível.
+# O Streamlit não permite expansor dentro de expansor; por isso os blocos
+# internos da Seção A são abas.
 # ---------------------------------------------------------------------------
+st.caption("Clique no título de cada seção para expandi-la ou recolhê-la.")
+
 tabs = st.tabs(list(DATASET_CONFIG.keys()))
 
 for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
     with tab:
         df = load_processed(cfg["parquet"])
         pre_df = pretrain_subgroup_table(df, cfg)
-
-        st.subheader("A. Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)")
-
-        if cfg.get("rich_pretrain"):
-            st.markdown("**Métricas dinâmicas de viés por atributo sensível**")
-            rows = []
-            for attr in cfg["dynamic_attrs"]:
-                m = calculate_dynamic_metrics(df, attr, cfg["target_col"], cfg["favorable_val"])
-                rows.append({"Atributo": attr, "Privilegiado": m["priv"], "Desprivilegiado": m["unpriv"],
-                             "CI": m["CI"], "DI": m["DI"], "DI Adverso": m["DI_adv"], "KL": m["KL"], "KS": m["KS"]})
-            st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
-
-            with st.expander("DI Marginal vs. Interseccional (mesma escala)", expanded=True):
-                di_cmp = intersectional_di_comparison(
-                    df, cfg["dynamic_attrs"], cfg["target_col"], cfg["favorable_val"], min_n=100
-                )
-                if di_cmp.empty:
-                    st.info("Não há subgrupos viáveis (N ≥ 100) com variação de desfecho para a comparação.")
-                else:
-                    st.dataframe(
-                        di_cmp.style.format({
-                            "Taxa Fav. Pior": "{:.2%}", "Taxa Fav. Melhor": "{:.2%}",
-                            "DI (Favorável)": "{:.3f}", "DI (Adverso)": _format_ratio,
-                        }),
-                        width='stretch', hide_index=True,
-                    )
-                st.caption("Pior e melhor subgrupo viável (N ≥ 100) de cada recorte. DI (Favorável) = taxa favorável "
-                           "pior / melhor; DI (Adverso) = taxa desfavorável pior / melhor. '∞' indica que o melhor "
-                           "subgrupo não possui desfechos adversos.")
-
-            with st.expander("Auditoria de Gerrymandering (todos os pares)", expanded=True):
-                gerry = pairwise_gerrymandering_audit(
-                    df, cfg["dynamic_attrs"], cfg["target_col"], cfg["favorable_val"]
-                )
-                gerry = gerry.sort_values("Viés Oculto (Excedente)", ascending=False)
-                st.dataframe(
-                    gerry.style.format({
-                        "Gap Indiv. A": lambda v: f"{v * 100:.2f} p.p.",
-                        "Gap Indiv. B": lambda v: f"{v * 100:.2f} p.p.",
-                        "Gap Esperado (Marginal Máx)": lambda v: f"{v * 100:.2f} p.p.",
-                        "Gap Real (Interseccional)": lambda v: f"{v * 100:.2f} p.p.",
-                        "Viés Oculto (Excedente)": lambda v: f"{v * 100:+.2f} p.p.",
-                    }),
-                    width='stretch', hide_index=True,
-                )
-                st.caption("Gap = amplitude (maior − menor taxa favorável), em pontos percentuais. Viés Oculto "
-                           "positivo indica que a interseção revela disparidade maior do que qualquer atributo "
-                           "isolado. O limiar de 0,05 p.p. é descritivo, não um teste de significância.")
-
-            with st.expander("Matriz de CDDL (Disparidade Condicionada por Proxy)", expanded=True):
-                cddl_parts = []
-                for prot_attr in cfg["dynamic_attrs"]:
-                    dyn = calculate_dynamic_metrics(df, prot_attr, cfg["target_col"], cfg["favorable_val"])
-                    proxies = [a for a in cfg["dynamic_attrs"] if a != prot_attr]
-                    cddl_parts.append(calculate_cddl(
-                        df, cfg["target_col"], cfg["favorable_val"],
-                        prot_attr, dyn["priv"], dyn["unpriv"], proxies,
-                    ))
-                cddl_df = pd.concat(cddl_parts, ignore_index=True).sort_values("CDDL", ascending=False)
-                st.dataframe(cddl_df.style.format({"CDDL": "{:.4f}"}), width='stretch', hide_index=True)
-
-        st.markdown(f"**Disparidades de paridade estatística por subgrupo ({' × '.join(cfg['group_cols'])})**")
-        show_pre = pre_df[["subgroup", "n", "favorable_rate", "pre_di", "pre_spd"]].rename(columns={
-            "subgroup": "Subgrupo", "n": "N", "favorable_rate": "Taxa Favorável",
-            "pre_di": "Pre-DI", "pre_spd": "Pre-SPD",
-        })
-        st.dataframe(
-            show_pre.style.format({"Taxa Favorável": "{:.4f}", "Pre-DI": "{:.3f}", "Pre-SPD": lambda v: f"{v * 100:+.2f} p.p."}),
-            width='stretch', hide_index=True,
-        )
-
-        st.divider()
-        st.subheader("B. Efeitos do Treinamento nos Baselines Tradicionais")
-
         gm = global_metrics_row(dataset_key, cfg)
         post_df = posttrain_subgroup_table(dataset_key, cfg, pre_df)
         mlp_base_df = fairmlp_baseline_subgroup_table(dataset_key, cfg, pre_df)
         comp_df = model_comparison_table(all_agg, dataset_key, cfg["attrs"])
+        sweep_df = lambda_sweep_table(dataset_key, cfg)
 
-        if not comp_df.empty:
-            st.markdown("**Comparação de desempenho e equidade entre todos os modelos testados**")
-            st.dataframe(model_comparison_display(comp_df), width='stretch', hide_index=True)
-            st.caption(
-                "Média ± desvio-padrão entre os 3 folds externos. Random Forest e Gradient Boosting aparecem em cada "
-                "métrica usada na seleção de hiperparâmetros; a MLP, em cada valor de λ. "
-                "↑: maior é melhor; ↓: menor é melhor."
-            )
+        # ------------------------------------------------------------------ A
+        with st.expander("**A. Diagnóstico do Viés nos Dados Brutos (Pré-Treinamento)**", expanded=True):
+            pair_label = " × ".join(cfg["group_cols"])
+            if cfg.get("rich_pretrain"):
+                tab_dyn, tab_di, tab_gerry, tab_cddl, tab_sub = st.tabs([
+                    "Métricas por atributo", "DI marginal × interseccional", "Gerrymandering",
+                    "CDDL", f"Subgrupos ({pair_label})",
+                ])
+            else:
+                tab_sub = st.container()
 
-        if gm is None or post_df is None:
-            st.info("Sem resultados pós-treino salvos para esta combinação ainda.")
-        else:
-            c1, c2, c3, c4 = st.columns(4)
-            c1.metric("Modelo — Config.", f"{cfg['model']}", f"otim. por {cfg['opt_metric_label']}")
-            c2.metric("Acurácia", f"{gm['accuracy_mean']:.3f}")
-            c3.metric("AUROC", f"{gm['roc_auc_mean']:.3f}" if not pd.isna(gm['roc_auc_mean']) else "N/A")
-            c4.metric("Max Intersectional AAOD", f"{gm['max_aaod_mean']:.4f}")
+            if cfg.get("rich_pretrain"):
+                with tab_dyn:
+                    rows = []
+                    for attr in cfg["dynamic_attrs"]:
+                        m = calculate_dynamic_metrics(df, attr, cfg["target_col"], cfg["favorable_val"])
+                        rows.append({"Atributo": attr, "Privilegiado": m["priv"], "Desprivilegiado": m["unpriv"],
+                                     "CI": m["CI"], "DI": m["DI"], "DI Adverso": m["DI_adv"], "KL": m["KL"], "KS": m["KS"]})
+                    dyn_df = pd.DataFrame(rows)
+                    st.markdown("**Métricas dinâmicas de viés por atributo sensível**")
+                    st.dataframe(dyn_df, width='stretch', hide_index=True)
+                    st.altair_chart(render_attribute_di_chart(dyn_df), width='stretch')
+                    st.caption("DI = taxa favorável do grupo desprivilegiado / do privilegiado, para cada atributo "
+                               "isolado. A linha tracejada marca o limiar de 0,80 da Regra dos 80%.")
 
-            st.markdown("**Disparate Impact antes e depois do treinamento e métricas de equidade por subgrupo** "
-                        "(média entre folds externos)")
-            show_pre_post_table(post_df)
-            st.caption("Taxa nos dados e Pre-DI: rótulos da base completa. Demais colunas: predições nos folds de "
-                       "teste. Em negrito, o subgrupo com maior AAOD.")
+                with tab_di:
+                    di_cmp = intersectional_di_comparison(
+                        df, cfg["dynamic_attrs"], cfg["target_col"], cfg["favorable_val"], min_n=100
+                    )
+                    if di_cmp.empty:
+                        st.info("Não há subgrupos viáveis (N ≥ 100) com variação de desfecho para a comparação.")
+                    else:
+                        st.dataframe(
+                            di_cmp.style.format({
+                                "Taxa Fav. Pior": "{:.2%}", "Taxa Fav. Melhor": "{:.2%}",
+                                "DI (Favorável)": "{:.3f}", "DI (Adverso)": _format_ratio,
+                            }),
+                            width='stretch', hide_index=True,
+                        )
+                        st.altair_chart(render_di_cmp_chart(di_cmp), width='stretch')
+                    st.caption("Pior e melhor subgrupo viável (N ≥ 100) de cada recorte. DI (Favorável) = taxa favorável "
+                               "pior / melhor; DI (Adverso) = taxa desfavorável pior / melhor. '∞' indica que o melhor "
+                               "subgrupo não possui desfechos adversos. No gráfico, quanto mais à esquerda, maior a "
+                               "disparidade; a linha tracejada marca o limiar de 0,80.")
 
-            st.markdown("**Amplificação do viés: Disparate Impact antes vs. depois do treinamento**")
-            st.altair_chart(render_pre_post_di_chart(pre_df, post_df, cfg["group_cols"]), width='stretch')
-            st.caption(
-                "A linha tracejada marca o limiar de $0,80$ da Regra dos 80%. Barras de Pós-treino à esquerda "
-                "da linha do Pré-treino indicam amplificação do viés pelo modelo."
-            )
+                with tab_gerry:
+                    gerry = pairwise_gerrymandering_audit(
+                        df, cfg["dynamic_attrs"], cfg["target_col"], cfg["favorable_val"]
+                    )
+                    gerry = gerry.sort_values("Viés Oculto (Excedente)", ascending=False)
+                    st.dataframe(
+                        gerry.style.format({
+                            "Gap Indiv. A": lambda v: f"{v * 100:.2f} p.p.",
+                            "Gap Indiv. B": lambda v: f"{v * 100:.2f} p.p.",
+                            "Gap Esperado (Marginal Máx)": lambda v: f"{v * 100:.2f} p.p.",
+                            "Gap Real (Interseccional)": lambda v: f"{v * 100:.2f} p.p.",
+                            "Viés Oculto (Excedente)": lambda v: f"{v * 100:+.2f} p.p.",
+                        }),
+                        width='stretch', hide_index=True,
+                    )
+                    st.altair_chart(render_gerry_chart(gerry), width='stretch')
+                    st.caption("Gap = amplitude (maior − menor taxa favorável), em pontos percentuais. Viés Oculto "
+                               "positivo indica que a interseção revela disparidade maior do que qualquer atributo "
+                               "isolado; no gráfico, é o comprimento da barra cinza entre os dois pontos. O limiar de "
+                               "0,05 p.p. é descritivo, não um teste de significância.")
 
-        with st.expander("📄 Código LaTeX das tabelas deste dataset (para a proposta)"):
+                with tab_cddl:
+                    cddl_parts = []
+                    for prot_attr in cfg["dynamic_attrs"]:
+                        dyn = calculate_dynamic_metrics(df, prot_attr, cfg["target_col"], cfg["favorable_val"])
+                        proxies = [a for a in cfg["dynamic_attrs"] if a != prot_attr]
+                        cddl_parts.append(calculate_cddl(
+                            df, cfg["target_col"], cfg["favorable_val"],
+                            prot_attr, dyn["priv"], dyn["unpriv"], proxies,
+                        ))
+                    cddl_df = pd.concat(cddl_parts, ignore_index=True).sort_values("CDDL", ascending=False)
+                    st.dataframe(cddl_df.style.format({"CDDL": "{:.4f}"}), width='stretch', hide_index=True)
+                    st.altair_chart(render_cddl_chart(cddl_df), width='stretch')
+                    st.caption("CDDL compara o grupo desprivilegiado com o restante da população dentro de cada "
+                               "estrato da variável proxy. Barras maiores indicam disparidade que persiste mesmo "
+                               "condicionando pela proxy.")
+
+            with tab_sub:
+                st.markdown(f"**Disparidades de paridade estatística por subgrupo ({pair_label})**")
+                show_pre = pre_df[["subgroup", "n", "favorable_rate", "pre_di", "pre_spd"]].rename(columns={
+                    "subgroup": "Subgrupo", "n": "N", "favorable_rate": "Taxa Favorável",
+                    "pre_di": "Pre-DI", "pre_spd": "Pre-SPD",
+                })
+                st.dataframe(
+                    show_pre.style.format({"Taxa Favorável": "{:.4f}", "Pre-DI": "{:.3f}", "Pre-SPD": lambda v: f"{v * 100:+.2f} p.p."}),
+                    width='stretch', hide_index=True,
+                )
+                overall_rate = float((df[cfg["target_col"]] == cfg["favorable_val"]).mean())
+                st.altair_chart(render_favorable_rate_chart(pre_df, overall_rate), width='stretch')
+                st.caption(f"A linha tracejada marca a taxa favorável da base inteira ({fmt_pct(overall_rate)}).")
+
+        # ------------------------------------------------------------------ B
+        with st.expander("**B. Efeitos do Treinamento nos Baselines Tradicionais**", expanded=False):
+            if not comp_df.empty:
+                st.markdown("**Comparação de desempenho e equidade entre todos os modelos testados**")
+                st.dataframe(model_comparison_display(comp_df), width='stretch', hide_index=True)
+                st.caption(
+                    "Média ± desvio-padrão entre os 3 folds externos. Random Forest e Gradient Boosting aparecem em cada "
+                    "métrica usada na seleção de hiperparâmetros; a MLP, em cada valor de λ. "
+                    "↑: maior é melhor; ↓: menor é melhor."
+                )
+                st.markdown("**Trade-off entre desempenho e equidade**")
+                st.altair_chart(render_tradeoff_chart(comp_df), width='stretch')
+                st.caption("Cada ponto é um modelo/configuração da tabela acima (passe o mouse para ver qual). "
+                           "O canto superior esquerdo concentra as configurações mais acuradas e mais equitativas.")
+
+            if gm is None or post_df is None:
+                st.info("Sem resultados pós-treino salvos para esta combinação ainda.")
+            else:
+                st.divider()
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric("Modelo — Config.", MODEL_LABELS.get(cfg["model"], cfg["model"]),
+                          f"otim. por {cfg['opt_metric_label']}")
+                c2.metric("Acurácia", f"{gm['accuracy_mean']:.3f}")
+                c3.metric("AUROC", f"{gm['roc_auc_mean']:.3f}" if not pd.isna(gm['roc_auc_mean']) else "N/A")
+                c4.metric("Max Intersectional AAOD", f"{gm['max_aaod_mean']:.4f}")
+
+                st.markdown("**Disparate Impact antes e depois do treinamento e métricas de equidade por subgrupo** "
+                            "(média entre folds externos)")
+                show_pre_post_table(post_df)
+                st.caption("Taxa nos dados e Pre-DI: rótulos da base completa. Demais colunas: predições nos folds de "
+                           "teste. Em negrito, o subgrupo com maior AAOD.")
+
+                col_di, col_rates = st.columns(2)
+                with col_di:
+                    st.markdown("**Amplificação do viés: DI antes vs. depois do treinamento**")
+                    st.altair_chart(render_pre_post_di_chart(pre_df, post_df, cfg["group_cols"]), width='stretch')
+                    st.caption(
+                        "A linha tracejada marca o limiar de $0,80$ da Regra dos 80%. Barras de Pós-treino à esquerda "
+                        "da barra de Pré-treino indicam amplificação do viés pelo modelo."
+                    )
+                with col_rates:
+                    st.markdown("**Taxas de verdadeiros e falsos positivos por subgrupo**")
+                    st.altair_chart(render_tpr_fpr_chart(post_df), width='stretch')
+                    st.caption("Subgrupos ordenados do maior para o menor AAOD. Quanto mais distantes os pontos de "
+                               "um subgrupo em relação aos demais, maior a disparidade de erro que o AAOD resume.")
+
+        # ------------------------------------------------------------------ C
+        with st.expander("**C. Mitigação por Rede Neural Artificial (MLP: Variação de λ)**", expanded=False):
+            if mlp_base_df is not None:
+                st.markdown("**Baseline de rede neural sem mitigação (MLP, λ = 0,0) — quebra por subgrupo**")
+                show_pre_post_table(mlp_base_df)
+                st.caption(
+                    "Referência para comparar com o melhor baseline de árvore (Seção B) — antes de qualquer "
+                    "penalização de equidade ($\\lambda = 0$)."
+                )
+                st.altair_chart(render_pre_post_di_chart(pre_df, mlp_base_df, cfg["group_cols"]), width='stretch')
+                st.caption("DI antes do treinamento (dados) e depois (predições da MLP sem mitigação). A linha "
+                           "tracejada marca o limiar de $0,80$.")
+
+            if sweep_df is None:
+                st.info("Sem resultados de lambda sweep salvos para esta combinação ainda.")
+            else:
+                def _mean_std(mean_col, std_col, fmt="{:.4f}"):
+                    return sweep_df.apply(
+                        lambda r: f"{fmt.format(r[mean_col])} ± {fmt.format(r[std_col])}"
+                        if not pd.isna(r.get(std_col, float('nan'))) else fmt.format(r[mean_col]),
+                        axis=1,
+                    )
+
+                st.divider()
+                show_sweep = pd.DataFrame({
+                    "Configuração": sweep_df["Configuração"],
+                    "Acurácia": _mean_std("accuracy_mean", "accuracy_std"),
+                    "AUROC": _mean_std("roc_auc_mean", "roc_auc_std"),
+                    "AUPRC": _mean_std("pr_auc_mean", "pr_auc_std"),
+                    "Max AAOD": _mean_std("max_aaod_mean", "max_aaod_std"),
+                    "Sensitivity Gap": _mean_std("sensitivity_gap_mean", "sensitivity_gap_std"),
+                })
+                st.dataframe(show_sweep, width='stretch', hide_index=True)
+                st.caption("Valores no formato média ± desvio-padrão entre folds/execuções.")
+
+                col_fair, col_perf = st.columns(2)
+                with col_fair:
+                    st.markdown("**Equidade × λ**")
+                    st.altair_chart(render_lambda_chart(sweep_df), width='stretch')
+                with col_perf:
+                    st.markdown("**Desempenho preditivo × λ**")
+                    st.altair_chart(render_lambda_perf_chart(sweep_df), width='stretch')
+                st.caption(
+                    "Uma curva de equidade decrescente com λ indicaria mitigação monotônica; o gráfico de desempenho "
+                    "mostra o custo correspondente (eixo sem zero, para tornar visíveis variações pequenas). Platôs "
+                    "indicam que a penalização não altera as predições: no COMPAS, porque as poucas combinações de "
+                    "entrada só mudam de classe quando cruzam o limiar de decisão; no SINASC, porque o modelo prediz "
+                    "a classe favorável para todas as instâncias."
+                )
+
+        # ------------------------------------------------------------- LaTeX
+        with st.expander("📄 **Código LaTeX das tabelas deste dataset (para a proposta)**", expanded=False):
             st.markdown("Formato do texto da tese: vírgula decimal e linhas `\\hline`. Requer os pacotes "
                         "`multirow`, `pdflscape` e `float`.")
             tex_blocks = []
@@ -358,7 +621,8 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
                 tex_blocks.append(("Comparação entre todos os modelos",
                                    latex_model_comparison(comp_df, dataset_key, cfg["attrs"])))
             if post_df is not None:
-                tex_blocks.append((f"Subgrupos — {cfg['model']} otimizado por {cfg['opt_metric_label']}",
+                tex_blocks.append((f"Subgrupos — {MODEL_LABELS.get(cfg['model'], cfg['model'])} "
+                                   f"otimizado por {cfg['opt_metric_label']}",
                                    latex_subgroup_pre_post(post_df, dataset_key, cfg["model"], cfg["opt_metric"])))
             if mlp_base_df is not None:
                 tex_blocks.append(("Subgrupos — MLP sem mitigação (λ = 0,0)",
@@ -374,43 +638,3 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
                     mime="text/plain",
                     key=f"dl_tex_{dataset_key}",
                 )
-
-        st.divider()
-        st.subheader("C. Mitigação por Rede Neural Artificial (MLP: Variação de λ)")
-
-        if mlp_base_df is not None:
-            st.markdown("**Baseline de rede neural sem mitigação (MLP, λ = 0,0) — quebra por subgrupo**")
-            show_pre_post_table(mlp_base_df)
-            st.caption(
-                "Referência para comparar com o melhor baseline de árvore (Seção B) — antes de qualquer "
-                "penalização de equidade ($\\lambda = 0$)."
-            )
-
-        sweep_df = lambda_sweep_table(dataset_key, cfg)
-        if sweep_df is None:
-            st.info("Sem resultados de lambda sweep salvos para esta combinação ainda.")
-        else:
-            def _mean_std(mean_col, std_col, fmt="{:.4f}"):
-                return sweep_df.apply(
-                    lambda r: f"{fmt.format(r[mean_col])} ± {fmt.format(r[std_col])}"
-                    if not pd.isna(r.get(std_col, float('nan'))) else fmt.format(r[mean_col]),
-                    axis=1,
-                )
-
-            show_sweep = pd.DataFrame({
-                "Configuração": sweep_df["Configuração"],
-                "Acurácia": _mean_std("accuracy_mean", "accuracy_std"),
-                "AUROC": _mean_std("roc_auc_mean", "roc_auc_std"),
-                "AUPRC": _mean_std("pr_auc_mean", "pr_auc_std"),
-                "Max AAOD": _mean_std("max_aaod_mean", "max_aaod_std"),
-                "Sensitivity Gap": _mean_std("sensitivity_gap_mean", "sensitivity_gap_std"),
-            })
-            st.dataframe(show_sweep, width='stretch', hide_index=True)
-            st.caption("Valores no formato média ± desvio-padrão entre folds/execuções.")
-            st.markdown("**Trade-off entre equidade e λ**")
-            st.altair_chart(render_lambda_chart(sweep_df), width='stretch')
-            st.caption(
-                "Uma curva decrescente com λ indicaria mitigação monotônica. Platôs indicam que a penalização não "
-                "altera as predições: no COMPAS, porque as poucas combinações de entrada só mudam de classe quando "
-                "cruzam o limiar de decisão; no SINASC, porque o modelo prediz a classe favorável para todas as instâncias."
-            )
