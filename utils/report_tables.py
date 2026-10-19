@@ -23,7 +23,7 @@ MODEL_ORDER = ["RandomForest", "GradientBoosting", "FairMLP"]
 MODEL_LABELS = {
     "RandomForest": "Random Forest",
     "GradientBoosting": "Gradient Boosting",
-    "FairMLP": "FairMLP",
+    "FairMLP": "MLP",
 }
 
 # (coluna de média, coluna de desvio, rótulo, maior é melhor)
@@ -75,7 +75,7 @@ def pretrain_subgroup_table(df, group_cols, target_col, favorable_val):
 
 
 def model_comparison_table(agg_df, dataset_key, attrs):
-    """Uma linha por modelo/configuração (RF e GB por métrica de otimização; FairMLP por λ)."""
+    """Uma linha por modelo/configuração (RF e GB por métrica de otimização; MLP por λ)."""
     d = agg_df[(agg_df["dataset"] == dataset_key) & (agg_df["attrs"] == attrs)].copy()
     if d.empty:
         return d
@@ -161,7 +161,7 @@ def latex_model_comparison(comp_df, dataset_key, attrs, decimals=4):
         r"\begin{table}[H]",
         r"    \centering",
         r"    \small",
-        rf"    \caption{{{ds}: desempenho preditivo e equidade interseccional de todos os modelos e configurações avaliados (média $\pm$ desvio-padrão entre 3 \textit{{folds}} externos). Para Random Forest e Gradient Boosting, a configuração indica a métrica usada na seleção de hiperparâmetros; para a FairMLP, o valor de $\lambda$. Em negrito, o melhor valor de cada coluna.}}",
+        rf"    \caption{{{ds}: desempenho preditivo e equidade interseccional de todos os modelos e configurações avaliados (média $\pm$ desvio-padrão entre 3 \textit{{folds}} externos). Para Random Forest e Gradient Boosting, a configuração indica a métrica usada na seleção de hiperparâmetros; para a MLP, o valor de $\lambda$. Em negrito, o melhor valor de cada coluna.}}",
         r"    \vspace{2mm}",
         r"    \setlength{\tabcolsep}{4pt}",
         r"    \begin{tabular}{ll|ccccc|cc}",

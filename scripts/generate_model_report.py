@@ -46,7 +46,7 @@ def clean_dataframe(df):
     model_clean_map = {
         "RandomForest": "Random Forest",
         "GradientBoosting": "Gradient Boosting",
-        "FairMLP": "FairMLP",
+        "FairMLP": "MLP",
     }
     df["model_clean"] = df["model"].map(lambda x: model_clean_map.get(x, x))
 

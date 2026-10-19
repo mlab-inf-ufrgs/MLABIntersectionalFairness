@@ -102,7 +102,7 @@ TEXTS = {
         "comparison_header": "Comparação entre Todos os Modelos e Configurações",
         "comparison_desc": (
             "Desempenho preditivo e equidade interseccional de cada modelo testado neste dataset: Random Forest e "
-            "Gradient Boosting em cada métrica de otimização da busca de hiperparâmetros, e a FairMLP em cada valor de λ."
+            "Gradient Boosting em cada métrica de otimização da busca de hiperparâmetros, e a MLP em cada valor de λ."
         ),
         "comparison_caption": "Média ± desvio-padrão entre as 3 outer folds. ↑: maior é melhor; ↓: menor é melhor.",
         "latex_tables_expander": "📄 Código LaTeX desta tabela",
@@ -341,7 +341,7 @@ TEXTS = {
         "comparison_header": "Comparison Across All Models and Configurations",
         "comparison_desc": (
             "Predictive performance and intersectional fairness of every model tested on this dataset: Random Forest "
-            "and Gradient Boosting for each hyperparameter-search optimization metric, and FairMLP for each λ value."
+            "and Gradient Boosting for each hyperparameter-search optimization metric, and MLP for each λ value."
         ),
         "comparison_caption": "Mean ± std across the 3 outer folds. ↑: higher is better; ↓: lower is better.",
         "latex_tables_expander": "📄 LaTeX code for this table",

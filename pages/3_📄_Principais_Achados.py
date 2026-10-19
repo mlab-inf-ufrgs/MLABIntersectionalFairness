@@ -128,7 +128,7 @@ def global_metrics_row(dataset_key, cfg):
 
 
 def fairmlp_baseline_subgroup_table(dataset_key, cfg, pre_df):
-    """Quebra por subgrupo do baseline de rede neural (FairMLP, λ=0,0 — sem mitigação), com o Pre-DI ao lado."""
+    """Quebra por subgrupo do baseline de rede neural (MLP, λ=0,0 — sem mitigação), com o Pre-DI ao lado."""
     return subgroup_pre_post_table(all_sub, dataset_key, cfg["attrs"], "FairMLP", "lambda_0.0", pre_df)
 
 
@@ -163,7 +163,7 @@ def lambda_sweep_table(dataset_key, cfg):
         return None
     sub = sub.sort_values("lambda_fairness").reset_index(drop=True)
     sub["Configuração"] = sub["lambda_fairness"].apply(
-        lambda l: "MLP sem mitigação (λ = 0,0)" if l == 0.0 else f"FairMLP (λ = {l:.1f})".replace(".", ",")
+        lambda l: "MLP sem mitigação (λ = 0,0)" if l == 0.0 else f"MLP (λ = {l:.1f})".replace(".", ",")
     )
     return sub
 
@@ -324,7 +324,7 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
             st.dataframe(model_comparison_display(comp_df), width='stretch', hide_index=True)
             st.caption(
                 "Média ± desvio-padrão entre os 3 folds externos. Random Forest e Gradient Boosting aparecem em cada "
-                "métrica usada na seleção de hiperparâmetros; a FairMLP, em cada valor de λ. "
+                "métrica usada na seleção de hiperparâmetros; a MLP, em cada valor de λ. "
                 "↑: maior é melhor; ↓: menor é melhor."
             )
 
@@ -376,7 +376,7 @@ for tab, (dataset_key, cfg) in zip(tabs, DATASET_CONFIG.items()):
                 )
 
         st.divider()
-        st.subheader("C. Mitigação por Rede Neural Artificial (FairMLP: Variação de λ)")
+        st.subheader("C. Mitigação por Rede Neural Artificial (MLP: Variação de λ)")
 
         if mlp_base_df is not None:
             st.markdown("**Baseline de rede neural sem mitigação (MLP, λ = 0,0) — quebra por subgrupo**")

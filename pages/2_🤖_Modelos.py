@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 from utils.i18n import t
 from utils.report_tables import (
     pretrain_subgroup_table, model_comparison_table, model_comparison_display,
-    subgroup_pre_post_table, latex_model_comparison, latex_subgroup_pre_post,
+    subgroup_pre_post_table, latex_model_comparison, latex_subgroup_pre_post, MODEL_LABELS,
 )
 from data_module import DATASETS
 from scripts.generate_model_report import clean_dataframe, generate_latex_table
@@ -407,9 +407,10 @@ with tab_detailed:
 
     col_m, col_om = st.columns(2)
     with col_m:
-        sel_model = st.selectbox(t("select_model"), models_avail, key="detailed_model")
+        sel_model = st.selectbox(t("select_model"), models_avail, key="detailed_model",
+                                 format_func=lambda m: MODEL_LABELS.get(m, m))
     with col_om:
-        # Só as configurações existentes para o modelo escolhido (FairMLP usa λ; árvores, métricas de otimização)
+        # Só as configurações existentes para o modelo escolhido (MLP usa λ; árvores, métricas de otimização)
         metrics_avail = sorted(agg_filt.loc[agg_filt["model"] == sel_model, "opt_metric"].unique())
         sel_opt = st.selectbox(t("select_opt_metric"), metrics_avail, key="detailed_opt")
 
@@ -451,6 +452,7 @@ with tab_detailed:
     st.markdown(t("pareto_desc"))
 
     pareto_data = agg_filt.copy()
+    pareto_data["model"] = pareto_data["model"].map(lambda m: MODEL_LABELS.get(m, m))
 
     perf_metric = st.selectbox(
         t("pareto_xaxis_label"),
@@ -604,6 +606,7 @@ with tab_detailed:
         t("ranking_model_select"),
         models_avail,
         key="detailed_ranking_model",
+        format_func=lambda m: MODEL_LABELS.get(m, m),
     )
 
     rank_data = sub_filt[sub_filt["model"] == sel_model_rank].copy()
