@@ -37,19 +37,38 @@ selected_display = st.selectbox(t("select_dataset"), list(display_map.keys()))
 dataset_name = display_map[selected_display]
 dataset_info = filtered_datasets[dataset_name]
 
-@st.cache_data
-def load_data(name, uf=None):
-    if DATASETS[name].get('supports_uf', False):
-        return DATASETS[name]['loader'](uf)
-    return DATASETS[name]['loader']()
+# max_entries limita quantas combinações (base, UF, ano) ficam em cache ao mesmo tempo,
+# para a memória do Streamlit Cloud não crescer a cada ano ou UF consultados.
+@st.cache_data(max_entries=6, show_spinner=False)
+def load_data(name, uf=None, year=None):
+    info = DATASETS[name]
+    kwargs = {}
+    if info.get('supports_uf', False):
+        kwargs['uf'] = uf
+    if info.get('years'):
+        kwargs['year'] = year
+    return info['loader'](**kwargs)
+
+# Seletor de ano: ativo para bases com vários anos ('years'), só informativo nas demais.
+available_years = dataset_info.get('years')
+col_year, col_uf = st.columns([1, 3]) if dataset_info.get('supports_uf', False) else (st.container(), None)
+with col_year:
+    if available_years:
+        year_selected = st.selectbox(t("select_year"), available_years,
+                                     index=len(available_years) - 1, help=t("multi_year_help"))
+    else:
+        year_selected = None
+        st.selectbox(t("select_year"), [dataset_info.get('year') or '—'], disabled=True,
+                     help=t("single_year_help"))
 
 uf_selected = ['Todos']
-if dataset_info.get('supports_uf', False):
+if col_uf is not None:
     ufs_options = ['Todos', 'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO']
-    uf_selected = st.multiselect(t("select_state"), ufs_options, default=['Todos'])
+    with col_uf:
+        uf_selected = st.multiselect(t("select_state"), ufs_options, default=['Todos'])
 
 with st.spinner(t("loading")):
-    df = load_data(dataset_name, uf=uf_selected)
+    df = load_data(dataset_name, uf=uf_selected, year=year_selected)
 
 if len(df) == 0:
     st.warning("⚠️ Os dados não foram encontrados ou estão vazios. Caso seja o primeiro uso, certifique-se de ter executado os scripts de extração em `scripts/`.")
@@ -70,6 +89,8 @@ with st.container(border=True):
         st.markdown(f"{t('original_source')}({link})")
     
     orig_n = dataset_info.get('original_n')
+    if isinstance(orig_n, dict):  # bases com vários anos: N bruto do ano selecionado
+        orig_n = orig_n.get(year_selected)
     orig_n_str = f"{orig_n:,}".replace(',', '.') if orig_n else dataset_info.get('n_approx', '—')
     processed_n_str = f"{len(df):,}".replace(',', '.')
     
@@ -78,7 +99,7 @@ with st.container(border=True):
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(t("n_original"), orig_n_str)
     c2.metric(t("n_processed"), processed_n_str)
-    c3.metric(t("year"), dataset_info.get('year', '') or '—')
+    c3.metric(t("year"), str(year_selected) if year_selected else (dataset_info.get('year', '') or '—'))
     c4.metric(
         t("class_dist"), 
         base_metrics['Distribuição de Classes (%)'], 

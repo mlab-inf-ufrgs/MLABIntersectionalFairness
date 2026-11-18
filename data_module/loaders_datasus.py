@@ -36,17 +36,25 @@ def load_and_preprocess_sim(ufs=['Todos']):
     st.error("⚠️ Base SIM real não encontrada! Execute os scripts de coleta para baixar os dados.")
     return pd.DataFrame(columns=['sexo', 'raca_cor', 'tipo_obito', 'uf'])
 
-def load_and_preprocess_sinasc(ufs=['Todos']):
+SINASC_YEARS = [2022, 2023, 2024]
+# Só as colunas que o painel usa: o arquivo do ano tem 27, mas o parquet lê apenas estas.
+_SINASC_PANEL_COLS = ['uf', 'raca_cor_mae', 'idade_mae', 'escolaridade_mae', 'desfecho_nascimento']
+
+
+def load_and_preprocess_sinasc(ufs=['Todos'], year=2022):
     """
-    Carrega amostra real do SINASC (DATASUS).
-    Leitura direta em parquet (0.15s), evitando sobrecarga de pickle/MemoryError do cache em memória.
+    Carrega um ano do SINASC v2 (Portal de Dados Abertos do SUS), um arquivo por ano em
+    data/processed/thesis/sinasc_v2/ (gerados por scripts/build_thesis_datasets.py).
+
+    Para caber na memória do Streamlit Cloud: lê só as colunas do painel, filtra a UF na
+    própria leitura do parquet e mantém as colunas como category (≈12 MB por ano).
+    O arquivo da qualificação (data/processed/sinasc_processed.parquet) não é alterado.
     """
-    path = os.path.join(os.path.dirname(__file__), '..', 'data', 'processed', 'sinasc_processed.parquet')
+    path = os.path.join(os.path.dirname(__file__), '..', 'data', 'processed', 'thesis', 'sinasc_v2',
+                        f'sinasc_v2_{int(year)}.parquet')
     if os.path.exists(path):
-        df = pd.read_parquet(path)
-        if 'Todos' not in ufs and len(ufs) > 0:
-            df = df[df['uf'].isin(ufs)]
-        return df
+        filters = [('uf', 'in', list(ufs))] if ufs and 'Todos' not in ufs else None
+        return pd.read_parquet(path, columns=_SINASC_PANEL_COLS, filters=filters)
         
     # Fallback explícito para evitar confusão com dados reais
     st.error("⚠️ Base SINASC real não encontrada! Execute os scripts de coleta para baixar os dados.")

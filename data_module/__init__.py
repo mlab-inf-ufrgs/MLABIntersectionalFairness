@@ -3,7 +3,7 @@ from .compas import load_and_preprocess_compas
 from .dropout import load_and_preprocess_dropout
 from .intersectional_bias import load_and_preprocess_intersectional_bias
 from .loaders_folktables import load_and_preprocess_folktables_income, load_and_preprocess_folktables_coverage
-from .loaders_datasus import load_and_preprocess_sih, load_and_preprocess_sim, load_and_preprocess_sinasc, load_and_preprocess_sinan
+from .loaders_datasus import load_and_preprocess_sih, load_and_preprocess_sim, load_and_preprocess_sinasc, load_and_preprocess_sinan, SINASC_YEARS
 
 import os
 import pandas as pd
@@ -181,7 +181,7 @@ DATASETS = {
         'domain_pt': 'Saúde Pública — Internações Hospitalares',
         'domain_en': 'Public Health — Hospital Admissions',
         'link': '',
-        'year': '',
+        'year': '2023 (jan.)',  # RD{UF}2301.dbc (scripts/fetch_datasus_ftp.py)
         'n_approx': '',
         'target_label_pt': 'Desfecho da internação hospitalar',
         'target_label_en': 'Hospital admission outcome',
@@ -203,7 +203,7 @@ DATASETS = {
         'domain_pt': 'Saúde Pública — Mortalidade',
         'domain_en': 'Public Health — Mortality',
         'link': '',
-        'year': '',
+        'year': '2022',  # DO{UF}2022.dbc (scripts/fetch_datasus_ftp.py)
         'n_approx': '',
         'target_label_pt': 'Tipo de óbito',
         'target_label_en': 'Death type',
@@ -213,8 +213,10 @@ DATASETS = {
         'description_en': "Mortality Information System. Analyzes if death was preventable by SUS interventions. Shows inequities in access and early mortality focused on race/color."
     },
     'SINASC (DATASUS) 🇧🇷': {
-        'loader': lambda uf=['Todos']: load_and_preprocess_sinasc(uf),
+        'loader': lambda uf=['Todos'], year=2022: load_and_preprocess_sinasc(uf, year),
         'supports_uf': True,
+        # Base com vários anos: o seletor de ano fica ativo e o loader recebe o ano escolhido.
+        'years': SINASC_YEARS,
         'target': 'desfecho_nascimento',
         'favorable_val': 'Normal',
         'protected_attributes': ['raca_cor_mae', 'idade_mae'],
@@ -224,9 +226,10 @@ DATASETS = {
         'icon': '👶',
         'domain_pt': 'Saúde Materno-Infantil',
         'domain_en': 'Maternal and Child Health',
-        'link': 'https://datasus.saude.gov.br/acesso-a-informacao/nascidos-vivos-desde-1994-a-2022/',
+        'link': 'https://dadosabertos.saude.gov.br/dataset/sistema-de-informacao-sobre-nascidos-vivos-sinasc',
         'year': '2022',
-        'original_n': 2561922,
+        # Registros brutos por ano no arquivo nacional do portal (residentes no Brasil).
+        'original_n': {2022: 2561922, 2023: 2537576, 2024: 2389325},
         'target_label_pt': 'Desfecho do nascimento',
         'target_label_en': 'Birth outcome',
         'favorable_label_pt': 'Nascimento a termo, sem intercorrências',
@@ -247,7 +250,7 @@ DATASETS = {
         'domain_pt': 'Saúde Pública — Agravos de Notificação',
         'domain_en': 'Public Health — Notifiable Diseases',
         'link': '',
-        'year': '',
+        'year': '2022',  # DENGBR22.dbc (scripts/fetch_sinan.py)
         'n_approx': '',
         'target_label_pt': 'Evolução do caso',
         'target_label_en': 'Case evolution',

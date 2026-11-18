@@ -148,6 +148,9 @@ TEXTS = {
         "select_country": "Selecione o país/região:",
         "select_dataset": "Selecione o Dataset:",
         "select_state": "Selecione o Estado (UF):",
+        "select_year": "Ano:",
+        "single_year_help": "Esta base tem um único ano disponível.",
+        "multi_year_help": "Cada ano é carregado separadamente, com as mesmas regras de processamento.",
         "loading": "Carregando e processando dados...",
         
         "domain_label": "**Domínio:**",
@@ -387,6 +390,9 @@ TEXTS = {
         "select_country": "Select country/region:",
         "select_dataset": "Select Dataset:",
         "select_state": "Select State (UF):",
+        "select_year": "Year:",
+        "single_year_help": "This dataset has a single year available.",
+        "multi_year_help": "Each year is loaded separately, with the same processing rules.",
         "loading": "Loading and processing data...",
         
         "domain_label": "**Domain:**",
