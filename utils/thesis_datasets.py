@@ -83,6 +83,54 @@ _SINASC_BASE = {
     "domain": "Saúde materno-infantil (Brasil, 2022)",
 }
 
+# --- SIH: um experimento por capítulo da CID-10 (os que a geração da base marcou como incluídos) ---
+# Variáveis conhecidas na admissão. A idade em anos entra como ajuste de risco clínico; a faixa
+# etária é o 3º atributo protegido (só auditoria) e capitulo_cid é constante dentro do capítulo.
+SIH_FEATURES = [
+    "uf", "idade_anos", "cid_categoria", "carater_internacao", "complexidade",
+    "especialidade_leito", "fora_municipio_residencia", "mes_internacao",
+]
+SIH_YEAR = 2024
+# Capítulos grandes (até 1,4 milhão de internações) usam uma amostra estratificada por
+# desfecho x raça/cor x sexo, com semente fixa: mesma amostra em todos os modelos e sementes.
+SIH_MAX_ROWS = 200_000
+SIH_SAMPLE_SEED = 42
+
+
+def _sih_chapter(year, chapter, max_rows=SIH_MAX_ROWS):
+    def load():
+        df = pd.read_parquet(os.path.join(PROCESSED_DIR, "thesis", "sih_v2", str(year),
+                                          f"sih_v2_{year}_cap{chapter:02d}.parquet"))
+        if max_rows and len(df) > max_rows:
+            frac = max_rows / len(df)
+            df = (df.groupby(["desfecho", "raca_cor", "sexo"], observed=True, group_keys=False)
+                    .sample(frac=frac, random_state=SIH_SAMPLE_SEED)
+                    .reset_index(drop=True))
+        return df
+    return load
+
+
+def _sih_registry(year=SIH_YEAR):
+    path = os.path.join(PROCESSED_DIR, "thesis", "sih_v2", str(year), f"sih_v2_{year}_resumo.parquet")
+    if not os.path.exists(path):
+        return {}
+    resumo = pd.read_parquet(path)
+    entries = {}
+    for _, row in resumo[resumo["incluido"]].iterrows():
+        n = int(row["capitulo_n"])
+        entries[f"sih_v2_{year}_cap{n:02d}"] = {
+            "loader": _sih_chapter(year, n),
+            "target": "desfecho",
+            "favorable_val": "Alta",
+            "protected_attributes": ["raca_cor", "sexo", "faixa_etaria"],
+            "proxy_attributes": [],
+            "feature_columns": SIH_FEATURES,
+            "n_total": int(row["mantidos"]),
+            "domain": f"Internações hospitalares (Brasil, {year}) — {row['capitulo_cid']}",
+        }
+    return entries
+
+
 THESIS_DATASETS = {
     "adult": {
         "loader": _parquet("adult_processed.parquet"),
@@ -127,4 +175,5 @@ THESIS_DATASETS = {
         "proxy_attributes": [],
         "domain": "Cobertura pública de saúde (EUA, ACS 2018, Califórnia)",
     },
+    **_sih_registry(),
 }

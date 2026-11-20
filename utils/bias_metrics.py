@@ -277,7 +277,7 @@ def calculate_cddl(df, target_col, favorable_val, protected_attr, priv_group, un
         })
         
     return pd.DataFrame(results)
-def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_val=1):
+def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_val=1, min_ref_n=None):
     """
     Calculates intersectional post-training fairness metrics.
 
@@ -331,6 +331,12 @@ def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_va
         Example values: "Female & Black", "Male & White".
     favorable_val : int or str, default=1
         The value considered the favorable outcome (positive class).
+    min_ref_n : int or None, default=None
+        Minimum subgroup size to be eligible as the reference group. None keeps the
+        qualification behaviour (any subgroup). The thesis experiments use 30, the same
+        viability threshold as the sensitivity gap, so that a tiny subgroup (e.g. with no
+        negatives, hence FPR fixed at 0) cannot anchor every AAOD. If no subgroup reaches
+        the threshold, all subgroups are eligible.
 
     Returns
     -------
@@ -390,7 +396,10 @@ def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_va
     subgroup_df = pd.DataFrame(results)
 
     # Reference group: highest favorable prediction rate (determined dynamically)
-    ref_idx = subgroup_df['favorable_rate'].idxmax()
+    eligible = subgroup_df
+    if min_ref_n and (subgroup_df['n'] >= min_ref_n).any():
+        eligible = subgroup_df[subgroup_df['n'] >= min_ref_n]
+    ref_idx = eligible['favorable_rate'].idxmax()
     ref_group = subgroup_df.loc[ref_idx, 'subgroup']
     ref_favorable_rate = subgroup_df.loc[ref_idx, 'favorable_rate']
     ref_tpr = subgroup_df.loc[ref_idx, 'tpr']

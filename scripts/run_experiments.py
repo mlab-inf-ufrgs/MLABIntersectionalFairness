@@ -123,12 +123,19 @@ EXPERIMENT_CONFIG = {}
 SAMPLE_ROWS = None
 
 
+# Tamanho mínimo do grupo de referência do DI/AAOD. None = comportamento da qualificação
+# (qualquer subgrupo); a tese usa 30, o mesmo limiar de viabilidade da diferença de sensibilidade.
+REF_MIN_N = None
+
+
 def load_registry(name="dashboard"):
-    global DATASETS, EXPERIMENT_CONFIG
+    global DATASETS, EXPERIMENT_CONFIG, REF_MIN_N
     if name == "thesis":
         from utils.thesis_datasets import THESIS_DATASETS as registry
+        REF_MIN_N = 30
     else:
         from data_module import DATASETS as registry
+        REF_MIN_N = None
 
     DATASETS = registry
     EXPERIMENT_CONFIG = {}
@@ -461,6 +468,7 @@ def run_standard_fold(prep, model_name, opt_metric, fold_idx, run_ts,
         y_pred=pd.Series(y_pred),
         groups_series=groups_test,
         favorable_val=favorable_encoded,
+        min_ref_n=REF_MIN_N,
     )
     sg_df = _annotate_subgroups(sg_df, agg, prep, fold_idx, model_name, opt_metric, run_ts)
 
@@ -534,6 +542,7 @@ def run_lambda_fold(prep, lam, fold_idx, run_ts, dry_run=False, seed=DEFAULT_SEE
         y_pred=pd.Series(y_pred),
         groups_series=groups_test,
         favorable_val=favorable_encoded,
+        min_ref_n=REF_MIN_N,
     )
     sg_df["fold"] = fold_idx
     sg_df["model"] = LAMBDA_MODEL_NAME

@@ -9,6 +9,9 @@ de data/processed/ usados na qualificação:
   sinasc_v2/sinasc_v2_{ano}.parquet          SINASC de um ano, com variáveis da Declaração de Nascido Vivo
   sinasc_v2/sinasc_v2_{ano}_ausencia.csv     preenchimento de cada variável bruta, por raça/cor da mãe
   sinasc_v2/sinasc_v2_{ano}_exclusoes.csv    registros excluídos, por motivo
+  sih_v2/{ano}/sih_v2_{ano}_cap{NN}.parquet  SIH: internações do ano, um arquivo por capítulo da CID-10
+  sih_v2/{ano}/sih_v2_{ano}_resumo.parquet   SIH: AIHs, mantidas e % de óbito por capítulo (lido pelo painel)
+  sih_v2/{ano}/sih_v2_{ano}_exclusoes.csv    SIH: funil de exclusões, total e por capítulo
   intersectional_bias_train.parquet  OpenML 44202 (10.000 instâncias)
   intersectional_bias_test.parquet   OpenML 44203 (1.000 instâncias)
 
@@ -19,6 +22,8 @@ Uso
   python scripts/build_thesis_datasets.py --only sinasc     # 2022-2024 a partir dos CSVs
   python scripts/build_thesis_datasets.py --only sinasc --sinasc-years 2022 --sinasc-source dbc
                                                             # FTP do DATASUS; requer pyreaddbc e dbfread
+  python scripts/download_datasus_ftp.py --inicio 2024-01 --fim 2025-06
+  python scripts/build_thesis_datasets.py --only sih        # internações de 2024; requer pyreaddbc
 
 Cada base é conferida contra a versão da qualificação: aplicadas as mesmas regras,
 as colunas em comum devem coincidir.
@@ -407,14 +412,279 @@ def build_sinasc(years=(2022,), source='csv'):
         del out
 
 
+# ---------------------------------------------------------------------------
+# SIH — internações de um ano (AIH reduzida, FTP do DATASUS)
+# ---------------------------------------------------------------------------
+
+DATASUS_FTP_DIR = os.path.join(PROJECT_ROOT, "data", "raw", "datasus_ftp")
+
+# Capítulos da CID-10 (faixas de categorias de 3 caracteres, inclusivas).
+CID10_CAPITULOS = [
+    (1, 'A00', 'B99', 'I – Infecciosas e parasitárias (A00–B99)'),
+    (2, 'C00', 'D48', 'II – Neoplasias (C00–D48)'),
+    (3, 'D50', 'D89', 'III – Sangue e transtornos imunitários (D50–D89)'),
+    (4, 'E00', 'E90', 'IV – Endócrinas, nutricionais e metabólicas (E00–E90)'),
+    (5, 'F00', 'F99', 'V – Transtornos mentais e comportamentais (F00–F99)'),
+    (6, 'G00', 'G99', 'VI – Sistema nervoso (G00–G99)'),
+    (7, 'H00', 'H59', 'VII – Olho e anexos (H00–H59)'),
+    (8, 'H60', 'H95', 'VIII – Ouvido e apófise mastoide (H60–H95)'),
+    (9, 'I00', 'I99', 'IX – Aparelho circulatório (I00–I99)'),
+    (10, 'J00', 'J99', 'X – Aparelho respiratório (J00–J99)'),
+    (11, 'K00', 'K93', 'XI – Aparelho digestivo (K00–K93)'),
+    (12, 'L00', 'L99', 'XII – Pele e tecido subcutâneo (L00–L99)'),
+    (13, 'M00', 'M99', 'XIII – Osteomuscular e tecido conjuntivo (M00–M99)'),
+    (14, 'N00', 'N99', 'XIV – Aparelho geniturinário (N00–N99)'),
+    (15, 'O00', 'O99', 'XV – Gravidez, parto e puerpério (O00–O99)'),
+    (16, 'P00', 'P96', 'XVI – Afecções do período perinatal (P00–P96)'),
+    (17, 'Q00', 'Q99', 'XVII – Malformações congênitas e anomalias cromossômicas (Q00–Q99)'),
+    (18, 'R00', 'R99', 'XVIII – Sintomas, sinais e achados anormais (R00–R99)'),
+    (19, 'S00', 'T98', 'XIX – Lesões, envenenamentos e causas externas (S00–T98)'),
+    (20, 'V01', 'Y98', 'XX – Causas externas de morbidade e mortalidade (V01–Y98)'),
+    (21, 'Z00', 'Z99', 'XXI – Fatores que influenciam o contato com serviços de saúde (Z00–Z99)'),
+    (22, 'U00', 'U99', 'XXII – Códigos para propósitos especiais (U00–U99)'),
+]
+CID10_CAPITULO_LABEL = {n: label for n, _, _, label in CID10_CAPITULOS}
+
+# Rótulos dos códigos do SIH (layout da AIH reduzida, RD).
+SIH_SEXO = {'1': 'Masculino', '3': 'Feminino'}
+SIH_RACA = {'01': 'Branca', '02': 'Preta', '03': 'Parda', '04': 'Amarela', '05': 'Indígena'}  # 99 = sem informação
+SIH_CARATER = {'01': 'Eletiva', '02': 'Urgência', '03': 'Acidente de trabalho', '04': 'Acidente de trabalho',
+               '05': 'Acidente de trânsito', '06': 'Outras lesões e envenenamentos'}
+SIH_COMPLEX = {'02': 'Média complexidade', '03': 'Alta complexidade'}
+SIH_ESPEC = {'01': 'Cirúrgico', '02': 'Obstétrico', '03': 'Clínico', '04': 'Crônico', '05': 'Psiquiatria',
+             '06': 'Pneumologia sanitária', '07': 'Pediátrico', '08': 'Reabilitação'}  # demais: hospital-dia/outros
+SIH_FAIXA = ['Criança/adolescente (0-17)', 'Adulto (18-59)', 'Idoso (60+)']
+# Motivo de saída (COBRANCA), pelo primeiro dígito: 1 alta; 2 permanência; 3 transferência; 4 óbito;
+# 5 encerramento administrativo; 6 alta ou óbito da mãe/puérpera (obstetrícia). O óbito vem de MORTE.
+SIH_SAIDA_EXCLUIDA = {'2': 'saida_permanencia', '3': 'saida_transferencia', '5': 'saida_encerramento_administrativo'}
+# Capítulos que entram no resumo (para documentar o funil) mas não ganham arquivo nem entram no painel:
+# óbito raro demais (desfecho sem variação suficiente para a análise de viés) ou poucas internações
+# (grupos interseccionais pequenos demais). Em 2024: XV, VII e VIII pela taxa; XXII pelo tamanho.
+SIH_OBITO_MIN_PCT = 0.2
+SIH_N_MIN = 1000
+SIH_RAW_COLS = ['N_AIH', 'IDENT', 'DT_INTER', 'SEXO', 'RACA_COR', 'IDADE', 'COD_IDADE', 'DIAG_PRINC',
+                'CAR_INT', 'COMPLEX', 'ESPEC', 'MUNIC_RES', 'MUNIC_MOV', 'COBRANCA', 'MORTE']
+
+
+def _read_dbf_columns(dbf_path, cols):
+    """Lê só as colunas pedidas de um DBF (registros de largura fixa), como texto sem espaços.
+
+    Equivalente ao dbfread para campos de texto/número, mas fatiando o arquivo inteiro com numpy:
+    dezenas de vezes mais rápido para os 113 campos da AIH, dos quais usamos 15.
+    """
+    with open(dbf_path, 'rb') as f:
+        data = f.read()
+    n = int.from_bytes(data[4:8], 'little')
+    header_len = int.from_bytes(data[8:10], 'little')
+    rec_len = int.from_bytes(data[10:12], 'little')
+    fields, offset, pos = {}, 1, 32  # byte 0 de cada registro = marca de exclusão
+    while data[pos] != 0x0D:
+        name = data[pos:pos + 11].split(b'\0')[0].decode('latin-1').upper()
+        length = data[pos + 16]
+        fields[name] = (offset, length)
+        offset += length
+        pos += 32
+    rec = np.frombuffer(data, dtype=np.uint8, count=n * rec_len, offset=header_len).reshape(n, rec_len)
+    out = {}
+    for col in cols:
+        o, length = fields[col]
+        raw = np.ascontiguousarray(rec[:, o:o + length]).view(f'S{length}').ravel()
+        out[col] = pd.Series(raw).str.decode('latin-1').str.strip()
+    df = pd.DataFrame(out)
+    return df[rec[:, 0] != ord('*')].reset_index(drop=True)
+
+
+def _sih_categories():
+    return {
+        'uf': sorted(UF_IBGE.values()),
+        'sexo': ['Masculino', 'Feminino'],
+        'raca_cor': ['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena'],
+        'faixa_etaria': SIH_FAIXA,
+        'desfecho': ['Óbito', 'Alta'],
+        'capitulo_cid': [label for _, _, _, label in CID10_CAPITULOS],
+        'carater_internacao': list(dict.fromkeys(SIH_CARATER.values())) + ['Ignorado'],
+        'complexidade': list(SIH_COMPLEX.values()) + ['Ignorado'],
+        'especialidade_leito': list(SIH_ESPEC.values()) + ['Hospital-dia/outros'],
+    }
+
+
+def _sih_compact(raw, uf, comp, year):
+    """AIHs com internação no ano `year`, em tipos compactos (o ano inteiro tem ~12 milhões de linhas)."""
+    raw = raw[raw['DT_INTER'].str[:4] == str(year)]
+    d = pd.DataFrame(index=raw.index)
+    d['n_aih'] = pd.to_numeric(raw['N_AIH'], errors='coerce').astype('Int64')
+    d['competencia'] = np.int16(comp)
+    d['longa_permanencia'] = raw['IDENT'].eq('5')
+    d['mes_internacao'] = pd.to_numeric(raw['DT_INTER'].str[4:6], errors='coerce').astype('Int8')
+    d['uf'] = uf
+    d['sexo'] = raw['SEXO'].map(SIH_SEXO)
+    d['raca_cor'] = raw['RACA_COR'].map(SIH_RACA)
+    idade = pd.to_numeric(raw['IDADE'], errors='coerce')
+    cod = raw['COD_IDADE']
+    # COD_IDADE: 2 = dias, 3 = meses, 4 = anos, 5 = centenas de anos (idade = 100 + IDADE).
+    anos = np.select([cod.eq('4'), cod.eq('5'), cod.eq('3'), cod.isin(['0', '1', '2'])],
+                     [idade, 100 + idade, idade // 12, 0], default=np.nan)
+    d['idade_anos'] = pd.Series(anos, index=raw.index).astype('Int16')
+    d['cid_categoria'] = raw['DIAG_PRINC'].str[:3]
+    cap = pd.Series(pd.NA, index=raw.index, dtype='Int8')
+    for n, ini, fim, _ in CID10_CAPITULOS:
+        cap[(d['cid_categoria'] >= ini) & (d['cid_categoria'] <= fim)] = n
+    d['capitulo_n'] = cap
+    d['carater_internacao'] = raw['CAR_INT'].map(SIH_CARATER).fillna('Ignorado')
+    d['complexidade'] = raw['COMPLEX'].map(SIH_COMPLEX).fillna('Ignorado')
+    d['especialidade_leito'] = raw['ESPEC'].map(SIH_ESPEC).fillna('Hospital-dia/outros')
+    d['fora_municipio_residencia'] = raw['MUNIC_RES'].str[:6] != raw['MUNIC_MOV'].str[:6]
+    d['saida_grupo'] = raw['COBRANCA'].str[:1]
+    d['obito'] = raw['MORTE'].eq('1')
+    for col in ['uf', 'sexo', 'raca_cor', 'cid_categoria', 'carater_internacao', 'complexidade',
+                'especialidade_leito', 'saida_grupo']:
+        d[col] = d[col].astype('category')
+    return d.reset_index(drop=True)
+
+
+def build_sih(year=2024, last_comp='2025-06'):
+    """Internações com data de internação em `year`, de todas as competências até `last_comp`.
+
+    Grava em data/processed/thesis/sih_v2/{ano}/ um parquet por capítulo da CID-10
+    (sih_v2_{ano}_cap{NN}.parquet), o funil de exclusões, a cobertura por competência e um
+    resumo por capítulo (sih_v2_{ano}_resumo.parquet, lido pelo painel).
+    """
+    sdir = os.path.join(DATASUS_FTP_DIR, "sih")
+    y_end, m_end = map(int, last_comp.split('-'))
+    comps, y, m = [], year, 1
+    while (y, m) <= (y_end, m_end):
+        comps.append(f"{y % 100:02d}{m:02d}")
+        y, m = (y + 1, 1) if m == 12 else (y, m + 1)
+
+    frames, cobertura, faltando = [], [], []
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        import pyreaddbc
+        for comp in comps:
+            n_comp = 0
+            for uf in UFS:
+                path = os.path.join(sdir, f"RD{uf}{comp}.dbc")
+                if not os.path.exists(path):
+                    faltando.append(os.path.basename(path))
+                    continue
+                dbf = os.path.join(tmp_dir, f"RD{uf}{comp}.dbf")
+                pyreaddbc.dbc2dbf(path, dbf)
+                part = _sih_compact(_read_dbf_columns(dbf, SIH_RAW_COLS), uf, int(comp), year)
+                os.remove(dbf)
+                n_comp += len(part)
+                frames.append(part)
+            cobertura.append({'competencia': f"20{comp[:2]}-{comp[2:]}", 'aihs_internacao_no_ano': n_comp})
+            print(f"[SIH] competência 20{comp[:2]}-{comp[2:]}: {n_comp:,} AIHs com internação em {year}",
+                  flush=True)
+    if faltando:
+        raise FileNotFoundError(f"[SIH] {len(faltando)} arquivos ausentes (ex.: {faltando[:3]}). "
+                                "Rode scripts/download_datasus_ftp.py")
+
+    cats = _sih_categories()
+    for col in ['uf', 'sexo', 'raca_cor', 'carater_internacao', 'complexidade', 'especialidade_leito']:
+        for f in frames:
+            f[col] = pd.Categorical(f[col].astype(object), categories=cats[col])
+    all_cid = sorted(set().union(*[set(f['cid_categoria'].cat.categories) for f in frames]))
+    all_saida = sorted(set().union(*[set(f['saida_grupo'].cat.categories) for f in frames]))
+    for f in frames:
+        f['cid_categoria'] = pd.Categorical(f['cid_categoria'].astype(object), categories=all_cid)
+        f['saida_grupo'] = pd.Categorical(f['saida_grupo'].astype(object), categories=all_saida)
+    d = pd.concat(frames, ignore_index=True)
+    del frames
+
+    # ---- Funil de exclusões (sequencial) ----
+    funil = []
+
+    def step(motivo, mask):
+        nonlocal d
+        n = int(mask.sum())
+        by_cap = d.loc[mask, 'capitulo_n'].value_counts(dropna=False)
+        funil.append({'motivo': motivo, 'registros': n, **{f'cap{int(k):02d}' if pd.notna(k) else 'cap_invalido': int(v)
+                                                        for k, v in by_cap.items()}})
+        d = d[~mask].reset_index(drop=True)
+
+    total = len(d)
+    funil.append({'motivo': 'aihs_com_internacao_no_ano', 'registros': total,
+                  **{f'cap{int(k):02d}' if pd.notna(k) else 'cap_invalido': int(v)
+                     for k, v in d['capitulo_n'].value_counts(dropna=False).items()}})
+    # A mesma AIH pode ser reapresentada em outra competência: fica a mais recente.
+    d = d.sort_values('competencia', kind='stable')
+    step('aih_repetida_em_outra_competencia', d.duplicated('n_aih', keep='last').to_numpy())
+    step('aih_de_longa_permanencia (continuação)', d['longa_permanencia'].to_numpy())
+    for code, motivo in SIH_SAIDA_EXCLUIDA.items():
+        step(motivo, d['saida_grupo'].astype(object).eq(code).to_numpy())
+    step('sem_raca_cor', d['raca_cor'].isna().to_numpy())
+    step('sexo_invalido', d['sexo'].isna().to_numpy())
+    step('idade_invalida', (d['idade_anos'].isna() | (d['idade_anos'] > 120)).to_numpy())
+    step('cid_fora_dos_capitulos', d['capitulo_n'].isna().to_numpy())
+    funil.append({'motivo': 'mantidos', 'registros': len(d),
+                  **{f'cap{int(k):02d}': int(v) for k, v in d['capitulo_n'].value_counts().items()}})
+    funil = pd.DataFrame(funil).fillna(0)
+    funil.insert(2, 'pct_do_total', (100 * funil['registros'] / total).round(3))
+
+    # ---- Base final ----
+    d['faixa_etaria'] = pd.Categorical(
+        pd.cut(d['idade_anos'].astype(float), bins=[-1, 17, 59, 200], labels=SIH_FAIXA).astype(object),
+        categories=SIH_FAIXA)
+    d['desfecho'] = pd.Categorical(np.where(d['obito'], 'Óbito', 'Alta'), categories=cats['desfecho'])
+    d['capitulo_cid'] = pd.Categorical(d['capitulo_n'].map(CID10_CAPITULO_LABEL), categories=cats['capitulo_cid'])
+    d['idade_anos'] = d['idade_anos'].astype('int16')
+    d['mes_internacao'] = d['mes_internacao'].astype('int8')
+    cols = ['uf', 'sexo', 'raca_cor', 'faixa_etaria', 'idade_anos', 'desfecho', 'capitulo_cid', 'cid_categoria',
+            'carater_internacao', 'complexidade', 'especialidade_leito', 'fora_municipio_residencia',
+            'mes_internacao']
+
+    out_dir = os.path.join(OUT_DIR, "sih_v2", str(year))
+    os.makedirs(out_dir, exist_ok=True)
+    for f in os.listdir(out_dir):  # arquivos de capítulo de uma geração anterior
+        if f.startswith(f"sih_v2_{year}_cap") and f.endswith(".parquet"):
+            os.remove(os.path.join(out_dir, f))
+    resumo = []
+    for n, _, _, label in CID10_CAPITULOS:
+        part = d.loc[d['capitulo_n'] == n, cols].reset_index(drop=True)
+        brutos = int(funil.loc[funil['motivo'] == 'aihs_com_internacao_no_ano', f'cap{n:02d}'].sum()) \
+            if f'cap{n:02d}' in funil else 0
+        obito_pct = 100 * (part['desfecho'] == 'Óbito').mean() if len(part) else np.nan
+        if len(part) == 0:
+            motivo_fora = 'sem internações'
+        elif len(part) < SIH_N_MIN:
+            motivo_fora = f'menos de {SIH_N_MIN} internações'
+        elif obito_pct < SIH_OBITO_MIN_PCT:
+            motivo_fora = f'óbito abaixo de {SIH_OBITO_MIN_PCT}%'
+        else:
+            motivo_fora = ''
+        incluido = motivo_fora == ''
+        resumo.append({'capitulo_n': n, 'capitulo_cid': label, 'aihs_no_ano': brutos, 'mantidos': len(part),
+                       'obito_pct': round(obito_pct, 3), 'incluido': incluido, 'motivo_fora': motivo_fora})
+        if not incluido:
+            continue
+        part['cid_categoria'] = part['cid_categoria'].cat.remove_unused_categories()
+        part.to_parquet(os.path.join(out_dir, f"sih_v2_{year}_cap{n:02d}.parquet"), index=False, compression="zstd")
+    resumo = pd.DataFrame(resumo)
+    resumo.to_parquet(os.path.join(out_dir, f"sih_v2_{year}_resumo.parquet"), index=False)
+    funil.to_csv(os.path.join(out_dir, f"sih_v2_{year}_exclusoes.csv"), index=False, encoding="utf-8-sig")
+    pd.DataFrame(cobertura).to_csv(os.path.join(out_dir, f"sih_v2_{year}_cobertura_competencias.csv"),
+                                   index=False, encoding="utf-8-sig")
+
+    print("\n[SIH] funil:")
+    print(funil[['motivo', 'registros', 'pct_do_total']].to_string(index=False))
+    print(f"\n[SIH] {len(d):,} internações mantidas; óbito {100 * d['obito'].mean():.2f}%")
+    print(resumo.to_string(index=False))
+    sizes = sum(os.path.getsize(os.path.join(out_dir, f)) for f in os.listdir(out_dir))
+    print(f"[SIH] arquivos em {out_dir} ({sizes / 1e6:.1f} MB)")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Build the thesis versions of the datasets.")
-    parser.add_argument("--only", nargs="+", choices=["compas", "synthetic", "sinasc"],
+    parser.add_argument("--only", nargs="+", choices=["compas", "synthetic", "sinasc", "sih"],
                         default=["compas", "synthetic", "sinasc"])
     parser.add_argument("--sinasc-years", nargs="+", type=int, default=[2022, 2023, 2024],
                         help="Anos do SINASC (padrão: 2022 2023 2024, os consolidados).")
     parser.add_argument("--sinasc-source", choices=["csv", "dbc"], default="csv",
                         help="csv = Portal de Dados Abertos do SUS (padrão); dbc = FTP do DATASUS.")
+    parser.add_argument("--sih-year", type=int, default=2024,
+                        help="Ano de internação do SIH (padrão: 2024).")
+    parser.add_argument("--sih-last-comp", default="2025-06",
+                        help="Última competência lida, AAAA-MM (AIHs de internações do ano chegam depois dele).")
     args = parser.parse_args()
     os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -424,6 +694,8 @@ def main():
         build_synthetic()
     if "sinasc" in args.only:
         build_sinasc(years=args.sinasc_years, source=args.sinasc_source)
+    if "sih" in args.only:
+        build_sih(year=args.sih_year, last_comp=args.sih_last_comp)
 
 
 if __name__ == "__main__":

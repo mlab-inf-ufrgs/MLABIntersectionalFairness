@@ -48,3 +48,9 @@ venv.bak/
 
 # Microdados brutos baixados localmente (compartilhar fora do git)
 data/raw/
+
+# Brutos arquivados (não versionar)
+data/old/raw/
+
+# Saídas dos experimentos (shards e logs do PCAD); só os resultados processados vão para o painel
+runs/

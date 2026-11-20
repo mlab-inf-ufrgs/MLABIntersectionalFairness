@@ -3,7 +3,7 @@ from .compas import load_and_preprocess_compas
 from .dropout import load_and_preprocess_dropout
 from .intersectional_bias import load_and_preprocess_intersectional_bias
 from .loaders_folktables import load_and_preprocess_folktables_income, load_and_preprocess_folktables_coverage
-from .loaders_datasus import load_and_preprocess_sih, load_and_preprocess_sim, load_and_preprocess_sinasc, load_and_preprocess_sinan, SINASC_YEARS
+from .loaders_datasus import load_and_preprocess_sih, load_and_preprocess_sim, load_and_preprocess_sinasc, load_and_preprocess_sinan, SINASC_YEARS, SIH_YEARS, sih_groups
 
 import os
 import pandas as pd
@@ -169,26 +169,29 @@ DATASETS = {
         'description_en': "Training partition of the FAccT 2022 synthetic benchmark (10,000 instances). Developed to audit mental health classifiers with hidden intersectional disparities between race and sex."
     },
     'SIH (DATASUS) 🇧🇷': {
-        'loader': lambda uf=['Todos']: load_and_preprocess_sih(uf),
+        'loader': lambda uf=['Todos'], year=2024, group=1: load_and_preprocess_sih(uf, year, group),
         'supports_uf': True,
+        'years': SIH_YEARS,
+        # Seletor de grupo de diagnóstico (capítulo da CID-10): um arquivo por capítulo.
+        'groups': sih_groups,
         'target': 'desfecho',
         'favorable_val': 'Alta',
-        'protected_attributes': ['sexo', 'raca_cor'],
+        'protected_attributes': ['raca_cor', 'sexo', 'faixa_etaria'],
         'proxy_attributes': [],
         'country_pt': '🇧🇷 Brasil',
         'country_en': '🇧🇷 Brazil',
         'icon': '🏥',
         'domain_pt': 'Saúde Pública — Internações Hospitalares',
         'domain_en': 'Public Health — Hospital Admissions',
-        'link': '',
-        'year': '2023 (jan.)',  # RD{UF}2301.dbc (scripts/fetch_datasus_ftp.py)
+        'link': 'https://datasus.saude.gov.br/transferencia-de-arquivos/',
+        'year': '2024',
         'n_approx': '',
         'target_label_pt': 'Desfecho da internação hospitalar',
         'target_label_en': 'Hospital admission outcome',
         'favorable_label_pt': 'Alta hospitalar',
         'favorable_label_en': 'Hospital discharge',
-        'description_pt': "Sistema de Informações Hospitalares. Avalia o desfecho da internação (Alta vs. Óbito). Revela disparidades na qualidade da assistência segundo raça/cor e sexo.",
-        'description_en': "Hospital Information System. Evaluates admission outcome (Discharge vs. Death). Reveals disparities in care quality by race/color and sex."
+        'description_pt': "Sistema de Informações Hospitalares do SUS: internações com data de internação em 2024. Desfecho: alta ou óbito hospitalar; transferências, permanências e encerramentos administrativos ficam de fora. Os grupos de diagnóstico (capítulos da CID-10) têm riscos muito diferentes, por isso cada um é analisado separadamente. Raça/cor é registrada pelo hospital, não autodeclarada.",
+        'description_en': "SUS Hospital Information System: admissions with admission date in 2024. Outcome: hospital discharge or death; transfers, continued stays and administrative closures are excluded. Diagnosis groups (ICD-10 chapters) carry very different risks, so each is analysed separately. Race/color is recorded by the hospital, not self-reported."
     },
     'SIM (DATASUS) 🇧🇷': {
         'loader': lambda uf=['Todos']: load_and_preprocess_sim(uf),

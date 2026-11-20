@@ -1,0 +1,203 @@
+% =============================================================================
+% Pré-processamento das bases de dados da tese
+% Arquivo para \input{} no documento principal. Tradução: preprocessing.tex
+% Pacotes usados: booktabs, url (ou hyperref), babel[brazilian]
+% Manter sincronizado com scripts/build_thesis_datasets.py.
+% Última atualização: 20/11/2026 (SIH 2024)
+% =============================================================================
+
+\section{Pré-processamento}
+\label{sec:preprocessamento}
+
+Cada base foi pré-processada por um script único e reprodutível
+(\texttt{scripts/build\_thesis\_datasets.py}), que lê os arquivos originais sem
+modificá-los e grava, junto com a base final, um relatório das exclusões etapa
+por etapa. As exclusões são sequenciais: cada registro é contado apenas na
+primeira etapa em que é removido.
+
+% -----------------------------------------------------------------------------
+\subsection{Sistema de Informações Hospitalares (SIH/SUS)}
+\label{subsec:pre-sih}
+
+\paragraph{Fonte e obtenção.}
+Foram usados os arquivos de AIH reduzida (RD) do SIH/SUS, disponibilizados pelo
+DATASUS em
+\url{ftp://ftp.datasus.gov.br/dissemin/publicos/SIHSUS/200801_/Dados}. Cada
+arquivo corresponde a uma unidade da federação e a uma competência, isto é, ao
+mês em que a autorização de internação hospitalar (AIH) foi processada para
+pagamento. Foram baixados os arquivos das 27 unidades da federação para as
+competências de janeiro de 2024 a junho de 2025 (486 arquivos), em 19/11/2026,
+pelo script \texttt{scripts/download\_datasus\_ftp.py}. Para cada arquivo, um
+manifesto registra o caminho de origem, a data de extração, a data de
+modificação no servidor, o tamanho e o \textit{hash} SHA-256, o que permite
+verificar se uma reexecução usa exatamente os mesmos dados.
+
+Os arquivos, em formato DBC, foram descompactados para DBF
+(biblioteca \texttt{pyreaddbc}), e apenas 15 dos 113 campos da AIH foram lidos:
+número da AIH (\texttt{N\_AIH}), tipo de AIH (\texttt{IDENT}), data de internação
+(\texttt{DT\_INTER}), sexo (\texttt{SEXO}), raça/cor (\texttt{RACA\_COR}), idade e
+unidade da idade (\texttt{IDADE}, \texttt{COD\_IDADE}), diagnóstico principal
+(\texttt{DIAG\_PRINC}), caráter da internação (\texttt{CAR\_INT}), complexidade
+(\texttt{COMPLEX}), especialidade do leito (\texttt{ESPEC}), municípios de
+residência e do estabelecimento (\texttt{MUNIC\_RES}, \texttt{MUNIC\_MOV}), motivo
+de saída (\texttt{COBRANCA}) e indicador de óbito (\texttt{MORTE}).
+
+\paragraph{Unidade de análise e recorte temporal.}
+A unidade de análise é a internação, identificada pela AIH. Foram selecionadas
+as internações com data de internação em 2024. Como a competência indica o mês
+de processamento e não o de internação, as AIHs de internações de 2024
+continuam chegando nas competências de 2025: as competências de 2024 trouxeram
+13.335.211 dessas AIHs e as de 2025 trouxeram outras 796.655, das quais 510.221
+em janeiro e apenas 1.118 em junho. A leitura foi encerrada na competência de
+junho de 2025, quando a chegada de novas AIHs referentes a 2024 já era
+residual (menos de 0,01\% do total). Nenhuma internação de 2025 faz parte da
+base: as competências de 2025 foram usadas apenas para completar o ano de 2024.
+
+\paragraph{Critérios de exclusão.}
+A Tabela~\ref{tab:sih-funil} resume as exclusões, aplicadas nesta ordem:
+\begin{enumerate}
+  \item \textbf{AIH reapresentada.} Uma mesma AIH pode ser processada em mais de
+    uma competência (por exemplo, após rejeição e reapresentação). Manteve-se
+    apenas o registro da competência mais recente de cada \texttt{N\_AIH}.
+  \item \textbf{AIH de continuação de longa permanência} (\texttt{IDENT} = 5).
+    Essas AIHs dão continuidade a uma internação já registrada em uma AIH
+    principal e a contariam mais de uma vez.
+  \item \textbf{Saída sem desfecho definido}, pelo primeiro dígito do motivo de
+    saída (\texttt{COBRANCA}): permanência (2), em que o paciente continua
+    internado; transferência para outro estabelecimento (3), em que o desfecho
+    ocorre em outra internação; e encerramento administrativo (5).
+  \item \textbf{Dados demográficos ou diagnóstico inválidos}: raça/cor sem
+    informação (código 99), sexo diferente de masculino ou feminino, idade
+    ausente ou acima de 120 anos e diagnóstico principal fora dos capítulos da
+    CID-10. Apenas 131 internações de 2024 (0,001\%) foram excluídas nesta
+    etapa, todas por idade acima de 120 anos. Os
+    registros sem raça/cor observados nos arquivos são todos de AIHs de longa
+    permanência de internações iniciadas antes de 2024.
+\end{enumerate}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Exclusões aplicadas às AIHs com data de internação em 2024 (SIH/SUS).}
+  \label{tab:sih-funil}
+  \begin{tabular}{lrr}
+    \toprule
+    Etapa & Internações & \% do total \\
+    \midrule
+    AIHs com internação em 2024 & 14.131.866 & 100,00 \\
+    AIH reapresentada em outra competência & $-$96.095 & 0,68 \\
+    AIH de continuação de longa permanência & $-$49.822 & 0,35 \\
+    Saída por permanência & $-$736.740 & 5,21 \\
+    Saída por transferência & $-$630.287 & 4,46 \\
+    Saída por encerramento administrativo & $-$155.443 & 1,10 \\
+    Idade acima de 120 anos & $-$131 & 0,00 \\
+    Raça/cor, sexo ou CID inválidos & 0 & 0,00 \\
+    \midrule
+    Internações mantidas & 12.463.348 & 88,19 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Desfecho.}
+O desfecho é binário: \emph{óbito} quando o indicador \texttt{MORTE} é igual a 1,
+o que abrange as saídas por óbito (motivo 4) e os óbitos obstétricos (motivo 6),
+e \emph{alta} nos demais casos, que, após as exclusões, correspondem às saídas
+por alta (motivo 1) e às altas obstétricas (motivo 6). A taxa de óbito na base é
+de 4,98\%.
+Por ser derivado do registro de saída, o desfecho refere-se ao óbito durante a
+internação, não ao óbito após a alta.
+
+\paragraph{Atributos protegidos.}
+Foram usados como atributos protegidos a raça/cor (Branca, Preta, Parda,
+Amarela e Indígena), o sexo (Masculino e Feminino) e a faixa etária (0--17,
+18--59 e 60 anos ou mais). A idade em anos foi obtida a partir de
+\texttt{COD\_IDADE}: idades registradas em dias foram convertidas para
+0 ano, em meses para o número de anos completos, em anos foram mantidas e o
+código 5 (centenas de anos) corresponde a $100 + \texttt{IDADE}$. No SIH, a
+raça/cor é registrada pelo estabelecimento de saúde e não necessariamente
+autodeclarada pelo paciente, o que deve ser considerado na interpretação das
+métricas de equidade.
+
+\paragraph{Demais variáveis.}
+Além dos atributos protegidos e do desfecho, a base guarda variáveis
+conhecidas no momento da admissão: idade em anos, unidade da federação do
+estabelecimento, categoria da CID-10 do diagnóstico principal (três
+caracteres), caráter da internação (eletiva, urgência, acidente de trabalho,
+acidente de trânsito ou outras lesões), complexidade (média ou alta),
+especialidade do leito (cirúrgico, obstétrico, clínico, crônico, psiquiatria,
+pneumologia sanitária, pediátrico, reabilitação ou hospital-dia/outros),
+internação fora do município de residência (quando os códigos IBGE de seis
+dígitos de \texttt{MUNIC\_RES} e \texttt{MUNIC\_MOV} diferem) e mês de
+internação. Variáveis registradas durante ou após a internação, como uso de
+UTI, dias de permanência, procedimentos realizados e valores pagos, foram
+deliberadamente excluídas para evitar vazamento de informação sobre o
+desfecho. O diagnóstico principal, embora usado como variável de entrada, é
+consolidado no fechamento da AIH, o que constitui uma limitação.
+
+\paragraph{Organização por capítulo da CID-10.}
+Como o risco de óbito e o perfil dos pacientes variam muito entre grupos de
+diagnóstico, as internações foram separadas pelos 22 capítulos da CID-10,
+definidos pelas faixas oficiais de categorias de três caracteres, e cada
+capítulo é analisado separadamente (Tabela~\ref{tab:sih-capitulos}). Foram
+excluídos da análise os capítulos com taxa de óbito inferior a 0,2\%, cujo
+desfecho não tem variação suficiente para a análise de viés, sobretudo nos
+grupos interseccionais menores: XV (gravidez, parto e puerpério, 0,04\%), VII
+(olho e anexos, 0,02\%) e VIII (ouvido e apófise mastoide, 0,20\%\footnote{Taxa
+de 0,197\%, arredondada na tabela.}). Também foram excluídos os capítulos com
+menos de 1.000 internações, que não permitem estimar métricas por grupo
+interseccional: XXII (códigos para propósitos especiais, 415 internações). O
+capítulo XX (causas externas, V01--Y98) não tem internações, pois seus códigos
+não são aceitos como diagnóstico principal no SIH. Restam 17 capítulos. Os
+números dos capítulos excluídos continuam registrados no relatório de
+exclusões e no resumo da base.
+
+\begin{table}[htbp]
+  \centering
+  \caption{Internações de 2024 por capítulo da CID-10 do diagnóstico principal (SIH/SUS).}
+  \label{tab:sih-capitulos}
+  \small
+  \begin{tabular}{llrrr}
+    \toprule
+    Cap. & Descrição (categorias) & AIHs em 2024 & Mantidas & Óbito (\%) \\
+    \midrule
+    I     & Infecciosas e parasitárias (A00--B99)               &   965.970 &   842.452 & 14,95 \\
+    II    & Neoplasias (C00--D48)                               & 1.104.508 & 1.002.953 &  8,02 \\
+    III   & Sangue e transtornos imunitários (D50--D89)         &   138.202 &   120.828 &  5,51 \\
+    IV    & Endócrinas, nutricionais e metabólicas (E00--E90)   &   257.186 &   215.324 &  5,95 \\
+    V     & Transtornos mentais e comportamentais (F00--F99)    &   339.518 &   183.324 &  0,67 \\
+    VI    & Sistema nervoso (G00--G99)                          &   254.320 &   208.990 &  4,64 \\
+    VII$^{a}$ & Olho e anexos (H00--H59)                        &   198.289 &   194.476 &  0,02 \\
+    VIII$^{a}$ & Ouvido e apófise mastoide (H60--H95)                &    30.450 &    28.954 &  0,20 \\
+    IX    & Aparelho circulatório (I00--I99)                    & 1.332.909 & 1.081.637 &  9,93 \\
+    X     & Aparelho respiratório (J00--J99)                    & 1.364.669 & 1.220.759 &  9,91 \\
+    XI    & Aparelho digestivo (K00--K93)                       & 1.500.519 & 1.397.963 &  3,12 \\
+    XII   & Pele e tecido subcutâneo (L00--L99)                 &   353.879 &   308.074 &  1,84 \\
+    XIII  & Osteomuscular e tecido conjuntivo (M00--M99)        &   294.914 &   271.914 &  0,61 \\
+    XIV   & Aparelho geniturinário (N00--N99)                   & 1.073.173 &   990.313 &  3,47 \\
+    XV$^{a}$ & Gravidez, parto e puerpério (O00--O99)           & 2.106.315 & 1.999.809 &  0,04 \\
+    XVI   & Afecções do período perinatal (P00--P96)            &   353.570 &   320.668 &  2,93 \\
+    XVII  & Malformações congênitas (Q00--Q99)                  &    97.479 &    85.709 &  2,54 \\
+    XVIII & Sintomas, sinais e achados anormais (R00--R99)      &   283.376 &   235.614 &  9,79 \\
+    XIX   & Lesões e envenenamentos (S00--T98)                  & 1.582.739 & 1.291.275 &  2,56 \\
+    XX$^{b}$ & Causas externas (V01--Y98)                       &         0 &         0 &   --- \\
+    XXI   & Contato com serviços de saúde (Z00--Z99)            &   499.406 &   461.897 &  0,39 \\
+    XXII$^{c}$ & Códigos para propósitos especiais (U00--U99)   &       475 &       415 &  7,23 \\
+    \midrule
+          & Total                                               & 14.131.866 & 12.463.348 & 4,98 \\
+          & Total dos 17 capítulos analisados                   & 11.796.337 & 10.239.694 & 6,05 \\
+    \bottomrule
+    \multicolumn{5}{l}{\footnotesize $^{a}$ Excluído da análise: taxa de óbito inferior a 0,2\%.} \\
+    \multicolumn{5}{l}{\footnotesize $^{b}$ Sem internações: códigos não aceitos como diagnóstico principal no SIH.} \\
+    \multicolumn{5}{l}{\footnotesize $^{c}$ Excluído da análise: menos de 1.000 internações.} \\
+  \end{tabular}
+\end{table}
+
+\paragraph{Arquivos gerados.}
+Para cada capítulo analisado é gravado um arquivo Parquet
+(\texttt{data/processed/thesis/sih\_v2/2024/sih\_v2\_2024\_capNN.parquet}), com as
+variáveis categóricas codificadas como categorias; o conjunto ocupa cerca de
+29~MB. Acompanham a base o relatório de exclusões por capítulo
+(\texttt{sih\_v2\_2024\_exclusoes.csv}), a contagem de AIHs de 2024 por
+competência (\texttt{sih\_v2\_2024\_cobertura\_competencias.csv}) e um resumo por
+capítulo (\texttt{sih\_v2\_2024\_resumo.parquet}). A base pode ser regenerada com
+\texttt{python scripts/download\_datasus\_ftp.py --inicio 2024-01 --fim 2025-06}
+seguido de \texttt{python scripts/build\_thesis\_datasets.py --only sih}.

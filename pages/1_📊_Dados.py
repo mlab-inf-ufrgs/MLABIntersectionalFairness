@@ -40,25 +40,27 @@ dataset_info = filtered_datasets[dataset_name]
 # max_entries limita quantas combinações (base, UF, ano) ficam em cache ao mesmo tempo,
 # para a memória do Streamlit Cloud não crescer a cada ano ou UF consultados.
 @st.cache_data(max_entries=6, show_spinner=False)
-def load_data(name, uf=None, year=None):
+def load_data(name, uf=None, year=None, group=None):
     info = DATASETS[name]
     kwargs = {}
     if info.get('supports_uf', False):
         kwargs['uf'] = uf
     if info.get('years'):
         kwargs['year'] = year
+    if info.get('groups'):
+        kwargs['group'] = group
     return info['loader'](**kwargs)
 
-# Seletor de ano: ativo para bases com vários anos ('years'), só informativo nas demais.
-available_years = dataset_info.get('years')
+# Seletor de ano: ativo para bases com mais de um ano ('years'), só informativo nas demais.
+available_years = dataset_info.get('years') or []
 col_year, col_uf = st.columns([1, 3]) if dataset_info.get('supports_uf', False) else (st.container(), None)
 with col_year:
-    if available_years:
+    if len(available_years) > 1:
         year_selected = st.selectbox(t("select_year"), available_years,
                                      index=len(available_years) - 1, help=t("multi_year_help"))
     else:
-        year_selected = None
-        st.selectbox(t("select_year"), [dataset_info.get('year') or '—'], disabled=True,
+        year_selected = available_years[0] if available_years else None
+        st.selectbox(t("select_year"), [str(year_selected or dataset_info.get('year') or '—')], disabled=True,
                      help=t("single_year_help"))
 
 uf_selected = ['Todos']
@@ -67,8 +69,21 @@ if col_uf is not None:
     with col_uf:
         uf_selected = st.multiselect(t("select_state"), ufs_options, default=['Todos'])
 
+# Seletor de grupo (SIH: capítulo da CID-10). Um grupo por vez, para não carregar o ano inteiro.
+group_selected, group_info = None, None
+if dataset_info.get('groups'):
+    groups = dataset_info['groups'](year_selected)
+    if groups.empty:
+        st.warning("⚠️ Os dados não foram encontrados ou estão vazios. Caso seja o primeiro uso, certifique-se de ter executado os scripts de extração em `scripts/`.")
+        st.stop()
+    group_labels = {int(r.capitulo_n): f"{r.capitulo_cid} · {int(r.mantidos):,}".replace(',', '.')
+                    for r in groups.itertuples()}
+    group_selected = st.selectbox(t("select_cid_group"), list(group_labels), format_func=group_labels.get,
+                                  help=t("cid_group_help"))
+    group_info = groups.set_index('capitulo_n').loc[group_selected]
+
 with st.spinner(t("loading")):
-    df = load_data(dataset_name, uf=uf_selected, year=year_selected)
+    df = load_data(dataset_name, uf=uf_selected, year=year_selected, group=group_selected)
 
 if len(df) == 0:
     st.warning("⚠️ Os dados não foram encontrados ou estão vazios. Caso seja o primeiro uso, certifique-se de ter executado os scripts de extração em `scripts/`.")
@@ -91,6 +106,8 @@ with st.container(border=True):
     orig_n = dataset_info.get('original_n')
     if isinstance(orig_n, dict):  # bases com vários anos: N bruto do ano selecionado
         orig_n = orig_n.get(year_selected)
+    if group_info is not None:  # bases com grupos: AIHs do grupo no ano, antes das exclusões
+        orig_n = int(group_info['aihs_no_ano'])
     orig_n_str = f"{orig_n:,}".replace(',', '.') if orig_n else dataset_info.get('n_approx', '—')
     processed_n_str = f"{len(df):,}".replace(',', '.')
     

@@ -1,0 +1,203 @@
+% =============================================================================
+% Preprocessing of the thesis datasets
+% File to be \input{} in the main document. Portuguese version: preprocessamento.tex
+% Packages used: booktabs, url (or hyperref)
+% Keep in sync with scripts/build_thesis_datasets.py.
+% Last updated: 2026-11-20 (SIH 2024)
+% =============================================================================
+
+\section{Preprocessing}
+\label{sec:preprocessing}
+
+Each dataset was preprocessed by a single, reproducible script
+(\texttt{scripts/build\_thesis\_datasets.py}), which reads the original files
+without modifying them and writes, alongside the final dataset, a step-by-step
+exclusion report. Exclusions are sequential: each record is counted only at the
+first step in which it is removed.
+
+% -----------------------------------------------------------------------------
+\subsection{Hospital Information System (SIH/SUS)}
+\label{subsec:pre-sih}
+
+\paragraph{Source and retrieval.}
+We used the reduced hospital admission authorization files (RD) of the
+Brazilian Unified Health System's Hospital Information System (SIH/SUS),
+published by DATASUS at
+\url{ftp://ftp.datasus.gov.br/dissemin/publicos/SIHSUS/200801_/Dados}. Each file
+covers one federative unit and one \emph{competência}, that is, the month in
+which the hospital admission authorization (AIH) was processed for payment. We
+downloaded the files for all 27 federative units for the processing months
+from January 2024 to June 2025 (486 files) on 19 November 2026, using
+\texttt{scripts/download\_datasus\_ftp.py}. For each file, a manifest records the
+source path, extraction date, last-modified date on the server, size and
+SHA-256 hash, which makes it possible to verify that a rerun uses exactly the
+same data.
+
+The files, in DBC format, were decompressed to DBF (\texttt{pyreaddbc}
+library), and only 15 of the 113 AIH fields were read: AIH number
+(\texttt{N\_AIH}), AIH type (\texttt{IDENT}), admission date (\texttt{DT\_INTER}),
+sex (\texttt{SEXO}), race/skin colour (\texttt{RACA\_COR}), age and age unit
+(\texttt{IDADE}, \texttt{COD\_IDADE}), principal diagnosis (\texttt{DIAG\_PRINC}),
+admission type (\texttt{CAR\_INT}), complexity (\texttt{COMPLEX}), bed specialty
+(\texttt{ESPEC}), municipalities of residence and of the hospital
+(\texttt{MUNIC\_RES}, \texttt{MUNIC\_MOV}), discharge reason (\texttt{COBRANCA})
+and death indicator (\texttt{MORTE}).
+
+\paragraph{Unit of analysis and time frame.}
+The unit of analysis is the hospital admission, identified by its AIH. We
+selected admissions with an admission date in 2024. Because the processing
+month is not the admission month, AIHs for 2024 admissions keep arriving in the
+2025 processing months: the 2024 processing months contained 13,335,211 of
+these AIHs and the 2025 months another 796,655, of which 510,221 arrived in
+January and only 1,118 in June. Reading stopped at the June 2025 processing
+month, when new AIHs for 2024 admissions had become negligible (less than
+0.01\% of the total). No 2025 admission is part of the dataset: the 2025
+processing months were used only to complete the year 2024.
+
+\paragraph{Exclusion criteria.}
+Table~\ref{tab:sih-funnel} summarises the exclusions, applied in this order:
+\begin{enumerate}
+  \item \textbf{Resubmitted AIH.} The same AIH may be processed in more than one
+    month (for example, after rejection and resubmission). Only the record from
+    the most recent processing month of each \texttt{N\_AIH} was kept.
+  \item \textbf{Long-stay continuation AIH} (\texttt{IDENT} = 5). These AIHs
+    continue an admission already recorded in a main AIH and would count it
+    more than once.
+  \item \textbf{Discharge without a defined outcome}, by the first digit of the
+    discharge reason (\texttt{COBRANCA}): continued stay (2), in which the
+    patient remains in hospital; transfer to another facility (3), in which the
+    outcome occurs in another admission; and administrative closure (5).
+  \item \textbf{Invalid demographic or diagnosis data}: missing race/skin colour
+    (code 99), sex other than male or female, missing age or age above 120
+    years, and principal diagnosis outside the ICD-10 chapters. Only 131 2024
+    admissions (0.001\%) were excluded at this step, all for age above
+    120 years. The records without race/skin
+    colour found in the files all belong to long-stay AIHs of admissions that
+    started before 2024.
+\end{enumerate}
+
+\begin{table}[htbp]
+  \centering
+  \caption{Exclusions applied to AIHs with an admission date in 2024 (SIH/SUS).}
+  \label{tab:sih-funnel}
+  \begin{tabular}{lrr}
+    \toprule
+    Step & Admissions & \% of total \\
+    \midrule
+    AIHs with admission in 2024 & 14,131,866 & 100.00 \\
+    AIH resubmitted in another processing month & $-$96,095 & 0.68 \\
+    Long-stay continuation AIH & $-$49,822 & 0.35 \\
+    Discharge by continued stay & $-$736,740 & 5.21 \\
+    Discharge by transfer & $-$630,287 & 4.46 \\
+    Discharge by administrative closure & $-$155,443 & 1.10 \\
+    Age above 120 years & $-$131 & 0.00 \\
+    Invalid race/skin colour, sex or ICD & 0 & 0.00 \\
+    \midrule
+    Admissions kept & 12,463,348 & 88.19 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\paragraph{Outcome.}
+The outcome is binary: \emph{death} when the \texttt{MORTE} indicator equals 1,
+which covers discharges by death (reason 4) and obstetric deaths (reason 6),
+and \emph{discharge} otherwise, which, after the exclusions, corresponds to
+regular discharges (reason 1) and obstetric discharges (reason 6). The death
+rate in the dataset is 4.98\%. Because it is derived from the discharge record,
+the outcome refers to in-hospital death, not to death after discharge.
+
+\paragraph{Protected attributes.}
+The protected attributes are race/skin colour (White, Black, Brown, Asian and
+Indigenous, following the IBGE categories \emph{Branca}, \emph{Preta},
+\emph{Parda}, \emph{Amarela} and \emph{Indígena}), sex (male and female) and age
+group (0--17, 18--59 and 60 years or older). Age in years was derived from
+\texttt{COD\_IDADE}: ages recorded in days were set to 0 years, ages in months
+were converted to completed years, ages in years were kept, and code 5
+(hundreds of years) corresponds to $100 + \texttt{IDADE}$. In the SIH, race/skin
+colour is recorded by the health facility and is not necessarily
+self-reported by the patient, which must be taken into account when
+interpreting the fairness metrics.
+
+\paragraph{Other variables.}
+Besides the protected attributes and the outcome, the dataset keeps variables
+known at admission: age in years, federative unit of the hospital, ICD-10
+category of the principal diagnosis (three characters), admission type
+(elective, emergency, work accident, traffic accident or other injuries),
+complexity (medium or high), bed specialty (surgical, obstetric, clinical,
+chronic, psychiatric, sanitary pneumology, paediatric, rehabilitation or
+day-hospital/other), admission outside the municipality of residence (when the
+six-digit IBGE codes of \texttt{MUNIC\_RES} and \texttt{MUNIC\_MOV} differ) and
+admission month. Variables recorded during or after the stay, such as ICU use,
+length of stay, procedures performed and amounts paid, were deliberately
+excluded to avoid leaking information about the outcome. The principal
+diagnosis, although used as an input variable, is finalised when the AIH is
+closed, which is a limitation.
+
+\paragraph{Organisation by ICD-10 chapter.}
+Because the risk of death and the patient profile vary widely across diagnosis
+groups, admissions were split by the 22 ICD-10 chapters, defined by the
+official ranges of three-character categories, and each chapter is analysed
+separately (Table~\ref{tab:sih-chapters}). Chapters with a death rate below
+0.2\% were excluded from the analysis, since their outcome does not vary enough
+for the bias analysis, especially in the smaller intersectional groups: XV
+(pregnancy, childbirth and the puerperium, 0.04\%), VII (eye and adnexa,
+0.02\%) and VIII (ear and mastoid process, 0.20\%\footnote{A rate of 0.197\%,
+rounded in the table.}). Chapters with fewer than 1,000 admissions, which do
+not allow metrics to be estimated per intersectional group, were also
+excluded: XXII (codes for special purposes, 415 admissions). Chapter XX
+(external causes, V01--Y98) has no admissions, because its codes are not
+accepted as a principal diagnosis in the SIH. Seventeen chapters remain. The
+figures for the excluded chapters remain recorded in the exclusion report and
+in the dataset summary.
+
+\begin{table}[htbp]
+  \centering
+  \caption{2024 admissions by ICD-10 chapter of the principal diagnosis (SIH/SUS).}
+  \label{tab:sih-chapters}
+  \small
+  \begin{tabular}{llrrr}
+    \toprule
+    Ch. & Description (categories) & AIHs in 2024 & Kept & Death (\%) \\
+    \midrule
+    I     & Infectious and parasitic (A00--B99)                 &   965,970 &   842,452 & 14.95 \\
+    II    & Neoplasms (C00--D48)                                & 1,104,508 & 1,002,953 &  8.02 \\
+    III   & Blood and immune disorders (D50--D89)               &   138,202 &   120,828 &  5.51 \\
+    IV    & Endocrine, nutritional and metabolic (E00--E90)     &   257,186 &   215,324 &  5.95 \\
+    V     & Mental and behavioural disorders (F00--F99)         &   339,518 &   183,324 &  0.67 \\
+    VI    & Nervous system (G00--G99)                           &   254,320 &   208,990 &  4.64 \\
+    VII$^{a}$ & Eye and adnexa (H00--H59)                       &   198,289 &   194,476 &  0.02 \\
+    VIII$^{a}$ & Ear and mastoid process (H60--H95)                  &    30,450 &    28,954 &  0.20 \\
+    IX    & Circulatory system (I00--I99)                       & 1,332,909 & 1,081,637 &  9.93 \\
+    X     & Respiratory system (J00--J99)                       & 1,364,669 & 1,220,759 &  9.91 \\
+    XI    & Digestive system (K00--K93)                         & 1,500,519 & 1,397,963 &  3.12 \\
+    XII   & Skin and subcutaneous tissue (L00--L99)             &   353,879 &   308,074 &  1.84 \\
+    XIII  & Musculoskeletal and connective tissue (M00--M99)    &   294,914 &   271,914 &  0.61 \\
+    XIV   & Genitourinary system (N00--N99)                     & 1,073,173 &   990,313 &  3.47 \\
+    XV$^{a}$ & Pregnancy, childbirth and puerperium (O00--O99)  & 2,106,315 & 1,999,809 &  0.04 \\
+    XVI   & Perinatal conditions (P00--P96)                     &   353,570 &   320,668 &  2.93 \\
+    XVII  & Congenital malformations (Q00--Q99)                 &    97,479 &    85,709 &  2.54 \\
+    XVIII & Symptoms, signs and abnormal findings (R00--R99)    &   283,376 &   235,614 &  9.79 \\
+    XIX   & Injury and poisoning (S00--T98)                     & 1,582,739 & 1,291,275 &  2.56 \\
+    XX$^{b}$ & External causes (V01--Y98)                       &         0 &         0 &   --- \\
+    XXI   & Contact with health services (Z00--Z99)             &   499,406 &   461,897 &  0.39 \\
+    XXII$^{c}$ & Codes for special purposes (U00--U99)          &       475 &       415 &  7.23 \\
+    \midrule
+          & Total                                               & 14,131,866 & 12,463,348 & 4.98 \\
+          & Total of the 17 analysed chapters                   & 11,796,337 & 10,239,694 & 6.05 \\
+    \bottomrule
+    \multicolumn{5}{l}{\footnotesize $^{a}$ Excluded from the analysis: death rate below 0.2\%.} \\
+    \multicolumn{5}{l}{\footnotesize $^{b}$ No admissions: codes not accepted as principal diagnosis in the SIH.} \\
+    \multicolumn{5}{l}{\footnotesize $^{c}$ Excluded from the analysis: fewer than 1,000 admissions.} \\
+  \end{tabular}
+\end{table}
+
+\paragraph{Output files.}
+For each analysed chapter, a Parquet file is written
+(\texttt{data/processed/thesis/sih\_v2/2024/sih\_v2\_2024\_capNN.parquet}), with
+categorical variables stored as categories; together they take about 29~MB.
+The dataset comes with the per-chapter exclusion report
+(\texttt{sih\_v2\_2024\_exclusoes.csv}), the count of 2024 AIHs per processing
+month (\texttt{sih\_v2\_2024\_cobertura\_competencias.csv}) and a per-chapter
+summary (\texttt{sih\_v2\_2024\_resumo.parquet}). The dataset can be regenerated
+with \texttt{python scripts/download\_datasus\_ftp.py --inicio 2024-01 --fim 2025-06}
+followed by \texttt{python scripts/build\_thesis\_datasets.py --only sih}.
