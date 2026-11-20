@@ -19,21 +19,24 @@
 #   python scripts/run_experiments.py --registry thesis --print-units --datasets $SIH \
 #       --seeds 42 43 44 45 46 > pcad/units_sih.txt
 #   mkdir -p runs/sih2024/logs        # o Slurm não cria a pasta dos logs
-#   sbatch --array=1-10 pcad/sih_array.slurm     # N jobs, abaixo do limite de jobs por usuário
+#   sbatch --array=1-15 pcad/sih_array.slurm     # 15 = limite de jobs na fila da QOS medium
 #
 # Acompanhar / juntar:
 #   ls runs/sih2024/shards/*.metrics.parquet | wc -l      # meta: 3825
 #   python scripts/collect_results.py --shard-dir runs/sih2024/shards --out-dir runs/sih2024/results
 #
 # Tempo medido (4 núcleos, maior capítulo): RandomForest 8 min, XGBoost 3,5 min, FairMLP 1 min
-# por unidade; ~270 h de unidade no total. Com 10 jobs x 4 unidades em paralelo: ~7 h.
+# por unidade; ~270 h de unidade no total. Com 8 jobs rodando x 4 unidades em paralelo: ~9 h.
 
 #SBATCH --job-name=sih2024
 #SBATCH --partition=hype,tupi,shared
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=1-00:00:00
+# QOS do PCAD (sacctmgr show qos): o limite é de jobs, não de núcleos.
+#   medium = 15 na fila, 8 rodando, 12 h  ->  --array=1-15: ~255 unidades e ~4,5 h por job
+#SBATCH --qos=medium
+#SBATCH --time=12:00:00
 #SBATCH --output=runs/sih2024/logs/%A_%a.out
 #SBATCH --error=runs/sih2024/logs/%A_%a.err
 
