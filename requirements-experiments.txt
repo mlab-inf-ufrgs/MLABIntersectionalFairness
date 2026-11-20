@@ -1,0 +1,9 @@
+# Ambiente dos experimentos da tese (PCAD). O requirements.txt continua sendo o do painel
+# no Streamlit Cloud, que não treina modelos e não precisa destes pacotes.
+# Versões testadas localmente em 20/11/2026.
+numpy==2.4.6
+pandas==3.0.3
+pyarrow==24.0.0
+scikit-learn==1.9.0
+xgboost==3.2.0
+torch==2.13.0

@@ -1,40 +1,52 @@
 #!/bin/bash
-# Experimentos do SIH 2024 no PCAD: um job do array = uma unidade de trabalho
-# (capítulo x modelo x configuração x dobra x semente). Unidades já concluídas são puladas,
-# então o array pode ser reenviado sem refazer nada.
+# Etapa 1 dos experimentos do SIH 2024 no PCAD: modelos de referência.
+#   RandomForest e XGBoost (5 métricas de otimização cada) e FairMLP com λ fixo,
+#   17 capítulos x 3 dobras x 5 sementes = 3.825 unidades.
+# Um job do array = uma unidade (capítulo x modelo x configuração x dobra x semente).
+# Unidades já concluídas são puladas, então o array pode ser reenviado sem refazer nada.
 #
-# Uso (na raiz do repositório, no PCAD):
-#   python scripts/run_experiments.py --registry thesis --print-units \
-#       --datasets $(python -c "from utils.thesis_datasets import THESIS_DATASETS as T; print(' '.join(k for k in T if k.startswith('sih_v2_2024')))") \
-#       --seeds 42 > pcad/units_sih.txt
+# Preparação (uma vez, na raiz do repositório, no PCAD):
+#   python -m venv ~/venvs/tese && source ~/venvs/tese/bin/activate
+#   pip install -r requirements-experiments.txt
+#   # copiar data/processed/thesis/sih_v2/2024/ para o PCAD (os parquets estão no git)
+#
+# Envio:
+#   SIH=$(python -c "from utils.thesis_datasets import THESIS_DATASETS as T; print(' '.join(k for k in T if k.startswith('sih_v2_2024')))")
+#   python scripts/run_experiments.py --registry thesis --print-units --datasets $SIH \
+#       --seeds 42 43 44 45 46 > pcad/units_sih.txt
 #   mkdir -p runs/sih2024/logs        # o Slurm não cria a pasta dos logs
 #   N=$(wc -l < pcad/units_sih.txt)
-#   sbatch --array=1-${N}%20 pcad/sih_array.slurm
-#   # ao final:
+#   sbatch --array=1-${N}%40 pcad/sih_array.slurm
+#
+# Ao final (ou a qualquer momento, para ver o parcial):
 #   python scripts/collect_results.py --shard-dir runs/sih2024/shards --out-dir runs/sih2024/results
 #
-# RASCUNHO: conferir com a documentação do PCAD o limite de tempo de cada partição,
-# o tamanho máximo de array e como ativar o ambiente Python (módulo ou conda).
+# CONFERIR com a documentação do PCAD: limite de tempo das partições, tamanho máximo de
+# array (se N passar do limite, dividir em --array=1-1000, 1001-2000, ...) e se o venv
+# acima funciona ou se é preciso carregar um módulo de Python antes.
 
 #SBATCH --job-name=sih2024
-#SBATCH --partition=hype,tupi
+#SBATCH --partition=hype,tupi,shared
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
-#SBATCH --time=12:00:00
+# Medido localmente (4 núcleos, maior capítulo, 200 mil linhas): RandomForest 8 min,
+# XGBoost 3,5 min, FairMLP 1 min por unidade. 2 h dá folga para nós mais lentos e
+# um limite curto ajuda o Slurm a encaixar os jobs nas brechas da fila.
+#SBATCH --time=02:00:00
 #SBATCH --output=runs/sih2024/logs/%A_%a.out
 #SBATCH --error=runs/sih2024/logs/%A_%a.err
 
 set -euo pipefail
 cd "${SLURM_SUBMIT_DIR}"
-
-# Ambiente Python (ajustar ao PCAD)
-# source ~/miniconda3/etc/profile.d/conda.sh && conda activate prop_tese
+source ~/venvs/tese/bin/activate
 
 UNIT_ARGS=$(sed -n "${SLURM_ARRAY_TASK_ID}p" pcad/units_sih.txt)
-echo "[unit ${SLURM_ARRAY_TASK_ID}] ${UNIT_ARGS} @ $(hostname)"
+echo "[unit ${SLURM_ARRAY_TASK_ID}] ${UNIT_ARGS} @ $(hostname) $(date -Is)"
 
 python scripts/run_experiments.py --registry thesis \
     --shard-dir runs/sih2024/shards \
     --n-jobs "${SLURM_CPUS_PER_TASK}" \
     ${UNIT_ARGS}
+
+echo "[unit ${SLURM_ARRAY_TASK_ID}] fim $(date -Is)"

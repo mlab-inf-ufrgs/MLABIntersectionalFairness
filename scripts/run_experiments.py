@@ -129,13 +129,15 @@ REF_MIN_N = None
 
 
 def load_registry(name="dashboard"):
-    global DATASETS, EXPERIMENT_CONFIG, REF_MIN_N
+    global DATASETS, EXPERIMENT_CONFIG, REF_MIN_N, MODELS
     if name == "thesis":
         from utils.thesis_datasets import THESIS_DATASETS as registry
         REF_MIN_N = 30
+        MODELS = _thesis_models()
     else:
         from data_module import DATASETS as registry
         REF_MIN_N = None
+        MODELS = dict(QUALIFICATION_MODELS)
 
     DATASETS = registry
     EXPERIMENT_CONFIG = {}
@@ -151,16 +153,19 @@ def load_registry(name="dashboard"):
 
 OPTIMIZATION_METRICS = ["accuracy", "recall", "precision", "roc_auc", "average_precision"]
 
-MODELS = {
-    "RandomForest": {
-        "estimator": RandomForestClassifier(random_state=42, n_jobs=1),
-        "param_dist": {
-            "clf__n_estimators": [50, 100, 200],
-            "clf__max_depth": [5, 10, None],
-            "clf__min_samples_leaf": [1, 5, 10],
-            "clf__max_features": ["sqrt", "log2"],
-        },
+_RANDOM_FOREST = {
+    "estimator": RandomForestClassifier(random_state=42, n_jobs=1),
+    "param_dist": {
+        "clf__n_estimators": [50, 100, 200],
+        "clf__max_depth": [5, 10, None],
+        "clf__min_samples_leaf": [1, 5, 10],
+        "clf__max_features": ["sqrt", "log2"],
     },
+}
+
+# Modelos da qualificação (registro "dashboard"): não alterar, para manter os resultados reprodutíveis.
+QUALIFICATION_MODELS = {
+    "RandomForest": _RANDOM_FOREST,
     "GradientBoosting": {
         "estimator": GradientBoostingClassifier(random_state=42),
         "param_dist": {
@@ -171,6 +176,30 @@ MODELS = {
         },
     },
 }
+
+
+def _thesis_models():
+    """Modelos da tese (registro "thesis"): o XGBoost substitui o GradientBoosting do scikit-learn."""
+    from xgboost import XGBClassifier  # importado só aqui: a qualificação não depende do xgboost
+    return {
+        "RandomForest": _RANDOM_FOREST,
+        "XGBoost": {
+            "estimator": XGBClassifier(tree_method="hist", n_jobs=1, random_state=42,
+                                       eval_metric="logloss", verbosity=0),
+            "param_dist": {
+                "clf__n_estimators": [100, 200, 400],
+                "clf__max_depth": [3, 5, 7],
+                "clf__learning_rate": [0.03, 0.1, 0.2],
+                "clf__subsample": [0.7, 1.0],
+                "clf__colsample_bytree": [0.7, 1.0],
+                "clf__min_child_weight": [1, 5],
+            },
+        },
+    }
+
+
+# Preenchido por load_registry() (o padrão é o conjunto da qualificação).
+MODELS = dict(QUALIFICATION_MODELS)
 
 LAMBDA_MODEL_NAME = "FairMLP"
 LAMBDAS = [0.0, 0.5, 1.0, 2.0, 4.0]
