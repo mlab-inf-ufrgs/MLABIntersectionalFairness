@@ -15,8 +15,11 @@
 #   python scripts/run_experiments.py --registry thesis --print-units --datasets $SIH \
 #       --seeds 42 43 44 45 46 > pcad/units_sih.txt
 #   mkdir -p runs/sih2024/logs        # o Slurm não cria a pasta dos logs
-#   N=$(wc -l < pcad/units_sih.txt)
-#   sbatch --array=1-${N}%40 pcad/sih_array.slurm
+#   # o índice do array vai no máximo até 1000 no PCAD: 4 blocos com deslocamento (3.825 linhas)
+#   sbatch --array=1-1000%40 --export=ALL,OFFSET=0    pcad/sih_array.slurm
+#   sbatch --array=1-1000%40 --export=ALL,OFFSET=1000 pcad/sih_array.slurm
+#   sbatch --array=1-1000%40 --export=ALL,OFFSET=2000 pcad/sih_array.slurm
+#   sbatch --array=1-825%40  --export=ALL,OFFSET=3000 pcad/sih_array.slurm
 #
 # Ao final (ou a qualquer momento, para ver o parcial):
 #   python scripts/collect_results.py --shard-dir runs/sih2024/shards --out-dir runs/sih2024/results
@@ -41,12 +44,15 @@ set -euo pipefail
 cd "${SLURM_SUBMIT_DIR}"
 source ~/venvs/tese/bin/activate
 
-UNIT_ARGS=$(sed -n "${SLURM_ARRAY_TASK_ID}p" pcad/units_sih.txt)
-echo "[unit ${SLURM_ARRAY_TASK_ID}] ${UNIT_ARGS} @ $(hostname) $(date -Is)"
+# O PCAD limita o índice do array a 1000 (MaxArraySize = 1001): blocos seguintes usam OFFSET.
+LINE=$(( SLURM_ARRAY_TASK_ID + ${OFFSET:-0} ))
+UNIT_ARGS=$(sed -n "${LINE}p" pcad/units_sih.txt)
+if [ -z "${UNIT_ARGS}" ]; then echo "[unit ${LINE}] linha vazia, nada a fazer"; exit 0; fi
+echo "[unit ${LINE}] ${UNIT_ARGS} @ $(hostname) $(date -Is)"
 
 python scripts/run_experiments.py --registry thesis \
     --shard-dir runs/sih2024/shards \
     --n-jobs "${SLURM_CPUS_PER_TASK}" \
     ${UNIT_ARGS}
 
-echo "[unit ${SLURM_ARRAY_TASK_ID}] fim $(date -Is)"
+echo "[unit ${LINE}] fim $(date -Is)"
