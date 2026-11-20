@@ -46,12 +46,23 @@ source ~/venvs/tese/bin/activate
 
 UNITS=pcad/units_sih.txt
 THREADS=4                                              # núcleos por unidade
-PARALLEL=$(( SLURM_CPUS_PER_TASK / THREADS ))          # unidades simultâneas no job
+# As partições do PCAD entregam o nó inteiro (32 núcleos no draco/bali, 40 no hype) mesmo
+# pedindo 16: usa todos os núcleos alocados, não só os pedidos.
+# A memória também limita: os nós vão de 32 GB (bali2) a 128 GB (hype). Medido no bali2 em
+# 20/11/2026: 4 unidades simultâneas usavam 7 GB no total (<2 GB cada); 4 GB por unidade dá
+# o dobro de folga. Para mudar sem editar: sbatch --export=ALL,MEM_PER_UNIT_GB=6 ...
+CPUS=${SLURM_CPUS_ON_NODE:-${SLURM_CPUS_PER_TASK}}
+MEM_PER_UNIT_GB=${MEM_PER_UNIT_GB:-4}
+MEM_GB=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1024 / 1024 ))
+BY_CPU=$(( CPUS / THREADS ))
+BY_MEM=$(( (MEM_GB - 4) / MEM_PER_UNIT_GB ))           # 4 GB de folga para o sistema
+PARALLEL=$(( BY_CPU < BY_MEM ? BY_CPU : BY_MEM ))      # unidades simultâneas no job
+[ "${PARALLEL}" -ge 1 ] || PARALLEL=1
 TOTAL=$(wc -l < "${UNITS}")
 N=${SLURM_ARRAY_TASK_COUNT:-1}
 T=$(( SLURM_ARRAY_TASK_ID - ${SLURM_ARRAY_TASK_MIN:-1} + 1 ))
 
-echo "[job ${T}/${N}] linhas ${T}, $((T + N)), ... de ${TOTAL}; ${PARALLEL} em paralelo @ $(hostname) $(date -Is)"
+echo "[job ${T}/${N}] linhas ${T}, $((T + N)), ... de ${TOTAL}; ${PARALLEL} em paralelo (${CPUS} núcleos, ${MEM_GB} GB) @ $(hostname) $(date -Is)"
 
 run_line() {
     local line=$1
