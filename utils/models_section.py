@@ -88,74 +88,114 @@ def render_models_section(key, attrs_available, uf_filtered=False):
                  if f"max_aaod_{c}_mean" in a.columns]
 
     st.header(_L("5. Modelos", "5. Models"))
-    with st.expander(_L("Resultados dos modelos treinados nesta base",
-                        "Results of the models trained on this dataset"), expanded=False):
-        st.markdown(_L(
-            "Etapa 1 da tese: Random Forest e XGBoost (5 métricas de otimização) e FairMLP com "
-            "penalização λ fixa, em validação cruzada aninhada (3 × 3) repetida com 5 sementes, "
-            "sobre a amostra de modelagem do capítulo (até 200 mil internações). Equidade medida "
-            "nos subgrupos raça/cor × sexo.",
-            "Thesis stage 1: Random Forest and XGBoost (5 optimisation metrics) and FairMLP with a "
-            "fixed penalty λ, in nested cross-validation (3 × 3) repeated with 5 seeds, on the "
-            "chapter's modelling sample (up to 200k admissions). Fairness measured on race/colour × "
-            "sex subgroups."))
-        if uf_filtered:
-            st.caption(_L("Os modelos foram treinados com o Brasil inteiro; o filtro de UF acima não se aplica aqui.",
-                          "Models were trained on the whole country; the state filter above does not apply here."))
-        st.caption(_L(
-            "Subgrupos sem óbitos numa dobra de teste têm FPR indefinida nessa dobra e ficam fora do "
-            "AAOD dela (em vez de entrar com taxa 0).",
-            "Subgroups with no deaths in a test fold have an undefined FPR there and are left out of "
-            "that fold's AAOD (instead of counting as rate 0)."))
+    st.markdown(_L(
+        "Etapa 1 da tese: Random Forest e XGBoost (5 métricas de otimização) e FairMLP com "
+        "penalização λ fixa, em validação cruzada aninhada (3 × 3) repetida com 5 sementes, "
+        "sobre a amostra de modelagem do capítulo (até 200 mil internações). Equidade medida "
+        "nos subgrupos raça/cor × sexo.",
+        "Thesis stage 1: Random Forest and XGBoost (5 optimisation metrics) and FairMLP with a "
+        "fixed penalty λ, in nested cross-validation (3 × 3) repeated with 5 seeds, on the "
+        "chapter's modelling sample (up to 200k admissions). Fairness measured on race/colour × "
+        "sex subgroups."))
+    if uf_filtered:
+        st.caption(_L("Os modelos foram treinados com o Brasil inteiro; o filtro de UF acima não se aplica aqui.",
+                      "Models were trained on the whole country; the state filter above does not apply here."))
+    st.caption(_L(
+        "Subgrupos sem óbitos numa dobra de teste têm FPR indefinida nessa dobra e ficam fora do "
+        "AAOD dela (em vez de entrar com taxa 0).",
+        "Subgroups with no deaths in a test fold have an undefined FPR there and are left out of "
+        "that fold's AAOD (instead of counting as rate 0)."))
 
-        models = [m for m in MODEL_COLORS if m in a["modelo"].unique()]
-        all_lbl = _L("Todos", "All")
+    models = [m for m in MODEL_COLORS if m in a["modelo"].unique()]
+    all_lbl = _L("Todos", "All")
 
-        # ------------------------------------------------------------ boxplots
+    # ---------------------------------------------------------------- boxplots
+    with st.expander(_L("Desempenho por métrica", "Performance by metric"), expanded=True):
         sel_box = st.selectbox(_L("Selecione o modelo", "Select the model"), [all_lbl] + models,
                                key=f"ms_box_model_{key}")
         b = a if sel_box == all_lbl else a[a["modelo"] == sel_box]
+        mods_b = [m for m in models if m in b["modelo"].unique()]
+        seeds = sorted(b["seed"].unique())
         long = b.melt(id_vars=["modelo", "otimizacao", "lam", "seed", "config"],
-                      value_vars=list(PERF), var_name="metrica", value_name="valor")
+                      value_vars=list(PERF), var_name="metrica", value_name="valor").dropna(subset=["valor"])
         long["metrica"] = long["metrica"].map(lambda k: _lbl(PERF, k))
         long["semente"] = long["seed"].astype(str)
-        order = [_lbl(PERF, k) for k in PERF]
+        # Posições horizontais calculadas aqui (eixo x numérico): métrica i ocupa [i-0.4, i+0.4],
+        # dividida numa faixa por modelo; os pontos de cada semente se espalham dentro da faixa
+        # do seu modelo. Assim caixas e pontos ficam sempre alinhados.
+        order = [_lbl(PERF, k) for k in PERF if _lbl(PERF, k) in set(long["metrica"])]
+        w = 0.8 / len(mods_b)
+        m_idx = {m: i for i, m in enumerate(order)}
+        mod_idx = {m: j for j, m in enumerate(mods_b)}
+        seed_idx = {s: k for k, s in enumerate(seeds)}
+        step = w * 0.75 / max(1, len(seeds))
+        long["centro"] = [m_idx[me] - 0.4 + w * (mod_idx[mo] + 0.5)
+                          for me, mo in zip(long["metrica"], long["modelo"])]
+        long["xpos"] = long["centro"] + [(seed_idx[s] - (len(seeds) - 1) / 2) * step for s in long["seed"]]
 
-        x = alt.X("modelo:N", title=None, sort=models, axis=alt.Axis(labelAngle=0, labelLimit=90))
-        box = alt.Chart().mark_boxplot(extent="min-max", size=26, color="#c9c8c2", opacity=0.6,
-                                       median=alt.MarkConfig(color="#52514e")).encode(
-            x=x, y=alt.Y("valor:Q", title=None, scale=alt.Scale(zero=False)))
-        tip = [alt.Tooltip("config:N", title=_L("Configuração", "Configuration")),
+        st_ = (long.groupby(["metrica", "modelo", "centro"])["valor"]
+               .quantile([0, 0.25, 0.5, 0.75, 1]).unstack().reset_index())
+        st_.columns = ["metrica", "modelo", "centro", "vmin", "q1", "med", "q3", "vmax"]
+        st_["x0"], st_["x1"] = st_["centro"] - w * 0.42, st_["centro"] + w * 0.42
+
+        lo = np.floor(long["valor"].min() * 20) / 20
+        labels = "[" + ",".join(f"'{o}'" for o in order) + "]"
+        x_scale = alt.Scale(domain=[-0.5, len(order) - 0.5], nice=False, zero=False)
+        x_axis = alt.Axis(values=list(range(len(order))), labelExpr=f"{labels}[datum.value]",
+                          title=None, grid=False, ticks=False, labelAngle=0, labelFontWeight="bold",
+                          labelLimit=150, labelOverlap=False, domain=False)
+        y_scale = alt.Scale(domain=[lo, 1.0])
+        tip_box = [alt.Tooltip("metrica:N", title=_L("Métrica", "Metric")),
+                   alt.Tooltip("modelo:N", title=_L("Modelo", "Model")),
+                   alt.Tooltip("med:Q", format=".3f", title=_L("Mediana", "Median")),
+                   alt.Tooltip("q1:Q", format=".3f", title="Q1"),
+                   alt.Tooltip("q3:Q", format=".3f", title="Q3"),
+                   alt.Tooltip("vmin:Q", format=".3f", title=_L("Mínimo", "Min")),
+                   alt.Tooltip("vmax:Q", format=".3f", title=_L("Máximo", "Max"))]
+        boxes = alt.Chart(st_)
+        whisker = boxes.mark_rule(color="#a8a7a0").encode(
+            x=alt.X("centro:Q", scale=x_scale, axis=x_axis),
+            y=alt.Y("vmin:Q", scale=y_scale, title=_L("Valor", "Value")), y2="vmax:Q")
+        body = boxes.mark_rect(color="#c9c8c2", opacity=0.45, cornerRadius=2).encode(
+            x=alt.X("x0:Q", scale=x_scale, axis=x_axis), x2="x1:Q",
+            y=alt.Y("q1:Q", scale=y_scale), y2="q3:Q", tooltip=tip_box)
+        median = boxes.mark_rule(color="#52514e", strokeWidth=2).encode(
+            x=alt.X("x0:Q", scale=x_scale, axis=x_axis), x2="x1:Q",
+            y=alt.Y("med:Q", scale=y_scale), tooltip=tip_box)
+        # Separadores discretos entre métricas
+        seps = alt.Chart(pd.DataFrame({"s": [i + 0.5 for i in range(len(order) - 1)]})).mark_rule(
+            color="#e4e3df").encode(x=alt.X("s:Q", scale=x_scale, axis=x_axis))
+
+        tip = [alt.Tooltip("metrica:N", title=_L("Métrica", "Metric")),
+               alt.Tooltip("config:N", title=_L("Configuração", "Configuration")),
                alt.Tooltip("semente:N", title=_L("Semente", "Seed")),
                alt.Tooltip("valor:Q", format=".3f", title=_L("Valor", "Value"))]
-        pts_tree = alt.Chart().mark_point(filled=True, size=55, opacity=0.85).encode(
-            x=x, xOffset=alt.XOffset("semente:N"), y="valor:Q",
-            color=alt.Color("modelo:N", scale=_color_scale(models), title=_L("Modelo", "Model")),
+        color = alt.Color("modelo:N", scale=_color_scale(models), title=_L("Modelo", "Model"))
+        pts = alt.Chart(long)
+        xp = alt.X("xpos:Q", scale=x_scale, axis=x_axis)
+        pts_tree = pts.mark_point(filled=True, size=40, opacity=0.85).encode(
+            x=xp, y=alt.Y("valor:Q", scale=y_scale), color=color,
             shape=alt.Shape("otimizacao:N", scale=_shape_scale(),
                             title=_L("Métrica de otimização", "Optimisation metric")),
             tooltip=tip,
         ).transform_filter("datum.otimizacao != 'λ'")
-        pts_mlp = alt.Chart().mark_circle(opacity=0.55, stroke="white", strokeWidth=1).encode(
-            x=x, xOffset=alt.XOffset("semente:N"), y="valor:Q",
-            color=alt.Color("modelo:N", scale=_color_scale(models), title=_L("Modelo", "Model")),
-            size=alt.Size("lam:Q", title="λ (FairMLP)",
-                          scale=alt.Scale(domain=[0, 4], range=[25, 420]),
-                              legend=alt.Legend(values=list(LAMBDA_SIZES_2D), format="~g", symbolFillColor="#1baf7a", symbolStrokeWidth=0)),
+        pts_mlp = pts.mark_circle(opacity=0.6, stroke="white", strokeWidth=0.5).encode(
+            x=xp, y=alt.Y("valor:Q", scale=y_scale), color=color,
+            size=alt.Size("lam:Q", title="λ (FairMLP)", scale=alt.Scale(domain=[0, 4], range=[12, 160]),
+                          legend=alt.Legend(values=list(LAMBDA_SIZES_2D), format="~g",
+                                            symbolFillColor="#1baf7a", symbolStrokeWidth=0)),
             tooltip=tip,
         ).transform_filter("datum.otimizacao == 'λ'")
-        width = 70 * max(1, b["modelo"].nunique())
-        facet = alt.layer(box, pts_tree, pts_mlp, data=long).properties(width=width, height=200).facet(
-            facet=alt.Facet("metrica:N", sort=order, title=None, header=alt.Header(labelFontWeight="bold")),
-            columns=4,
-        ).resolve_scale(y="independent")
-        st.altair_chart(facet, width="content")
+        chart = alt.layer(seps, whisker, body, median, pts_tree, pts_mlp).properties(height=430)
+        st.altair_chart(chart, width="stretch")
         st.caption(_L(
-            "Uma caixa por modelo em cada métrica; cada ponto é uma semente (média das 3 dobras externas). "
-            "Escalas verticais independentes entre os painéis.",
-            "One box per model in each metric; each point is a seed (mean of the 3 outer folds). "
-            "Vertical scales are independent across panels."))
+            "Todas as métricas na mesma escala. Em cada métrica, uma caixa por modelo (mínimo, quartis "
+            "e mediana); cada ponto é uma semente (média das 3 dobras externas).",
+            "All metrics on the same scale. Within each metric, one box per model (min, quartiles and "
+            "median); each point is a seed (mean of the 3 outer folds)."))
 
-        st.divider()
+    # ---------------------------------------------------------------- dispersão
+    with st.expander(_L("Desempenho × equidade", "Performance × fairness"), expanded=True):
 
         # ------------------------------------------------------------ dispersão
         c1, c2, c3, c4 = st.columns(4)
@@ -201,16 +241,40 @@ def render_models_section(key, attrs_available, uf_filtered=False):
                               legend=alt.Legend(values=list(LAMBDA_SIZES_2D), format="~g", symbolFillColor="#1baf7a", symbolStrokeWidth=0)),
                 **enc
             ).transform_filter("datum.otimizacao == 'λ'")
-            st.altair_chart((tree + mlp).properties(height=420), width="stretch")
+            pdf = cfg[["config", fx, perf]].dropna()
+            pdf = pdf.assign(pareto=_pareto(pdf, [fx], perf))
+            mx, my = pdf[fx].median(), pdf[perf].median()
+            top = pdf[perf].max() + 0.05 * (pdf[perf].max() - pdf[perf].min() or 0.01)
+            region = alt.Chart(pd.DataFrame({"x0": [0.0], "x1": [mx], "y0": [my], "y1": [top]})).mark_rect(
+                color=REGION_COLOR, opacity=0.12).encode(x="x0:Q", x2="x1:Q", y="y0:Q", y2="y1:Q")
+            region_lbl = alt.Chart(pd.DataFrame({"x": [0.0], "y": [top],
+                                                 "t": [_L("↖ região desejada", "↖ desired region")]})).mark_text(
+                align="left", baseline="top", dx=4, dy=4, color=REGION_COLOR, fontWeight="bold").encode(
+                x="x:Q", y="y:Q", text="t:N")
+            front = pdf[pdf["pareto"]].sort_values(fx)
+            front_line = alt.Chart(front).mark_line(interpolate="step-after", strokeDash=[5, 4],
+                                                    color="#52514e", strokeWidth=1.5).encode(
+                x=f"{fx}:Q", y=f"{perf}:Q")
+            front_ring = alt.Chart(front).mark_point(size=380, color="#52514e", strokeWidth=1.5,
+                                                     filled=False).encode(
+                x=f"{fx}:Q", y=f"{perf}:Q",
+                tooltip=[alt.Tooltip("config:N", title=_L("Fronteira de Pareto", "Pareto front"))])
+            st.altair_chart((region + region_lbl + front_line + tree + mlp + front_ring).properties(height=420),
+                            width="stretch")
         else:
             _scatter_3d(cfg, perf, fair, sel_attrs[:2], models)
             if len(sel_attrs) > 2:
                 st.caption(_L("O gráfico usa os dois primeiros atributos; a tabela abaixo traz todos.",
                               "The chart uses the first two attributes; the table below has all of them."))
         st.caption(_L("Cada ponto é uma configuração (média das 5 sementes). Forma = métrica de "
-                      "otimização; tamanho do círculo = λ da FairMLP.",
+                      "otimização; tamanho do círculo = λ da FairMLP. Região sombreada = melhor que a "
+                      "mediana das configurações exibidas em todos os eixos (equidade menor, desempenho "
+                      "maior). Pontos circulados = fronteira de Pareto: nenhuma outra configuração é "
+                      "melhor em todos os eixos ao mesmo tempo.",
                       "Each point is a configuration (mean of 5 seeds). Shape = optimisation metric; "
-                      "circle size = FairMLP λ."))
+                      "circle size = FairMLP λ. Shaded region = better than the median of the displayed "
+                      "configurations on every axis (lower unfairness, higher performance). Circled "
+                      "points = Pareto front: no other configuration is better on all axes at once."))
 
         # ------------------------------------------------------------ tabela
         tcols = [(perf, _lbl(PERF, perf)), (f"{fair}_mean", f"{_lbl(FAIR, fair)} — " + _L("interseccional", "intersectional"))]
@@ -226,6 +290,20 @@ def render_models_section(key, attrs_available, uf_filtered=False):
                       "attribute = groups of a single attribute, pooling the subgroups."))
 
 
+REGION_COLOR = "#0ca30c"
+
+
+def _pareto(df, minimize, maximize):
+    """Máscara das linhas não dominadas: nenhuma outra é <= em todas as colunas a minimizar,
+    >= na coluna a maximizar e estritamente melhor em ao menos uma."""
+    v = np.column_stack([df[c].to_numpy() for c in minimize] + [-df[maximize].to_numpy()])
+    keep = np.ones(len(v), bool)
+    for i in range(len(v)):
+        others = np.delete(v, i, axis=0)
+        keep[i] = not np.any(np.all(others <= v[i], axis=1) & np.any(others < v[i], axis=1))
+    return keep
+
+
 def _scatter_3d(cfg, perf, fair, attrs, models):
     import plotly.graph_objects as go
 
@@ -234,6 +312,22 @@ def _scatter_3d(cfg, perf, fair, attrs, models):
     ty = f"{_lbl(FAIR, fair)} — {_lbl(ATTR_LABELS, attrs[1])}"
     tz = _lbl(PERF, perf)
     fig = go.Figure()
+
+    # Região desejada: caixa translúcida melhor que a mediana nos três eixos.
+    pdf = cfg[["config", fx, fy, perf]].dropna()
+    if len(pdf):
+        mx, my, mz = pdf[fx].median(), pdf[fy].median(), pdf[perf].median()
+        zt = pdf[perf].max()
+        bx, by, bz = [0, mx, mx, 0, 0, mx, mx, 0], [0, 0, my, my, 0, 0, my, my], [mz] * 4 + [zt] * 4
+        fig.add_trace(go.Mesh3d(
+            x=bx, y=by, z=bz, alphahull=0, color=REGION_COLOR, opacity=0.12, hoverinfo="skip",
+            name=_L("Região desejada", "Desired region"), showlegend=True))
+        front = pdf[_pareto(pdf, [fx, fy], perf)]
+        fig.add_trace(go.Scatter3d(
+            x=front[fx], y=front[fy], z=front[perf], mode="markers",
+            name=_L("Fronteira de Pareto", "Pareto front"),
+            marker=dict(symbol="circle-open", size=16, color="#52514e", line=dict(width=2)),
+            text=front["config"], hovertemplate="%{text}<extra>Pareto</extra>"))
     for (modelo, otim), g in cfg.groupby(["modelo", "otimizacao"], sort=False):
         if otim == "λ":
             symbol, size = "circle", [LAMBDA_SIZES_3D.get(l, 8) for l in g["lam"]]
