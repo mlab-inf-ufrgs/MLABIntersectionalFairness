@@ -121,22 +121,32 @@ def render_models_section(key, attrs_available, uf_filtered=False):
         long["metrica"] = long["metrica"].map(lambda k: _lbl(PERF, k))
         long["semente"] = long["seed"].astype(str)
         # Posições horizontais calculadas aqui (eixo x numérico): métrica i ocupa [i-0.4, i+0.4],
-        # dividida numa faixa por modelo; os pontos de cada semente se espalham dentro da faixa
-        # do seu modelo. Assim caixas e pontos ficam sempre alinhados.
+        # dividida numa faixa por modelo; dentro dela, uma subfaixa por configuração (métrica de
+        # otimização ou λ), com as 5 sementes lado a lado. Assim caixas e pontos ficam alinhados
+        # e as configurações não se sobrepõem.
         order = [_lbl(PERF, k) for k in PERF if _lbl(PERF, k) in set(long["metrica"])]
-        w = 0.8 / len(mods_b)
+        w = 0.84 / len(mods_b)
         m_idx = {m: i for i, m in enumerate(order)}
         mod_idx = {m: j for j, m in enumerate(mods_b)}
         seed_idx = {s: k for k, s in enumerate(seeds)}
-        step = w * 0.75 / max(1, len(seeds))
-        long["centro"] = [m_idx[me] - 0.4 + w * (mod_idx[mo] + 0.5)
+        long["sub"] = np.where(long["otimizacao"] == "λ",
+                               "λ=" + long["lam"].map(lambda v: f"{v:g}" if pd.notna(v) else ""),
+                               long["otimizacao"])
+        sub_order = {m: (sorted(g["sub"].unique(), key=lambda s: float(s[2:])) if (g["otimizacao"] == "λ").all()
+                         else [o for o in OPT_SHAPES if o in set(g["sub"])])
+                     for m, g in long.groupby("modelo")}
+        long["centro"] = [m_idx[me] - 0.42 + w * (mod_idx[mo] + 0.5)
                           for me, mo in zip(long["metrica"], long["modelo"])]
-        long["xpos"] = long["centro"] + [(seed_idx[s] - (len(seeds) - 1) / 2) * step for s in long["seed"]]
+        n_sub = {m: max(1, len(v)) for m, v in sub_order.items()}
+        sw = {m: w * 0.9 / n for m, n in n_sub.items()}            # largura de cada subfaixa
+        long["xpos"] = [c - w * 0.45 + sw[mo] * (sub_order[mo].index(su) + 0.5)
+                        + (seed_idx[se] - (len(seeds) - 1) / 2) * sw[mo] * 0.7 / max(1, len(seeds))
+                        for c, mo, su, se in zip(long["centro"], long["modelo"], long["sub"], long["seed"])]
 
         st_ = (long.groupby(["metrica", "modelo", "centro"])["valor"]
                .quantile([0, 0.25, 0.5, 0.75, 1]).unstack().reset_index())
         st_.columns = ["metrica", "modelo", "centro", "vmin", "q1", "med", "q3", "vmax"]
-        st_["x0"], st_["x1"] = st_["centro"] - w * 0.42, st_["centro"] + w * 0.42
+        st_["x0"], st_["x1"] = st_["centro"] - w * 0.46, st_["centro"] + w * 0.46
 
         lo = np.floor(long["valor"].min() * 20) / 20
         labels = "[" + ",".join(f"'{o}'" for o in order) + "]"
@@ -156,15 +166,17 @@ def render_models_section(key, attrs_available, uf_filtered=False):
         whisker = boxes.mark_rule(color="#a8a7a0").encode(
             x=alt.X("centro:Q", scale=x_scale, axis=x_axis),
             y=alt.Y("vmin:Q", scale=y_scale, title=_L("Valor", "Value")), y2="vmax:Q")
-        body = boxes.mark_rect(color="#c9c8c2", opacity=0.45, cornerRadius=2).encode(
+        body = boxes.mark_rect(fill="#c9c8c2", fillOpacity=0.35, stroke="#8d8c86", strokeWidth=1,
+                               cornerRadius=2).encode(
             x=alt.X("x0:Q", scale=x_scale, axis=x_axis), x2="x1:Q",
             y=alt.Y("q1:Q", scale=y_scale), y2="q3:Q", tooltip=tip_box)
-        median = boxes.mark_rule(color="#52514e", strokeWidth=2).encode(
+        median = boxes.mark_rule(color="#2b2a27", strokeWidth=2.5).encode(
             x=alt.X("x0:Q", scale=x_scale, axis=x_axis), x2="x1:Q",
             y=alt.Y("med:Q", scale=y_scale), tooltip=tip_box)
-        # Separadores discretos entre métricas
-        seps = alt.Chart(pd.DataFrame({"s": [i + 0.5 for i in range(len(order) - 1)]})).mark_rule(
-            color="#e4e3df").encode(x=alt.X("s:Q", scale=x_scale, axis=x_axis))
+        # Fundo alternado por métrica, para separar os grupos sem linhas fortes
+        seps = alt.Chart(pd.DataFrame({"a": [i - 0.5 for i in range(0, len(order), 2)],
+                                       "b": [i + 0.5 for i in range(0, len(order), 2)]})).mark_rect(
+            color="#f3f2ee").encode(x=alt.X("a:Q", scale=x_scale, axis=x_axis), x2="b:Q")
 
         tip = [alt.Tooltip("metrica:N", title=_L("Métrica", "Metric")),
                alt.Tooltip("config:N", title=_L("Configuração", "Configuration")),
@@ -173,26 +185,32 @@ def render_models_section(key, attrs_available, uf_filtered=False):
         color = alt.Color("modelo:N", scale=_color_scale(models), title=_L("Modelo", "Model"))
         pts = alt.Chart(long)
         xp = alt.X("xpos:Q", scale=x_scale, axis=x_axis)
-        pts_tree = pts.mark_point(filled=True, size=40, opacity=0.85).encode(
+        pts_tree = pts.mark_point(filled=True, size=55, opacity=0.9, stroke="white", strokeWidth=0.6).encode(
             x=xp, y=alt.Y("valor:Q", scale=y_scale), color=color,
             shape=alt.Shape("otimizacao:N", scale=_shape_scale(),
                             title=_L("Métrica de otimização", "Optimisation metric")),
             tooltip=tip,
         ).transform_filter("datum.otimizacao != 'λ'")
-        pts_mlp = pts.mark_circle(opacity=0.6, stroke="white", strokeWidth=0.5).encode(
+        pts_mlp = pts.mark_circle(opacity=0.75, stroke="white", strokeWidth=0.6).encode(
             x=xp, y=alt.Y("valor:Q", scale=y_scale), color=color,
-            size=alt.Size("lam:Q", title="λ (FairMLP)", scale=alt.Scale(domain=[0, 4], range=[12, 160]),
+            size=alt.Size("lam:Q", title="λ (FairMLP)", scale=alt.Scale(domain=[0, 4], range=[18, 110]),
                           legend=alt.Legend(values=list(LAMBDA_SIZES_2D), format="~g",
                                             symbolFillColor="#1baf7a", symbolStrokeWidth=0)),
             tooltip=tip,
         ).transform_filter("datum.otimizacao == 'λ'")
-        chart = alt.layer(seps, whisker, body, median, pts_tree, pts_mlp).properties(height=430)
+        zoom = alt.selection_interval(bind="scales", encodings=["y"])
+        chart = (alt.layer(seps, whisker, body, median, pts_tree, pts_mlp)
+                 .add_params(zoom).properties(height=500))
         st.altair_chart(chart, width="stretch")
         st.caption(_L(
             "Todas as métricas na mesma escala. Em cada métrica, uma caixa por modelo (mínimo, quartis "
-            "e mediana); cada ponto é uma semente (média das 3 dobras externas).",
+            "e mediana); dentro dela, um grupo de pontos por configuração (métrica de otimização ou λ, "
+            "na ordem da legenda) e um ponto por semente. Role sobre o gráfico para ampliar o eixo "
+            "vertical e arraste para deslocá-lo; clique duas vezes para voltar.",
             "All metrics on the same scale. Within each metric, one box per model (min, quartiles and "
-            "median); each point is a seed (mean of the 3 outer folds)."))
+            "median); inside it, one group of points per configuration (optimisation metric or λ, in "
+            "legend order) and one point per seed. Scroll over the chart to zoom the vertical axis and "
+            "drag to pan; double-click to reset."))
 
     # ---------------------------------------------------------------- dispersão
     with st.expander(_L("Desempenho × equidade", "Performance × fairness"), expanded=True):
@@ -244,23 +262,34 @@ def render_models_section(key, attrs_available, uf_filtered=False):
             pdf = cfg[["config", fx, perf]].dropna()
             pdf = pdf.assign(pareto=_pareto(pdf, [fx], perf))
             mx, my = pdf[fx].median(), pdf[perf].median()
-            top = pdf[perf].max() + 0.05 * (pdf[perf].max() - pdf[perf].min() or 0.01)
+            yr = (pdf[perf].max() - pdf[perf].min()) or 0.01
+            top, ylo = pdf[perf].max() + 0.08 * yr, pdf[perf].min() - 0.05 * yr
+            xhi = (pdf[fx].max() * 1.08) or 0.01
+            W, H = 760, 440
+            # Domínios fixos (sem "nice") em TODAS as camadas: sem isso o Vega-Lite junta os
+            # domínios das camadas (e inclui o zero), e a seta não pode ser orientada em pixels.
+            XS = alt.Scale(domain=[0, xhi], nice=False, zero=False)
+            YS = alt.Scale(domain=[ylo, top], nice=False, zero=False)
+            X = lambda f: alt.X(f"{f}:Q", title=xt, scale=XS)
+            Y = lambda f: alt.Y(f"{f}:Q", title=_lbl(PERF, perf), scale=YS)
+            tree, mlp = tree.encode(x=X(fx), y=Y(perf)), mlp.encode(x=X(fx), y=Y(perf))
+            arrow = _arrow_2d(mx, my, 0.0, top, (0, xhi), (ylo, top), W, H, X, Y)
             region = alt.Chart(pd.DataFrame({"x0": [0.0], "x1": [mx], "y0": [my], "y1": [top]})).mark_rect(
-                color=REGION_COLOR, opacity=0.12).encode(x="x0:Q", x2="x1:Q", y="y0:Q", y2="y1:Q")
+                color=REGION_COLOR, opacity=0.12).encode(x=X("x0"), x2="x1:Q", y=Y("y0"), y2="y1:Q")
             region_lbl = alt.Chart(pd.DataFrame({"x": [0.0], "y": [top],
-                                                 "t": [_L("↖ região desejada", "↖ desired region")]})).mark_text(
-                align="left", baseline="top", dx=4, dy=4, color=REGION_COLOR, fontWeight="bold").encode(
-                x="x:Q", y="y:Q", text="t:N")
+                                                 "t": [_L("região desejada", "desired region")]})).mark_text(
+                align="left", baseline="top", dx=6, dy=6, color=ARROW_COLOR, fontWeight="bold").encode(
+                x=X("x"), y=Y("y"), text="t:N")
             front = pdf[pdf["pareto"]].sort_values(fx)
             front_line = alt.Chart(front).mark_line(interpolate="step-after", strokeDash=[5, 4],
                                                     color="#52514e", strokeWidth=1.5).encode(
-                x=f"{fx}:Q", y=f"{perf}:Q")
+                x=X(fx), y=Y(perf))
             front_ring = alt.Chart(front).mark_point(size=380, color="#52514e", strokeWidth=1.5,
                                                      filled=False).encode(
-                x=f"{fx}:Q", y=f"{perf}:Q",
+                x=X(fx), y=Y(perf),
                 tooltip=[alt.Tooltip("config:N", title=_L("Fronteira de Pareto", "Pareto front"))])
-            st.altair_chart((region + region_lbl + front_line + tree + mlp + front_ring).properties(height=420),
-                            width="stretch")
+            st.altair_chart((region + region_lbl + front_line + arrow + tree + mlp + front_ring)
+                            .properties(width=W, height=H), width="content")
         else:
             _scatter_3d(cfg, perf, fair, sel_attrs[:2], models)
             if len(sel_attrs) > 2:
@@ -291,6 +320,25 @@ def render_models_section(key, attrs_available, uf_filtered=False):
 
 
 REGION_COLOR = "#0ca30c"
+ARROW_COLOR = "#006300"
+
+
+def _arrow_2d(x0, y0, xi, yi, xdom, ydom, W, H, X, Y, frac=0.65):
+    """Seta do ponto mediano (x0, y0) em direção ao canto ideal (xi, yi), percorrendo `frac` do
+    caminho. O ângulo da ponta é calculado em pixels, por isso os domínios dos eixos são fixos."""
+    xe, ye = x0 + (xi - x0) * frac, y0 + (yi - y0) * frac
+    px = lambda x: (x - xdom[0]) / (xdom[1] - xdom[0]) * W
+    py = lambda y: (1 - (y - ydom[0]) / (ydom[1] - ydom[0])) * H
+    ang = float(np.degrees(np.arctan2(px(xe) - px(x0), -(py(ye) - py(y0))))) % 360
+    d = pd.DataFrame({"x0": [x0], "y0": [y0], "xe": [xe], "ye": [ye], "ang": [ang],
+                      "t": [_L("direção desejada", "desired direction")]})
+    shaft = alt.Chart(d).mark_rule(color=ARROW_COLOR, strokeWidth=3, opacity=0.8).encode(
+        x=X("x0"), y=Y("y0"), x2="xe:Q", y2="ye:Q")
+    head = alt.Chart(d).mark_point(shape="triangle-up", filled=True, size=260, color=ARROW_COLOR,
+                                   opacity=0.9, angle=ang).encode(x=X("xe"), y=Y("ye"))
+    label = alt.Chart(d).mark_text(color=ARROW_COLOR, fontWeight="bold", align="left", dx=10, dy=14).encode(
+        x=X("x0"), y=Y("y0"), text="t:N")
+    return shaft + head + label
 
 
 def _pareto(df, minimize, maximize):
@@ -328,6 +376,21 @@ def _scatter_3d(cfg, perf, fair, attrs, models):
             name=_L("Fronteira de Pareto", "Pareto front"),
             marker=dict(symbol="circle-open", size=16, color="#52514e", line=dict(width=2)),
             text=front["config"], hovertemplate="%{text}<extra>Pareto</extra>"))
+        # Seta: do ponto mediano até o canto ideal (equidade 0 nos dois atributos, desempenho
+        # máximo). O Plotly não desenha pontas de seta em 3D e o cone distorce os eixos; a linha
+        # vai afinando por pontos de tamanho decrescente até a estrela "ideal".
+        n = 12
+        t = np.linspace(0, 1, n)
+        fig.add_trace(go.Scatter3d(
+            x=mx * (1 - t), y=my * (1 - t), z=mz + (zt - mz) * t, mode="lines+markers",
+            line=dict(color=ARROW_COLOR, width=5),
+            marker=dict(size=np.linspace(2, 6, n), color=ARROW_COLOR, symbol="circle"),
+            name=_L("Direção desejada", "Desired direction"), hoverinfo="skip"))
+        fig.add_trace(go.Scatter3d(
+            x=[0], y=[0], z=[zt], mode="markers+text", text=[_L("ideal", "ideal")],
+            textposition="top center", textfont=dict(color=ARROW_COLOR, size=13),
+            marker=dict(symbol="diamond", size=9, color=ARROW_COLOR),
+            name=_L("Canto ideal", "Ideal corner"), hoverinfo="skip"))
     for (modelo, otim), g in cfg.groupby(["modelo", "otimizacao"], sort=False):
         if otim == "λ":
             symbol, size = "circle", [LAMBDA_SIZES_3D.get(l, 8) for l in g["lam"]]
