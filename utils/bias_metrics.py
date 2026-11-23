@@ -277,7 +277,8 @@ def calculate_cddl(df, target_col, favorable_val, protected_attr, priv_group, un
         })
         
     return pd.DataFrame(results)
-def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_val=1, min_ref_n=None):
+def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_val=1, min_ref_n=None,
+                                     undefined_as_nan=False):
     """
     Calculates intersectional post-training fairness metrics.
 
@@ -337,6 +338,13 @@ def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_va
         viability threshold as the sensitivity gap, so that a tiny subgroup (e.g. with no
         negatives, hence FPR fixed at 0) cannot anchor every AAOD. If no subgroup reaches
         the threshold, all subgroups are eligible.
+    undefined_as_nan : bool, default=False
+        False keeps the qualification behaviour: a TPR/FPR whose denominator is zero (subgroup
+        with no positives / no negatives in the fold) is recorded as 0. That made a subgroup with
+        no deaths in the test fold get FPR = 0 and an artificial AAOD of 0.5 against a reference
+        with FPR near 1. True (thesis experiments) records those rates as NaN; the subgroup's AAOD
+        is then NaN and left out of max_aaod and of the sensitivity gap, and the reference group
+        is chosen only among subgroups with both rates defined. Also adds n_pos / n_neg columns.
 
     Returns
     -------
@@ -371,12 +379,13 @@ def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_va
         fp = int((fav_mask_pred & ~fav_mask_true).sum())
         tn = int((~fav_mask_pred & ~fav_mask_true).sum())
 
-        tpr = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+        undef = np.nan if undefined_as_nan else 0.0
+        tpr = tp / (tp + fn) if (tp + fn) > 0 else undef
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else undef
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
         favorable_rate = fav_mask_pred.mean()
 
-        results.append({
+        row = {
             'subgroup': group,
             'n': n,
             'tpr': tpr,
@@ -386,7 +395,10 @@ def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_va
             # DI and AAOD computed after reference group is identified below
             'post_di': np.nan,
             'aaod': np.nan,
-        })
+        }
+        if undefined_as_nan:
+            row['n_pos'], row['n_neg'] = tp + fn, fp + tn
+        results.append(row)
 
     if not results:
         empty_df = pd.DataFrame(columns=['subgroup', 'n', 'tpr', 'fpr', 'precision',
@@ -397,8 +409,10 @@ def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_va
 
     # Reference group: highest favorable prediction rate (determined dynamically)
     eligible = subgroup_df
-    if min_ref_n and (subgroup_df['n'] >= min_ref_n).any():
-        eligible = subgroup_df[subgroup_df['n'] >= min_ref_n]
+    if undefined_as_nan and (subgroup_df['tpr'].notna() & subgroup_df['fpr'].notna()).any():
+        eligible = subgroup_df[subgroup_df['tpr'].notna() & subgroup_df['fpr'].notna()]
+    if min_ref_n and (eligible['n'] >= min_ref_n).any():
+        eligible = eligible[eligible['n'] >= min_ref_n]
     ref_idx = eligible['favorable_rate'].idxmax()
     ref_group = subgroup_df.loc[ref_idx, 'subgroup']
     ref_favorable_rate = subgroup_df.loc[ref_idx, 'favorable_rate']
@@ -416,6 +430,8 @@ def calculate_model_fairness_metrics(y_true, y_pred, groups_series, favorable_va
 
     # Aggregate: viable subgroups only (N >= 30) for sensitivity gap
     viable = subgroup_df[subgroup_df['n'] >= 30]
+    if undefined_as_nan:
+        viable = viable[viable['tpr'].notna()]
     sensitivity_gap = (viable['tpr'].max() - viable['tpr'].min()) if len(viable) >= 2 else np.nan
     max_aaod = subgroup_df['aaod'].max()
 

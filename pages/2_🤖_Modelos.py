@@ -31,6 +31,20 @@ st.sidebar.selectbox("Idioma / Language", ["PT", "EN"], key="lang")
 
 st.title(t("models_title"))
 
+# Fonte dos resultados: qualificação (data/results, intocado) ou experimentos da tese
+# (data/results_thesis). A visão da tese é um módulo separado e encerra a página.
+from utils.thesis_results import sih_available
+if sih_available():
+    _pt = st.session_state.lang == "PT"
+    _src_qual = "Qualificação (benchmarks)" if _pt else "Qualification (benchmarks)"
+    _src_sih = "Tese · SIH 2024 (etapa 1)" if _pt else "Thesis · SIH 2024 (stage 1)"
+    _src = st.radio("Resultados" if _pt else "Results", [_src_qual, _src_sih],
+                    horizontal=True, key="models_source")
+    if _src == _src_sih:
+        from utils.sih_models_view import render_sih_view
+        render_sih_view()
+        st.stop()
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------

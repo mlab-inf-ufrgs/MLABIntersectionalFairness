@@ -191,6 +191,21 @@ in the dataset summary.
   \end{tabular}
 \end{table}
 
+\paragraph{Modelling sample.}
+To bound the computational cost of nested cross-validation, the models for
+each chapter are trained on a sample of at most 200,000 admissions, stratified
+by outcome $\times$ race/skin colour $\times$ sex (a constant fraction in each
+stratum, seed 42); chapters with at most 200,000 retained admissions are used
+in full. Stratification preserves the chapter's death rate and the composition
+of the intersectional subgroups. The input variables are age in years, state,
+ICD-10 category, admission type, complexity, bed specialty, admission outside
+the municipality of residence and month of admission. Race/skin colour and sex
+are not input variables: they define the intersectional subgroups being
+evaluated and, in the network with a fairness penalty, feed the penalty term.
+Subgroups are not subject to a minimum-size cut; the smallest ones (mainly
+Indigenous patients, with 47 to 620 admissions per sex in the sample,
+depending on the chapter) are kept in both training and evaluation.
+
 \paragraph{Output files.}
 For each analysed chapter, a Parquet file is written
 (\texttt{data/processed/thesis/sih\_v2/2024/sih\_v2\_2024\_capNN.parquet}), with

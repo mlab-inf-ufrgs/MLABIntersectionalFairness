@@ -676,3 +676,14 @@ if len(vars_to_correlate) > 1:
         st.altair_chart(heatmap, width="stretch")
 else:
     st.info(t("insufficient_attrs"))
+
+# ---------------------------------------------------------
+# Bloco 5: Modelos (só para bases que já têm resultados processados)
+# ---------------------------------------------------------
+from utils.thesis_results import results_key
+_res_key = results_key(dataset_name, year_selected, group_selected)
+if _res_key:
+    from utils.models_section import render_models_section
+    st.divider()
+    render_models_section(_res_key, protected_attrs,
+                          uf_filtered=bool(uf_selected) and 'Todos' not in uf_selected)

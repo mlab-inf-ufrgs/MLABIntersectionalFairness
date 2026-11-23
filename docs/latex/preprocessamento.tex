@@ -191,6 +191,22 @@ exclusões e no resumo da base.
   \end{tabular}
 \end{table}
 
+\paragraph{Amostra para modelagem.}
+Para limitar o custo computacional da validação cruzada aninhada, os modelos
+de cada capítulo são treinados sobre uma amostra de até 200.000 internações,
+estratificada por desfecho $\times$ raça/cor $\times$ sexo (fração constante
+em cada estrato, semente 42); capítulos com até 200.000 internações mantidas
+entram inteiros. A estratificação preserva a taxa de óbito e a composição dos
+subgrupos interseccionais do capítulo. As variáveis de entrada são idade em
+anos, unidade da federação, categoria da CID-10, caráter da internação,
+complexidade, especialidade do leito, internação fora do município de
+residência e mês de internação. Raça/cor e sexo não entram como variáveis de
+entrada: definem os subgrupos interseccionais avaliados e, na rede com
+penalização de justiça, alimentam o termo de penalização. Os subgrupos não
+passam por corte de tamanho mínimo; os menores (sobretudo os indígenas, com
+de 47 a 620 internações por sexo na amostra, conforme o capítulo)
+são mantidos tanto no treino quanto na avaliação.
+
 \paragraph{Arquivos gerados.}
 Para cada capítulo analisado é gravado um arquivo Parquet
 (\texttt{data/processed/thesis/sih\_v2/2024/sih\_v2\_2024\_capNN.parquet}), com as
